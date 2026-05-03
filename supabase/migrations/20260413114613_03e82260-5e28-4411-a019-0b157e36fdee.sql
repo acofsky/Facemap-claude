@@ -1,0 +1,1 @@
+ALTER TABLE public.persons DROP COLUMN nickname;

@@ -1,0 +1,1 @@
+ALTER TABLE public.persons ADD COLUMN known_people_notes text DEFAULT null;
