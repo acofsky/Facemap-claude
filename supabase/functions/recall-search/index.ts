@@ -80,17 +80,28 @@ serve(async (req) => {
         pCircles.length && `Circles: ${pCircles.join(", ")}`,
       ].filter(Boolean);
 
-      // Sign photo paths so the AI gateway can fetch them
+      // Sign photo paths so the AI gateway can fetch them.
+      // Photos may be stored as raw paths OR as full Supabase storage URLs
+      // (public/sign URLs). Since the bucket is private, we always re-sign.
       const signedPhotos: string[] = [];
       for (const photo of (p.photos || []).slice(0, 2)) {
         if (typeof photo !== "string") continue;
-        if (photo.startsWith("http://") || photo.startsWith("https://")) {
+
+        let path = photo;
+        // Extract storage path from a full Supabase storage URL if needed
+        const m = photo.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/person-photos\/([^?]+)/);
+        if (m) {
+          path = decodeURIComponent(m[1]);
+        } else if (photo.startsWith("http://") || photo.startsWith("https://")) {
+          // Non-Supabase URL — pass through
           signedPhotos.push(photo);
           continue;
         }
-        const { data: signed } = await admin.storage
+
+        const { data: signed, error: signErr } = await admin.storage
           .from("person-photos")
-          .createSignedUrl(photo, 60 * 10);
+          .createSignedUrl(path, 60 * 10);
+        if (signErr) console.error("sign error for", path, signErr);
         if (signed?.signedUrl) signedPhotos.push(signed.signedUrl);
       }
 
