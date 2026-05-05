@@ -22,7 +22,7 @@ locked primary tagline. Do not invent new primary taglines.)
 ## 2. Elevator pitch (≤30 sec)
 
 FaceMap is the iPhone app that turns every handshake into a relationship.
-Snap a photo of someone you just met, jot two lines about them, and FaceMap
+Import a photo of someone you just met, jot two lines about them, and FaceMap
 remembers their face, their name, the room you were in, and what you talked
 about — forever. Before you see them next, FaceMap hands you a thirty-second
 brief on who they are. You walk up, use their name, ask about the thing they
@@ -32,7 +32,7 @@ care about, and become the person everyone remembers meeting.
 
 Every great career, friendship, and crew started with a name remembered.
 FaceMap is a private, AI-powered memory layer for the people in your life —
-the new ones, the casual ones, the ones who could matter later. Take a
+the new ones, the casual ones, the ones who could matter later. Import a
 photo, add a few details, and FaceMap stores it as a face you can search,
 recall, and review on demand. Built around how real social moments
 actually work — the cocktail hour, the first day, the rush event, the
@@ -49,8 +49,10 @@ features that aren't here. If a campaign needs a feature that's not listed,
 flag it as a roadmap question, don't ad-lib it.
 
 ### 4.1 Capture a person (the "I just met them" moment)
-- **Photo-first add.** Take a photo of the person (or upload one). Their
-  face is the anchor of the record, not their name.
+- **Photo-first add.** Import a photo of the person — from your camera roll,
+  a group shot, a screenshot, anywhere you've already got one. Their face is
+  the anchor of the record (not their name) and the input that powers
+  FaceMap's AI search later.
 - **AI auto-describe from photo.** A backend AI function
   (`describe-from-photo`) generates an initial neutral description from the
   photo so the user has scaffolding to build on, not a blank field.
@@ -161,8 +163,8 @@ socially-active people actually meet people in 2026.
 The marketing should always ladder back to this 5-beat user loop.
 
 1. **Encounter.** User meets someone in a real social setting.
-2. **Capture.** Within 60 seconds (often inside the bathroom, the Uber, the
-   walk to the next room) — photo + 2 bullets in FaceMap.
+2. **Add.** Later — at home, on the train, scrolling your camera roll —
+   import a photo and jot 2 bullets in FaceMap.
 3. **Organize.** That person lands in one or more Circles automatically.
 4. **Recall on demand.** Days, weeks, or months later — at the next
    encounter — user pulls up the Meeting Brief in 5 seconds.
@@ -355,10 +357,10 @@ videos. Reassures skeptics that the tool isn't homework.
 - **App name**: FaceMap
 - **Subtitle**: Remember everyone. Miss no one.
 - **Promotional text** (170 char): The iPhone app that makes you the
-  person who remembers. Snap a photo, jot two lines, and never blank on a
+  person who remembers. Import a photo, jot two lines, and never blank on a
   name again — at work, at school, anywhere.
 - **Description hero paragraph**: FaceMap is your private social memory.
-  Take a photo of someone you just met, add a couple of bullets, and
+  Import a photo of someone you just met, add a couple of bullets, and
   FaceMap remembers their face, their context, and your conversation —
   forever. Before you see them next, FaceMap gives you a thirty-second
   brief on who they are. Walk in, use their name, ask about the thing
@@ -392,8 +394,9 @@ running into one of these should ask the founder, not improvise:
 
 - Pricing model (free, freemium, subscription tier?). Not yet decided.
 - Beta access / waitlist mechanics.
-- Privacy/legal language for photo capture of other people (jurisdiction-
-  dependent — needs legal review before any "snap anyone" scaled ad).
+- Privacy/legal language for photos of other people (jurisdiction-
+  dependent — needs legal review before scaled ads featuring user-imported
+  photos of identifiable people).
 - Founder personal-brand strategy (will founder be a public face of the
   brand? Influences Pillar 3 heavily).
 - Launch market: campus-first, NYC-finance-first, or both in parallel?
