@@ -22,18 +22,20 @@ locked primary tagline. Do not invent new primary taglines.)
 ## 2. Elevator pitch (≤30 sec)
 
 FaceMap is the iPhone app that turns every handshake into a relationship.
-Import a photo of someone you just met, jot two lines about them, and FaceMap
-remembers their face, their name, the room you were in, and what you talked
-about — forever. Before you see them next, FaceMap hands you a thirty-second
-brief on who they are. You walk up, use their name, ask about the thing they
-care about, and become the person everyone remembers meeting.
+Add someone you just met by name, jot two lines about them, drop in a photo
+if you've got one, and FaceMap remembers everything — their name, the room
+you were in, what you talked about, the face that goes with it — forever.
+Before you see them next, FaceMap hands you a thirty-second brief on who
+they are. You walk up, use their name, ask about the thing they care about,
+and become the person everyone remembers meeting.
 
 ## 3. Long-form description (≤120 words)
 
 Every great career, friendship, and crew started with a name remembered.
 FaceMap is a private, AI-powered memory layer for the people in your life —
-the new ones, the casual ones, the ones who could matter later. Import a
-photo, add a few details, and FaceMap stores it as a face you can search,
+the new ones, the casual ones, the ones who could matter later. Add their
+name, jot a few details, drop in a photo if you have one, and FaceMap
+stores them as a record you can search,
 recall, and review on demand. Built around how real social moments
 actually work — the cocktail hour, the first day, the rush event, the
 networking dinner — FaceMap helps you walk into any room already knowing
@@ -49,10 +51,10 @@ features that aren't here. If a campaign needs a feature that's not listed,
 flag it as a roadmap question, don't ad-lib it.
 
 ### 4.1 Capture a person (the "I just met them" moment)
-- **Photo-first add.** Import a photo of the person — from your camera roll,
-  a group shot, a screenshot, anywhere you've already got one. Their face is
-  the anchor of the record (not their name) and the input that powers
-  FaceMap's AI search later.
+- **Name-first add.** Every entry's root is the name — that's all you need
+  to create a record. A photo is optional but powerful: drop one in (camera
+  roll, group shot, screenshot, anywhere) and the face becomes a mnemonic
+  for you and the input that supercharges FaceMap's AI search later.
 - **AI auto-describe from photo.** A backend AI function
   (`describe-from-photo`) generates an initial neutral description from the
   photo so the user has scaffolding to build on, not a blank field.
@@ -112,8 +114,8 @@ flag it as a roadmap question, don't ad-lib it.
 - Photos and notes belong to the user. There is no public feed, no social
   graph published to other users, no "who you met" leaderboard.
 - FaceMap is **not** a face-recognition service — it's a personal memory
-  tool. The face is the user's mnemonic anchor, not a search key against
-  strangers.
+  tool. Photos, when added, are mnemonic aids for entries the user has
+  already named, not search keys against strangers.
 
 ## 5. Tech stack (for credibility-building content)
 
@@ -163,8 +165,8 @@ socially-active people actually meet people in 2026.
 The marketing should always ladder back to this 5-beat user loop.
 
 1. **Encounter.** User meets someone in a real social setting.
-2. **Add.** Later — at home, on the train, scrolling your camera roll —
-   import a photo and jot 2 bullets in FaceMap.
+2. **Add.** Later — at home, on the train, walking back to your desk — add
+   the person by name, jot 2 bullets, and drop in a photo if you've got one.
 3. **Organize.** That person lands in one or more Circles automatically.
 4. **Recall on demand.** Days, weeks, or months later — at the next
    encounter — user pulls up the Meeting Brief in 5 seconds.
@@ -327,7 +329,8 @@ remembers. Best for testimonials, founder posts, long-form thought
 leadership. Speaks to the career-networker and operator personas.
 
 ### Pillar 4 — The Effortlessness
-Show the **mechanic**: photo, two bullets, done. The product UX itself.
+Show the **mechanic**: name, two bullets, optional photo, done. The product
+UX itself.
 Best for tutorial content, onboarding, App Store screenshots, demo
 videos. Reassures skeptics that the tool isn't homework.
 
@@ -357,14 +360,15 @@ videos. Reassures skeptics that the tool isn't homework.
 - **App name**: FaceMap
 - **Subtitle**: Remember everyone. Miss no one.
 - **Promotional text** (170 char): The iPhone app that makes you the
-  person who remembers. Import a photo, jot two lines, and never blank on a
-  name again — at work, at school, anywhere.
+  person who remembers. Add a name, jot two lines, photo optional — and
+  never blank on a name again, at work, at school, anywhere.
 - **Description hero paragraph**: FaceMap is your private social memory.
-  Import a photo of someone you just met, add a couple of bullets, and
-  FaceMap remembers their face, their context, and your conversation —
-  forever. Before you see them next, FaceMap gives you a thirty-second
-  brief on who they are. Walk in, use their name, ask about the thing
-  they care about. Be the person everyone remembers meeting.
+  Add someone you just met by name, jot a couple of bullets, drop in a photo
+  if you've got one, and FaceMap remembers them — their name, their context,
+  your conversation, and the face that goes with it — forever. Before you
+  see them next, FaceMap gives you a thirty-second brief on who they are.
+  Walk in, use their name, ask about the thing they care about. Be the
+  person everyone remembers meeting.
 
 (Other tools writing App Store variants should treat the **app name,
 subtitle, and tagline as locked**.)
