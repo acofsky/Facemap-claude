@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:tunnel": "cloudflared tunnel --url http://localhost:8080"
   },
   "dependencies": {
     "@capacitor-community/contacts": "^7.2.0",
