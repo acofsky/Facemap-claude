@@ -23,10 +23,10 @@ Three machines, the user only ever touches the iPad. Claude (you) does the editi
 
 There are **two branches** with `codemagic.yaml`:
 
-- **`claude/ios-simulator-setup-7878D`** — the dev/working branch. **All real work happens here.** Pushing to this branch should auto-trigger the `ios-internal` Codemagic workflow (~10 min build → TestFlight).
-- **`claude/pwa-to-ios-conversion-F3VuG`** — the GitHub default branch. Codemagic discovers `codemagic.yaml` here. Keep this branch in sync with the dev branch's `codemagic.yaml` whenever it changes (Codemagic re-checks the default branch for config). Otherwise no other code lives here that we modify.
+- **The dev branch — `claude/ios-simulator-setup-XXXXX`** (the suffix is a random per-session ID assigned by Claude Code on the web; **don't hardcode it in docs or YAML**). All real work happens on whichever branch the current session is assigned to. Codemagic's `branch_patterns` uses a wildcard (`claude/ios-simulator-setup-*`) so auto-triggers fire from any session's branch.
+- **`claude/pwa-to-ios-conversion-F3VuG`** — the GitHub default branch. Codemagic discovers `codemagic.yaml` here. Keep this branch in sync with the dev branch's `codemagic.yaml` and `CLAUDE.md` whenever they change. Otherwise no other code lives here that we modify.
 
-**Workflow when changing `codemagic.yaml`:** edit on the dev branch → commit + push → checkout default branch → `git checkout claude/ios-simulator-setup-7878D -- codemagic.yaml` → commit + push → checkout dev branch.
+**Workflow when changing `codemagic.yaml`:** edit on the dev branch → commit + push → checkout default branch → `git checkout <dev-branch> -- codemagic.yaml CLAUDE.md` → commit + push → checkout dev branch. Replace `<dev-branch>` with the current session's branch name (find it via `git branch --show-current`).
 
 ## Codemagic workflows
 
@@ -35,7 +35,7 @@ Two workflows live in `codemagic.yaml`:
 ### `ios-livereload` (the one you'll use 99% of the time)
 
 - **Workflow ID is `ios-livereload`. Display name is "iOS Internal (TestFlight, every push)".** Don't rename the ID — it's intentionally kept to preserve the Codemagic cache keying that holds the distribution cert + private key. Renaming the ID orphans the cache, forcing a re-mint that Apple will reject (409: cert already exists).
-- **Trigger:** auto on push to `claude/ios-simulator-setup-7878D` *if the user has the auto-build toggle on in Codemagic settings*. The user typically prefers **manual triggers** ("Start new build" in Codemagic UI) because they batch changes.
+- **Trigger:** auto on push to any branch matching `claude/ios-simulator-setup-*` *if the user has the auto-build toggle on in Codemagic settings*. The user typically prefers **manual triggers** ("Start new build" in Codemagic UI) because they batch changes.
 - **What it does:** builds the iOS IPA with vanilla config (no `server.url`, no live-reload), uploads to TestFlight internal group `LiveReload`.
 - **Build time:** ~10 min.
 - **Bundle versions:** offset by `+99000` so internal builds sort visibly above production in App Store Connect.
@@ -76,8 +76,8 @@ The actual Apple-side API key has **Admin** access — anything less can't auto-
 User asks Claude to make changes (typically in **batches** — they prefer to accumulate several edits before triggering a build).
 
 1. Make the change(s) in `src/`.
-2. `git add -A && git commit -m "..." && git push origin claude/ios-simulator-setup-7878D`. Multiple commits are fine — only one build will be triggered when the user manually clicks Start.
-3. **The user manually triggers the Codemagic build** when they're ready: Codemagic UI → Start new build → branch `claude/ios-simulator-setup-7878D` → workflow `iOS Internal (TestFlight, every push)` (ID `ios-livereload`) → Start. ~10 min.
+2. `git add -A && git commit -m "..." && git push origin $(git branch --show-current)`. Multiple commits are fine — only one build will be triggered when the user manually clicks Start.
+3. **The user manually triggers the Codemagic build** when they're ready: Codemagic UI → Start new build → branch (the session's current `claude/ios-simulator-setup-XXXXX`) → workflow `iOS Internal (TestFlight, every push)` (ID `ios-livereload`) → Start. ~10 min.
 4. TestFlight notifies the user's iPhone. They install and test.
 5. If broken: iterate. Don't squash-rebase mid-iteration unless asked.
 
@@ -169,4 +169,4 @@ npm test
 
 If the user says something vague like "make this faster" or "fix the layout," start by skimming `src/` for the relevant component. The actual app code is React. The Capacitor/iOS layer is configured once and rarely changes.
 
-If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the conversation that produced this setup is in git history (commits `17c70a9` through `2552d30` on `claude/ios-simulator-setup-7878D`).
+If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the conversation that produced this setup is in git history under earlier `claude/ios-simulator-setup-*` branches (search for commits modifying `codemagic.yaml`).
