@@ -32,6 +32,17 @@ definitions:
       script: |
         set -e
         keychain initialize
+        # An existing distribution cert (created on a different Mac) lives in
+        # App Store Connect but its private key is unreachable. Force a brand
+        # new cert + private key here so keychain add-certificates has both.
+        # Cached across builds via cache_paths below; only mints a fresh cert
+        # when the cache is empty (first build, or after a cache flush).
+        CERT_CACHE_FLAG=/Users/builder/Library/codemagic-cli-tools/cache/dist_cert_minted.flag
+        if [ ! -f "$CERT_CACHE_FLAG" ]; then
+          app-store-connect certificates create --type IOS_DISTRIBUTION --save
+          mkdir -p "$(dirname "$CERT_CACHE_FLAG")"
+          touch "$CERT_CACHE_FLAG"
+        fi
         app-store-connect fetch-signing-files com.acofsky.facemap \
           --type IOS_APP_STORE \
           --create
@@ -76,6 +87,9 @@ workflows:
         # Shift live-reload bundle versions into the 99000+ range so they sort
         # above production builds in App Store Connect and are unmistakable.
         BUILD_NUMBER_OFFSET: 99000
+    cache:
+      cache_paths:
+        - /Users/builder/Library/codemagic-cli-tools
     triggering:
       events:
         - push
@@ -110,6 +124,9 @@ workflows:
       <<: *env_versions
       vars:
         BUILD_NUMBER_OFFSET: 0
+    cache:
+      cache_paths:
+        - /Users/builder/Library/codemagic-cli-tools
     triggering:
       events:
         - tag
