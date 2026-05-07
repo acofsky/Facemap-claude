@@ -3,6 +3,7 @@ import { usePersons, useCircles } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { LogEncounterModal } from '@/components/LogEncounterModal';
+import { Mark } from '@/components/Mark';
 import { Sparkles, Loader2, Wand2, ArrowRight, Search, ChevronRight, CalendarPlus } from 'lucide-react';
 import { differenceInDays, format, isToday, isTomorrow } from 'date-fns';
 
@@ -84,9 +85,10 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
 
   return (
     <div className="px-5 pt-12 pb-8 animate-fade-in">
-      {/* Header — small wordmark left, asymmetric */}
-      <div className="flex items-center justify-between mb-8 pr-14">
-        <span className="text-sm font-medium tracking-tight text-muted-foreground">Membr</span>
+      {/* Header — compact horizontal mark, asymmetric */}
+      <div className="flex items-center gap-1.5 mb-8 pr-14 text-foreground">
+        <Mark size={18} />
+        <span className="text-[15px] font-medium tracking-tight">Membr</span>
       </div>
 
       {/* Greeting — DM Serif, off-axis, single line */}

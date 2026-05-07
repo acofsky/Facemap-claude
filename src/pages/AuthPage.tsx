@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
 import { toast } from 'sonner';
 import { Loader2, Check, X } from 'lucide-react';
+import { Mark } from '@/components/Mark';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -66,9 +67,9 @@ export function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-6 py-12">
       <div className="w-full max-w-sm space-y-8">
-        {/* Brand — asymmetric, off-axis */}
+        {/* Brand — stacked: mark above wordmark, slightly off-axis */}
         <div className="pl-1">
-          <img src="/app-icon.png" alt="" className="w-9 h-9 rounded-button mb-5" />
+          <Mark size={44} className="text-foreground mb-5" />
           <h1 className="font-display text-foreground leading-none mb-2" style={{ fontSize: '44px' }}>
             Membr
           </h1>
