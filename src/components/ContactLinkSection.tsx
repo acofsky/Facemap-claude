@@ -98,24 +98,25 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   if (iosContactId) {
     return (
-      <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
+      <div className="surface-card p-4 mb-3">
         <div className="flex items-center gap-2 mb-2">
-          <Contact2 className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">iPhone Contact</span>
+          <Contact2 className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-[12px] font-medium text-muted-foreground">iPhone Contact</span>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => openIOSContact(iosContactId)}
             disabled={!native}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-button bg-primary text-primary-foreground text-[14px] font-semibold disabled:opacity-50"
           >
-            <ExternalLink className="w-4 h-4" /> Open in Contacts
+            <ExternalLink className="w-4 h-4" strokeWidth={1.75} /> Open in Contacts
           </button>
           <button
             onClick={handleUnlink}
-            className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-muted text-muted-foreground text-sm"
+            aria-label="Unlink"
+            className="flex items-center justify-center gap-1 px-3 py-2 rounded-button bg-secondary border border-border text-muted-foreground text-[14px]"
           >
-            <Link2Off className="w-4 h-4" />
+            <Link2Off className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
         {!native && (
@@ -129,26 +130,26 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   return (
     <>
-      <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
+      <div className="surface-card p-4 mb-3">
         <div className="flex items-center gap-2 mb-2">
-          <Contact2 className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">iPhone Contact</span>
+          <Contact2 className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-[12px] font-medium text-muted-foreground">iPhone Contact</span>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleLink}
             disabled={busy || !native}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-button bg-secondary border border-border text-foreground text-[14px] font-medium hover:border-foreground/20 transition-colors disabled:opacity-50"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Contact2 className="w-4 h-4" />}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} /> : <Contact2 className="w-4 h-4" strokeWidth={1.75} />}
             Link existing
           </button>
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={busy || !native || !person.name}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-button bg-secondary border border-border text-foreground text-[14px] font-medium hover:border-foreground/20 transition-colors disabled:opacity-50"
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-4 h-4" strokeWidth={1.75} />
             Create new
           </button>
         </div>
@@ -166,7 +167,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
               <UserPlus className="w-5 h-5 text-primary" /> Create iPhone Contact
             </DialogTitle>
             <DialogDescription className="text-xs">
-              FaceMap will port what fits cleanly into Contacts — and scan your notes for
+              Membr will port what fits cleanly into Contacts — and scan your notes for
               anything iOS can use.
             </DialogDescription>
           </DialogHeader>
@@ -196,16 +197,16 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               onClick={() => setConfirmOpen(false)}
-              className="px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium"
+              className="px-4 py-2 rounded-button bg-secondary border border-border text-muted-foreground text-[14px] font-medium"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirmCreate}
               disabled={busy}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-button bg-primary text-primary-foreground text-[14px] font-semibold disabled:opacity-50"
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} /> : <UserPlus className="w-4 h-4" strokeWidth={1.75} />}
               {busy ? 'Creating...' : 'Create contact'}
             </button>
           </DialogFooter>

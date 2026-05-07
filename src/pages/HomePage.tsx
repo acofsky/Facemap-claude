@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { usePersons, useCircles, usePersonCircles } from '@/hooks/use-data';
+import { usePersons, useCircles } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { LogEncounterModal } from '@/components/LogEncounterModal';
-import { Sparkles, AlertCircle, CalendarDays, Loader2, Wand2, Users, ArrowRight, Search, ChevronRight, CalendarPlus } from 'lucide-react';
+import { Sparkles, Loader2, Wand2, ArrowRight, Search, ChevronRight, CalendarPlus } from 'lucide-react';
 import { differenceInDays, format, isToday, isTomorrow } from 'date-fns';
 
 interface HomePageProps {
@@ -13,7 +13,6 @@ interface HomePageProps {
 export function HomePage({ onSelectPerson }: HomePageProps) {
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
-  const { data: personCircles = [] } = usePersonCircles();
 
   const [briefQuery, setBriefQuery] = useState('');
   const [briefTarget, setBriefTarget] = useState<{ id: string; name: string } | null>(null);
@@ -52,22 +51,17 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
     });
   }, [people, today]);
 
-  const sparsePeople = useMemo(() => {
-    return people
-      .filter(p => !p.how_we_met && !p.important_info && p.photos.length === 0)
-      .slice(0, 8);
-  }, [people]);
-
   const totalPeople = people.length;
   const totalCircles = circles.length;
-  const upcomingCount = reminders.filter(r => r.daysAway >= 0).length;
+  const dueToday = reminders.filter(r => r.daysAway === 0).length;
   const overdueCount = reminders.filter(r => r.daysAway < 0).length;
+  const nextReminder = reminders.find(r => r.daysAway >= 0) ?? reminders[0];
 
   const formatReminderDate = (d: Date, daysAway: number) => {
     if (isToday(d)) return 'Today';
     if (isTomorrow(d)) return 'Tomorrow';
     if (daysAway < 0) return `${Math.abs(daysAway)}d late`;
-    if (daysAway <= 7) return `${daysAway}d`;
+    if (daysAway <= 7) return `in ${daysAway}d`;
     return format(d, 'MMM d');
   };
 
@@ -83,134 +77,140 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center pt-32">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={1.75} />
       </div>
     );
   }
 
   return (
     <div className="px-5 pt-12 pb-8 animate-fade-in">
-      {/* Header */}
-      <div className="mb-6 pr-14">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{greeting}</p>
-        <h1 className="text-4xl font-display text-foreground leading-tight">Facemap</h1>
+      {/* Header — small wordmark left, asymmetric */}
+      <div className="flex items-center justify-between mb-8 pr-14">
+        <span className="text-sm font-medium tracking-tight text-muted-foreground">Membr</span>
       </div>
 
+      {/* Greeting — DM Serif, off-axis, single line */}
+      <div className="mb-2">
+        <h1 className="font-display text-foreground leading-tight" style={{ fontSize: '36px' }}>
+          {greeting}.
+        </h1>
+      </div>
+
+      {/* Meta strip — demoted stats */}
+      <p className="text-[13px] text-muted-foreground mb-8">
+        {totalPeople} {totalPeople === 1 ? 'person' : 'people'}
+        <span className="mx-1.5">·</span>
+        {totalCircles} {totalCircles === 1 ? 'circle' : 'circles'}
+        {(dueToday > 0 || overdueCount > 0) && (
+          <>
+            <span className="mx-1.5">·</span>
+            <span className="text-primary">
+              {overdueCount > 0 ? `${overdueCount} late` : `${dueToday} due today`}
+            </span>
+          </>
+        )}
+      </p>
+
       {people.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="w-20 h-20 mx-auto mb-5 icon-tile icon-tile-red !w-20 !h-20 !rounded-3xl">
-            <Sparkles className="w-9 h-9" />
+        <div className="text-center py-16">
+          <div className="w-14 h-14 mx-auto mb-6 icon-tile icon-tile-red">
+            <Sparkles className="w-6 h-6" strokeWidth={1.75} />
           </div>
-          <h2 className="font-display text-xl text-foreground mb-2">Your Facemap is empty</h2>
-          <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-            Tap the + button below to add someone you've met.
+          <h2 className="font-display text-foreground mb-3" style={{ fontSize: '28px' }}>
+            Add your first person.
+          </h2>
+          <p className="text-muted-foreground text-[15px] max-w-xs mx-auto">
+            Tap the + button below. Name, two bullets, optional photo. Done.
           </p>
         </div>
       ) : (
-        <div className="space-y-5">
-          {/* Hero stat card with ambient glow */}
-          <div className="relative rounded-3xl overflow-hidden warm-shadow p-5">
-            <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-primary/30 blur-3xl pointer-events-none" />
-            <div className="relative">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Your network</p>
-              <div className="flex items-end gap-2 mb-4">
-                <span className="text-5xl font-display text-foreground leading-none">{totalPeople}</span>
-                <span className="text-sm text-muted-foreground mb-1">{totalPeople === 1 ? 'person' : 'people'}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
-                  <Users className="w-3 h-3 text-primary" />
-                  <span className="text-xs text-foreground/80">{totalCircles} circles</span>
-                </div>
-                {upcomingCount > 0 && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
-                    <AlertCircle className="w-3 h-3 text-primary" />
-                    <span className="text-xs text-foreground/80">{upcomingCount} upcoming</span>
-                  </div>
-                )}
-                {overdueCount > 0 && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/15 border border-destructive/30">
-                    <span className="text-xs text-destructive">{overdueCount} late</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick action: log encounter */}
+        <div className="space-y-6">
+          {/* HERO featured card — the one red moment */}
           <button
-            onClick={() => setLogOpen(true)}
-            className="w-full rounded-3xl p-4 text-left warm-shadow relative overflow-hidden group active:scale-[0.99] transition-transform"
+            onClick={() => {
+              if (nextReminder) {
+                setBriefTarget({ id: nextReminder.id, name: nextReminder.name });
+              } else {
+                setBriefOpen(true);
+              }
+            }}
+            className="w-full surface-featured p-5 text-left active:scale-[0.99] transition-transform group"
           >
-            <div className="absolute -bottom-12 -right-12 w-40 h-40 rounded-full bg-primary/25 blur-2xl group-hover:bg-primary/35 transition-colors pointer-events-none" />
-            <div className="relative flex items-center gap-3">
-              <div className="icon-tile icon-tile-red !w-12 !h-12 !rounded-2xl">
-                <CalendarPlus className="w-5 h-5" />
+            <div className="flex items-start gap-4">
+              <div className="icon-tile icon-tile-red flex-shrink-0">
+                <Wand2 className="w-5 h-5" strokeWidth={1.75} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-display text-lg text-foreground leading-tight">Log an encounter</div>
-                <p className="text-xs text-muted-foreground mt-0.5">Tap to pick someone you just saw</p>
+                {nextReminder ? (
+                  <>
+                    <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">
+                      {nextReminder.daysAway === 0 ? 'Seeing today' : nextReminder.daysAway < 0 ? 'Overdue' : `Coming up · ${formatReminderDate(nextReminder.reminderDateObj, nextReminder.daysAway)}`}
+                    </p>
+                    <h2 className="font-display text-foreground leading-tight mb-1" style={{ fontSize: '22px' }}>
+                      Brief on {nextReminder.name.split(' ')[0]}
+                    </h2>
+                    <p className="text-[14px] text-muted-foreground line-clamp-1">
+                      {nextReminder.reminder_note || 'Get a 30-second refresher before you see them.'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">
+                      Pre-meeting brief
+                    </p>
+                    <h2 className="font-display text-foreground leading-tight mb-1" style={{ fontSize: '22px' }}>
+                      Walk in already winning.
+                    </h2>
+                    <p className="text-[14px] text-muted-foreground line-clamp-1">
+                      Pick anyone. We'll hand you a 30-second brief.
+                    </p>
+                  </>
+                )}
               </div>
-              <ArrowRight className="w-4 h-4 text-primary" />
+              <ArrowRight className="w-4 h-4 text-primary mt-1.5 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
             </div>
           </button>
 
-          {/* Action grid: brief CTA + on-this-day */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setBriefOpen(true)}
-              className="rounded-3xl p-4 text-left warm-shadow relative overflow-hidden group"
-            >
-              <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full bg-primary/20 blur-2xl group-hover:bg-primary/30 transition-colors pointer-events-none" />
-              <div className="relative">
-                <div className="icon-tile icon-tile-red mb-3">
-                  <Wand2 className="w-5 h-5" />
-                </div>
-                <div className="font-display text-base text-foreground leading-tight">Pre-meeting<br />brief</div>
-                <p className="text-xs text-muted-foreground mt-1">AI refresher</p>
+          {/* Log encounter — secondary, muted */}
+          <button
+            onClick={() => setLogOpen(true)}
+            className="w-full surface-card p-4 text-left active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-button bg-secondary flex items-center justify-center flex-shrink-0">
+                <CalendarPlus className="w-5 h-5 text-foreground" strokeWidth={1.75} />
               </div>
-            </button>
-
-            <div className="rounded-3xl p-4 warm-shadow relative overflow-hidden">
-              <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full bg-[hsl(265_75%_60%/0.15)] blur-2xl pointer-events-none" />
-              <div className="relative">
-                <div className="icon-tile icon-tile-purple mb-3">
-                  <CalendarDays className="w-5 h-5" />
-                </div>
-                <div className="font-display text-base text-foreground leading-tight">On this day</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {onThisDay.length > 0 ? `${onThisDay.length} ${onThisDay.length === 1 ? 'person' : 'people'}` : 'Nothing today'}
-                </p>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-medium text-foreground leading-tight">Log an encounter</div>
+                <p className="text-[13px] text-muted-foreground mt-0.5">Tap to pick someone you just saw</p>
               </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
             </div>
-          </div>
+          </button>
 
           {/* Reminders */}
-          {reminders.length > 0 && (
+          {reminders.length > 1 && (
             <section>
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full bg-gradient-primary" />
-                  <h2 className="font-display text-lg text-foreground">Reminders</h2>
-                </div>
-                <span className="text-xs text-muted-foreground">{reminders.length}</span>
+              <div className="flex items-baseline justify-between mb-3 px-1">
+                <h2 className="font-display text-foreground" style={{ fontSize: '20px' }}>Reminders</h2>
+                <span className="text-[12px] text-muted-foreground">{reminders.length}</span>
               </div>
-              <div className="rounded-3xl warm-shadow overflow-hidden divide-y divide-white/5">
+              <div className="space-y-px">
                 {reminders.slice(0, 4).map(p => (
                   <button
                     key={p.id}
                     onClick={() => onSelectPerson(p.id)}
-                    className="w-full flex items-center gap-3 p-3.5 hover:bg-white/[0.03] transition-colors"
+                    className="w-full flex items-center gap-3 py-3 hover:bg-foreground/[0.03] transition-colors border-b border-border last:border-b-0"
                   >
                     <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
                     <div className="flex-1 text-left min-w-0">
-                      <div className="font-medium text-foreground truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{p.reminder_note || 'Follow up'}</div>
+                      <div className="text-[15px] font-medium text-foreground truncate">{p.name}</div>
+                      <div className="text-[13px] text-muted-foreground truncate">{p.reminder_note || 'Follow up'}</div>
                     </div>
-                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                      p.daysAway < 0 ? 'bg-destructive/15 text-destructive border border-destructive/30'
-                      : p.daysAway === 0 ? 'bg-primary/20 text-primary border border-primary/30'
-                      : 'bg-white/5 text-muted-foreground border border-white/10'
+                    <span className={`text-[12px] font-medium ${
+                      p.daysAway < 0 ? 'text-destructive'
+                      : p.daysAway === 0 ? 'text-primary'
+                      : 'text-muted-foreground'
                     }`}>
                       {formatReminderDate(p.reminderDateObj, p.daysAway)}
                     </span>
@@ -220,25 +220,22 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
             </section>
           )}
 
-          {/* On this day inline list (only if there are matches) */}
+          {/* On this day */}
           {onThisDay.length > 0 && (
             <section>
-              <div className="flex items-center gap-2 mb-3 px-1">
-                <div className="w-1 h-4 rounded-full bg-[hsl(265_75%_60%)]" />
-                <h2 className="font-display text-lg text-foreground">Met on this day</h2>
-              </div>
+              <h2 className="font-display text-foreground mb-3 px-1" style={{ fontSize: '20px' }}>Met on this day</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide">
                 {onThisDay.map(p => (
                   <button
                     key={p.id}
                     onClick={() => onSelectPerson(p.id)}
-                    className="flex-shrink-0 w-32 rounded-2xl warm-shadow p-3 text-center hover:scale-[1.02] transition-transform"
+                    className="flex-shrink-0 w-28 text-center"
                   >
                     <div className="flex justify-center mb-2">
                       <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
                     </div>
-                    <div className="font-medium text-foreground text-sm truncate">{p.name}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                    <div className="text-[14px] font-medium text-foreground truncate">{p.name}</div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">
                       {p.date_met ? new Date(p.date_met).getFullYear() : new Date(p.created_at).getFullYear()}
                     </div>
                   </button>
@@ -247,52 +244,21 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
             </section>
           )}
 
-          {/* Recently added — horizontal scroller */}
+          {/* Recently added */}
           {recentPeople.length > 0 && (
             <section>
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full bg-[hsl(210_90%_58%)]" />
-                  <h2 className="font-display text-lg text-foreground">Recently added</h2>
-                </div>
-              </div>
+              <h2 className="font-display text-foreground mb-3 px-1" style={{ fontSize: '20px' }}>Recently added</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide">
                 {recentPeople.map(p => (
                   <button
                     key={p.id}
                     onClick={() => onSelectPerson(p.id)}
-                    className="flex-shrink-0 w-28 rounded-2xl warm-shadow p-3 text-center hover:scale-[1.02] transition-transform"
+                    className="flex-shrink-0 w-24 text-center"
                   >
                     <div className="flex justify-center mb-2">
                       <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
                     </div>
-                    <div className="font-medium text-foreground text-xs truncate">{p.name || 'Unknown'}</div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Sparse profiles */}
-          {sparsePeople.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full bg-[hsl(35_95%_58%)]" />
-                  <h2 className="font-display text-lg text-foreground">Add details</h2>
-                </div>
-                <span className="text-xs text-muted-foreground">{sparsePeople.length} sparse</span>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide">
-                {sparsePeople.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => onSelectPerson(p.id)}
-                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-full warm-shadow hover:bg-white/[0.04] transition-colors"
-                  >
-                    <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                    <span className="text-xs font-medium text-foreground pr-1">{p.name}</span>
-                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                    <div className="text-[13px] font-medium text-foreground truncate">{p.name || 'Unknown'}</div>
                   </button>
                 ))}
               </div>
@@ -301,33 +267,33 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
         </div>
       )}
 
-      {/* Brief search modal */}
+      {/* Brief search modal — solid Surface 2, no backdrop-blur */}
       {briefOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm pt-24 px-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 pt-24 px-4 animate-fade-in"
           onClick={() => { setBriefOpen(false); setBriefQuery(''); }}
         >
           <div
-            className="w-full max-w-md rounded-3xl warm-shadow p-5 animate-scale-in"
+            className="w-full max-w-md surface-featured p-5 animate-scale-in"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="icon-tile icon-tile-red !w-10 !h-10">
-                <Wand2 className="w-4 h-4" />
+                <Wand2 className="w-4 h-4" strokeWidth={1.75} />
               </div>
               <div>
-                <h3 className="font-display text-lg text-foreground leading-tight">Pre-meeting brief</h3>
-                <p className="text-xs text-muted-foreground">Pick someone to refresh on</p>
+                <h3 className="font-display text-foreground leading-tight" style={{ fontSize: '20px' }}>Pre-meeting brief</h3>
+                <p className="text-[13px] text-muted-foreground">Pick someone to refresh on</p>
               </div>
             </div>
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
               <input
                 autoFocus
                 value={briefQuery}
                 onChange={e => setBriefQuery(e.target.value)}
                 placeholder="Type a name..."
-                className="w-full pl-10 pr-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full pl-10 pr-3 py-2.5 rounded-input bg-secondary border border-border text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
               />
             </div>
             <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -339,15 +305,15 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
                     setBriefQuery('');
                     setBriefOpen(false);
                   }}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-2xl hover:bg-white/[0.04] transition-colors"
+                  className="w-full flex items-center gap-3 p-2.5 rounded-button hover:bg-foreground/[0.04] transition-colors"
                 >
                   <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                  <span className="text-sm text-foreground flex-1 text-left truncate font-medium">{p.name}</span>
-                  <ArrowRight className="w-4 h-4 text-primary" />
+                  <span className="text-[15px] text-foreground flex-1 text-left truncate font-medium">{p.name}</span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
                 </button>
               ))}
               {briefQuery.trim() && briefMatches.length === 0 && (
-                <p className="text-xs text-muted-foreground italic text-center py-6">No one matches "{briefQuery}"</p>
+                <p className="text-[13px] text-muted-foreground italic text-center py-6">No one matches "{briefQuery}"</p>
               )}
             </div>
           </div>

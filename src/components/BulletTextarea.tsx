@@ -112,7 +112,7 @@ export function BulletTextarea({
       placeholder={placeholder}
       rows={rows}
       className={cn(
-        'w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none',
+        'w-full bg-secondary border border-border rounded-input px-3 py-2 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 resize-none transition-colors',
         className,
       )}
     />
@@ -133,11 +133,11 @@ export function BulletDisplay({ value, className }: BulletDisplayProps) {
   if (items.length === 0) return null;
 
   return (
-    <ul className={cn('space-y-1 text-foreground text-sm', className)}>
+    <ul className={cn('space-y-1 text-foreground text-[15px]', className)}>
       {items.map((item, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary leading-5">•</span>
-          <span className="flex-1 leading-5">{item}</span>
+          <span className="text-muted-foreground leading-6">•</span>
+          <span className="flex-1 leading-6">{item}</span>
         </li>
       ))}
     </ul>

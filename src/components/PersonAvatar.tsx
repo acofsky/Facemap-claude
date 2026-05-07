@@ -37,7 +37,7 @@ export function PersonAvatar({ name, photo, size = 'md', className = '' }: Perso
   }, [photo]);
 
   return (
-    <div className={`${sizes[size]} rounded-full overflow-hidden flex-shrink-0 bg-secondary flex items-center justify-center font-display text-secondary-foreground ${className}`}>
+    <div className={`${sizes[size]} rounded-full overflow-hidden flex-shrink-0 bg-secondary border border-border flex items-center justify-center font-display text-foreground ${className}`}>
       {resolved ? (
         <img src={resolved} alt={name} className="w-full h-full object-cover" />
       ) : (

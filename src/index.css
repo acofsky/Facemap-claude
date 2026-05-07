@@ -6,69 +6,73 @@
 
 @layer base {
   :root {
-    /* Pure black base */
+    /* Foundation — black canvas, white text */
     --background: 0 0% 0%;
     --foreground: 0 0% 96%;
 
-    /* Glassy elevated cards (slightly raised off pure black) */
+    /* Surface 1 — standard cards lifted off the canvas */
     --card: 0 0% 6%;
     --card-foreground: 0 0% 96%;
 
-    --popover: 0 0% 5%;
+    /* Modal / popover background */
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 96%;
 
-    /* Red primary kept */
-    --primary: 0 78% 55%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 8 90% 62%;
+    /* Membr Red — the one signal */
+    --primary: 0 75% 53%;
+    --primary-foreground: 0 0% 96%;
 
+    /* Surface 2 — elevated surfaces, inputs */
     --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 88%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 58%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 0 50% 18%;
+    --accent: 0 60% 15%;
     --accent-foreground: 0 0% 96%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 65% 44%;
+    --destructive-foreground: 0 0% 96%;
 
-    --border: 0 0% 14%;
-    --input: 0 0% 12%;
-    --ring: 0 78% 55%;
+    --border: 0 0% 17%;
+    --input: 0 0% 10%;
+    --ring: 0 75% 53%;
 
-    --radius: 1rem;
+    /* Per-surface radii (10/12/8/6/16) */
+    --radius: 0.625rem;
+    --radius-card: 0.625rem;
+    --radius-modal: 0.75rem;
+    --radius-button: 0.5rem;
+    --radius-button-sm: 0.375rem;
+    --radius-input: 0.5rem;
+    --radius-sheet-top: 1rem;
 
+    /* Sidebar (shadcn defaults — kept aligned with main palette) */
     --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 0 78% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 0 75% 53%;
+    --sidebar-primary-foreground: 0 0% 96%;
     --sidebar-accent: 0 0% 10%;
-    --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 0 78% 55%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 17%;
+    --sidebar-ring: 0 75% 53%;
 
-    /* Custom semantic tokens */
-    --warm-glow: 0 78% 55%;
-    --warm-surface: 0 0% 8%;
-    --warm-highlight: 8 90% 62%;
-    --success: 145 65% 48%;
-    --success-foreground: 0 0% 100%;
+    /* Extended palette per brief */
+    --red-deep: 0 60% 15%;
+    --red-muted: 0 50% 35%;
+    --success: 145 55% 42%;
+    --success-foreground: 0 0% 96%;
+    --warning: 38 90% 52%;
+    --warning-foreground: 0 0% 96%;
+    --disabled: 0 0% 25%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(0 80% 55%) 0%, hsl(15 90% 60%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 7%) 0%, hsl(0 0% 4%) 100%);
-    --gradient-tile-red: linear-gradient(135deg, hsl(0 80% 58%) 0%, hsl(15 90% 60%) 100%);
-    --gradient-tile-blue: linear-gradient(135deg, hsl(210 90% 58%) 0%, hsl(195 95% 55%) 100%);
-    --gradient-tile-purple: linear-gradient(135deg, hsl(265 75% 60%) 0%, hsl(290 70% 60%) 100%);
-    --gradient-tile-green: linear-gradient(135deg, hsl(150 70% 45%) 0%, hsl(170 75% 45%) 100%);
-    --gradient-tile-amber: linear-gradient(135deg, hsl(35 95% 58%) 0%, hsl(20 90% 58%) 100%);
-
-    /* Shadows / glows */
-    --shadow-soft: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
-    --shadow-elevated: 0 20px 50px -12px hsl(0 0% 0% / 0.8);
-    --shadow-glow-primary: 0 10px 40px -10px hsl(0 80% 55% / 0.45);
+    /* Circle tile gradients — red full-sat, others muted ~35% */
+    --gradient-tile-red: linear-gradient(135deg, hsl(0 75% 42%) 0%, hsl(10 80% 45%) 100%);
+    --gradient-tile-blue: linear-gradient(135deg, hsl(210 40% 40%) 0%, hsl(195 45% 38%) 100%);
+    --gradient-tile-purple: linear-gradient(135deg, hsl(265 30% 42%) 0%, hsl(285 28% 42%) 100%);
+    --gradient-tile-green: linear-gradient(135deg, hsl(150 30% 35%) 0%, hsl(165 32% 35%) 100%);
+    --gradient-tile-amber: linear-gradient(135deg, hsl(35 45% 40%) 0%, hsl(22 42% 38%) 100%);
 
     font-family: 'DM Sans', system-ui, sans-serif;
   }
@@ -78,29 +82,29 @@
     --foreground: 0 0% 96%;
     --card: 0 0% 6%;
     --card-foreground: 0 0% 96%;
-    --popover: 0 0% 5%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 96%;
-    --primary: 0 78% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 75% 53%;
+    --primary-foreground: 0 0% 96%;
     --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 88%;
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 58%;
-    --accent: 0 50% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 60% 15%;
     --accent-foreground: 0 0% 96%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 14%;
-    --input: 0 0% 12%;
-    --ring: 0 78% 55%;
+    --destructive: 0 65% 44%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 17%;
+    --input: 0 0% 10%;
+    --ring: 0 75% 53%;
     --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 0 78% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 0 75% 53%;
+    --sidebar-primary-foreground: 0 0% 96%;
     --sidebar-accent: 0 0% 10%;
-    --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 0 78% 55%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 17%;
+    --sidebar-ring: 0 75% 53%;
   }
 }
 
@@ -112,71 +116,63 @@
   body {
     @apply bg-background text-foreground;
     background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, hsl(0 80% 25% / 0.18), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(15 80% 30% / 0.10), transparent 60%);
-    background-attachment: fixed;
+    /* Pure black. No gradient. No glow. */
   }
 
   h1, h2, h3, h4 {
     font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.015em;
   }
 }
 
 @layer utilities {
   .font-display {
     font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.015em;
   }
 
-  /* Glassy card surface — used wherever .warm-shadow / .bg-card was used */
-  .warm-shadow {
-    background: linear-gradient(180deg, hsl(0 0% 8% / 0.85) 0%, hsl(0 0% 4% / 0.9) 100%);
-    border: 1px solid hsl(0 0% 100% / 0.06);
+  /* Standard card — Surface 1, hairline border, soft shadow */
+  .surface-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(0 0% 100% / 0.08);
+    border-radius: var(--radius-card);
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.5);
+    transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .surface-card:hover {
+    border-color: hsl(0 0% 100% / 0.14);
+    box-shadow: 0 4px 16px hsl(0 0% 0% / 0.6);
+  }
+
+  /* Featured card — Surface 2, whisper-thin red ring. One per screen. */
+  .surface-featured {
+    background: hsl(var(--secondary));
+    border: 1px solid hsl(0 0% 100% / 0.12);
+    border-radius: var(--radius-modal);
     box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.04) inset,
-      0 8px 24px -10px hsl(0 0% 0% / 0.6);
-    backdrop-filter: blur(8px);
+      0 4px 20px hsl(0 0% 0% / 0.7),
+      0 0 0 1px hsl(0 75% 53% / 0.08);
   }
 
-  .warm-shadow-lg {
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.05) inset,
-      0 20px 50px -12px hsl(0 0% 0% / 0.8),
-      0 10px 30px -10px hsl(0 80% 50% / 0.35);
-  }
+  /* Legacy aliases — retained for compatibility, point to new surfaces */
+  .warm-shadow { @apply surface-card; }
+  .warm-shadow-lg { @apply surface-featured; }
 
-  /* Gradient surfaces */
-  .bg-gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .shadow-glow-primary {
-    box-shadow: var(--shadow-glow-primary);
-  }
-
-  /* Vibrant icon tiles (rounded-square with glow) */
-  .icon-tile {
-    @apply w-11 h-11 rounded-2xl flex items-center justify-center text-white;
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.2) inset,
-      0 8px 20px -6px hsl(0 0% 0% / 0.5);
-  }
-  .icon-tile-red    { background: var(--gradient-tile-red);    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(0 80% 55% / 0.45); }
-  .icon-tile-blue   { background: var(--gradient-tile-blue);   box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(210 90% 55% / 0.45); }
-  .icon-tile-purple { background: var(--gradient-tile-purple); box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(270 75% 55% / 0.45); }
-  .icon-tile-green  { background: var(--gradient-tile-green);  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(160 75% 45% / 0.4); }
-  .icon-tile-amber  { background: var(--gradient-tile-amber);  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(30 90% 55% / 0.4); }
-
-  /* Make all primary buttons gradient + glow by default */
-  .bg-primary {
-    background: var(--gradient-primary) !important;
-    box-shadow: 0 8px 24px -8px hsl(0 80% 55% / 0.5);
-  }
-
-  /* Subtle hairline divider */
+  /* Hairline divider */
   .hairline {
     background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.08), transparent);
   }
+
+  /* Icon tiles — red full-sat, others muted, no glow */
+  .icon-tile {
+    @apply w-11 h-11 flex items-center justify-center text-foreground;
+    border-radius: var(--radius-modal);
+  }
+  .icon-tile-red    { background: var(--gradient-tile-red); color: hsl(0 0% 96%); }
+  .icon-tile-blue   { background: var(--gradient-tile-blue); color: hsl(0 0% 96%); }
+  .icon-tile-purple { background: var(--gradient-tile-purple); color: hsl(0 0% 96%); }
+  .icon-tile-green  { background: var(--gradient-tile-green); color: hsl(0 0% 96%); }
+  .icon-tile-amber  { background: var(--gradient-tile-amber); color: hsl(0 0% 96%); }
 
   .scrollbar-hide {
     -ms-overflow-style: none;

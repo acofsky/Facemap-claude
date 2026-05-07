@@ -17,7 +17,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={1.75} />
       </div>
     );
   }

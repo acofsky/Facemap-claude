@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import {
   usePerson, usePersons, useCircles, useUpdatePerson, useDeletePerson,
@@ -12,7 +12,8 @@ import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import {
   ArrowLeft, Trash2, ImagePlus, MapPin, Users, FileText,
   AlertCircle, Briefcase, StickyNote, Loader2, Check, X,
-  CalendarIcon, Link2, Plus, UserMinus, Sparkles, Wand2,
+  CalendarIcon, Link2, Plus, UserMinus, Wand2, MoreVertical,
+  ArrowRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
+import { resolveCircleColor } from '@/lib/circle-colors';
 
 interface PersonProfilePageProps {
   personId: string;
@@ -46,6 +48,15 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   const [showConnectPicker, setShowConnectPicker] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const [generatingDesc, setGeneratingDesc] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [menuOpen]);
 
   const handleGenerateDescription = async () => {
     const photo = person?.photos?.[0];
@@ -55,7 +66,6 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
     }
     setGeneratingDesc(true);
     try {
-      // Resolve to a signed URL the AI can fetch
       const { getPhotoUrl } = await import('@/lib/store');
       const photoUrl = await getPhotoUrl(photo);
       const { data, error } = await supabase.functions.invoke('describe-from-photo', {
@@ -75,7 +85,6 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
     }
   };
 
-  // Connections for this person
   const personConnections = useMemo(() => {
     return connections.filter(c => c.person_a_id === personId || c.person_b_id === personId);
   }, [connections, personId]);
@@ -91,7 +100,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center pt-32">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={1.75} />
       </div>
     );
   }
@@ -100,7 +109,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
     return (
       <div className="px-5 pt-12 text-center">
         <p className="text-muted-foreground">Person not found.</p>
-        <button onClick={onBack} className="mt-4 text-primary text-sm">Go back</button>
+        <button onClick={onBack} className="mt-4 text-primary text-[14px]">Go back</button>
       </div>
     );
   }
@@ -139,7 +148,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   };
 
   const handleDelete = () => {
-    if (confirm('Remove this person from your Facemap?')) {
+    if (confirm('Remove this person from your Membr?')) {
       deletePersonMut.mutate(personId);
       onBack();
     }
@@ -161,73 +170,123 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
     deleteConnection.mutate(connectionId);
   };
 
-  const fields = [
+  const fields: Array<{ key: string; label: string; icon: typeof Users }> = [
     { key: 'how_we_met', label: 'How we met', icon: Users },
     { key: 'where_when', label: 'Where we met', icon: MapPin },
     { key: 'physical_description', label: 'Physical description', icon: FileText },
     { key: 'important_info', label: 'Important info', icon: Briefcase },
     { key: 'misc_notes', label: 'Notes', icon: StickyNote },
-    { key: 'reminder_note', label: 'Reminder', icon: AlertCircle },
+    { key: 'reminder_note', label: 'Reminder note', icon: AlertCircle },
   ];
 
-  const getFieldValue = (key: string) => {
-    return (person as any)[key] as string | null;
-  };
+  const getFieldValue = (key: string) => (person as any)[key] as string | null;
+
+  const personCircles = circles.filter(c => (person.circleIds || []).includes(c.id));
+  const firstCircle = personCircles[0];
+  const metaParts: string[] = [];
+  if (person.date_met) metaParts.push(`Met ${format(new Date(person.date_met), 'MMM d, yyyy')}`);
+  else metaParts.push(`Added ${format(new Date(person.created_at), 'MMM d, yyyy')}`);
+  if (firstCircle) metaParts.push(`${firstCircle.emoji} ${firstCircle.name}`);
 
   return (
-    <div className="px-5 pt-8 pb-8 animate-fade-in">
-      <button onClick={onBack} className="flex items-center gap-1 text-muted-foreground hover:text-foreground mb-6 text-sm">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
+    <div className="px-5 pt-4 pb-8 animate-fade-in">
+      {/* Header — back chevron + kebab */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center hover:border-foreground/20 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 text-foreground" strokeWidth={1.75} />
+        </button>
+        <div className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+            aria-label="More"
+            className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center hover:border-foreground/20 transition-colors"
+          >
+            <MoreVertical className="w-4 h-4 text-foreground" strokeWidth={1.75} />
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-11 z-20 w-44 surface-card overflow-hidden animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => { setMenuOpen(false); handleDelete(); }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-[14px] text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} /> Remove from Membr
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* Avatar + Name */}
-      <div className="flex flex-col items-center mb-8">
-        <div className="relative mb-4">
+      {/* Hero — person first, asymmetric */}
+      <div className="mb-6 pl-1">
+        <div className="relative w-fit mb-4">
           <PersonAvatar name={person.name} photo={person.photos[0]} size="lg" />
           <button
             onClick={() => fileRef.current?.click()}
-            className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center warm-shadow"
+            aria-label="Add photo"
+            className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
           >
-            <ImagePlus className="w-3.5 h-3.5" />
+            <ImagePlus className="w-3.5 h-3.5" strokeWidth={1.75} />
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
         </div>
 
         {editing === 'name' ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             <input
               value={editValue}
               onChange={e => setEditValue(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && saveEdit()}
-              className="text-2xl font-display text-center bg-transparent border-b-2 border-primary focus:outline-none text-foreground"
+              className="font-display text-foreground bg-transparent border-b-2 border-primary focus:outline-none flex-1"
+              style={{ fontSize: '36px' }}
               autoFocus
             />
-            <button onClick={saveEdit} className="p-1.5 rounded-lg bg-primary text-primary-foreground"><Check className="w-4 h-4" /></button>
-            <button onClick={cancelEdit} className="p-1.5 rounded-lg bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+            <button onClick={saveEdit} aria-label="Save" className="p-1.5 rounded-button bg-primary text-primary-foreground"><Check className="w-4 h-4" strokeWidth={2} /></button>
+            <button onClick={cancelEdit} aria-label="Cancel" className="p-1.5 rounded-button bg-secondary border border-border text-muted-foreground"><X className="w-4 h-4" strokeWidth={1.75} /></button>
           </div>
         ) : (
-          <button onClick={() => startEdit('name', person.name)} className="text-2xl font-display text-foreground hover:text-primary transition-colors">
+          <button
+            onClick={() => startEdit('name', person.name)}
+            className="font-display text-foreground hover:text-primary transition-colors text-left leading-none mb-1"
+            style={{ fontSize: '36px' }}
+          >
             {person.name || 'Tap to add name'}
           </button>
         )}
 
-        <span className="text-xs text-muted-foreground mt-2">
-          Added {new Date(person.created_at).toLocaleDateString()}
-        </span>
-
-        <button
-          onClick={() => setBriefOpen(true)}
-          className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all warm-shadow"
-        >
-          <Sparkles className="w-4 h-4" /> Generate brief
-        </button>
+        <p className="text-[13px] text-muted-foreground mt-2">{metaParts.join(' · ')}</p>
       </div>
 
-      {/* Photos strip */}
+      {/* HERO featured card — Meeting Brief, the one red moment */}
+      <button
+        onClick={() => setBriefOpen(true)}
+        className="w-full surface-featured p-4 mb-6 text-left active:scale-[0.99] transition-transform group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="icon-tile icon-tile-red flex-shrink-0">
+            <Wand2 className="w-5 h-5" strokeWidth={1.75} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-display text-foreground leading-tight" style={{ fontSize: '20px' }}>
+              Brief on {person.name?.split(' ')[0] || 'them'}
+            </h2>
+            <p className="text-[13px] text-muted-foreground">A 30-second AI refresher.</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
+        </div>
+      </button>
+
+      {/* Photo strip */}
       {person.photos.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 -mx-5 px-5">
+        <div className="flex gap-2 overflow-x-auto pb-3 mb-4 -mx-5 px-5 scrollbar-hide">
           {person.photos.map((photo, i) => (
-            <PhotoImg key={i} path={photo} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+            <PhotoImg key={i} path={photo} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0 border border-border" />
           ))}
         </div>
       )}
@@ -239,16 +298,16 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
         iosContactId={(person as any).ios_contact_id ?? null}
       />
 
-      {/* Date Met — calendar picker */}
-      <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
+      {/* Date met */}
+      <div className="surface-card p-4 mb-3">
         <div className="flex items-center gap-2 mb-2">
-          <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">When we met</span>
+          <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-[12px] font-medium text-muted-foreground">When we met</span>
         </div>
         <Popover>
           <PopoverTrigger asChild>
             <button className={cn(
-              "w-full text-left text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors",
+              "w-full text-left text-[15px] px-3 py-2 rounded-input border border-border bg-secondary hover:border-foreground/20 transition-colors",
               !person.date_met && "text-muted-foreground italic"
             )}>
               {person.date_met ? format(new Date(person.date_met), 'MMMM d, yyyy') : 'Tap to pick a date...'}
@@ -268,23 +327,36 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
       </div>
 
       {/* Circles */}
-      <div className="mb-6">
-        <h3 className="text-sm font-medium text-muted-foreground mb-2">Circles</h3>
-        <div className="flex flex-wrap gap-2">
-          {circles.map(c => (
-            <button
-              key={c.id}
-              onClick={() => toggleCircle(c.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                (person.circleIds || []).includes(c.id)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {c.emoji} {c.name}
-            </button>
-          ))}
-        </div>
+      <div className="surface-card p-4 mb-3">
+        <p className="text-[12px] font-medium text-muted-foreground mb-2.5">Circles</p>
+        {circles.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground italic">No circles yet — create some on the Circles tab.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {circles.map(c => {
+              const active = (person.circleIds || []).includes(c.id);
+              const colorKey = resolveCircleColor(c.color, c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggleCircle(c.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-button-sm text-[12px] font-medium transition-colors border ${
+                    active
+                      ? 'bg-secondary border-primary text-foreground'
+                      : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ background: `var(--gradient-tile-${colorKey})` }}
+                  />
+                  <span>{c.emoji}</span>
+                  <span>{c.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Text fields */}
@@ -292,84 +364,79 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
         {fields.map(f => {
           const value = getFieldValue(f.key);
           const isEditing = editing === f.key;
+          const isBulletField = f.key === 'important_info' || f.key === 'misc_notes';
 
           return (
-            <div key={f.key} className="rounded-xl bg-card p-4 warm-shadow">
-              <div className="flex items-center justify-between mb-1">
+            <div key={f.key} className="surface-card p-4">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <f.icon className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">{f.label}</span>
+                  <f.icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+                  <span className="text-[12px] font-medium text-muted-foreground">{f.label}</span>
                 </div>
                 {f.key === 'physical_description' && person.photos.length > 0 && !isEditing && (
                   <button
                     onClick={handleGenerateDescription}
                     disabled={generatingDesc}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded-button-sm bg-secondary border border-border text-foreground text-[11px] font-medium hover:border-foreground/20 disabled:opacity-50 transition-colors"
                   >
-                    {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                    {generatingDesc ? 'Generating...' : 'From photo'}
+                    {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.75} /> : <Wand2 className="w-3 h-3" strokeWidth={1.75} />}
+                    {generatingDesc ? 'Generating…' : 'From photo'}
                   </button>
                 )}
               </div>
-              {(() => {
-                const isBulletField = f.key === 'important_info' || f.key === 'misc_notes';
-                if (isEditing) {
-                  return (
-                    <div>
-                      {isBulletField ? (
-                        <BulletTextarea value={editValue} onChange={setEditValue} rows={4} autoFocus className="mt-1" />
-                      ) : (
-                        <textarea
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          className="w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mt-1"
-                          rows={3}
-                          autoFocus
-                        />
-                      )}
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={saveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium">
-                          <Check className="w-3 h-3" /> Save
-                        </button>
-                        <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-medium">
-                          <X className="w-3 h-3" /> Cancel
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <button
-                    onClick={() => startEdit(f.key, value || '')}
-                    className="text-sm text-left w-full mt-1"
-                  >
-                    {value ? (
-                      isBulletField ? (
-                        <BulletDisplay value={value} />
-                      ) : (
-                        <span className="text-foreground">{value}</span>
-                      )
+              {isEditing ? (
+                <div>
+                  {isBulletField ? (
+                    <BulletTextarea value={editValue} onChange={setEditValue} rows={4} autoFocus className="mt-1" />
+                  ) : (
+                    <textarea
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      className="w-full bg-secondary border border-border rounded-input px-3 py-2 text-[15px] text-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 resize-none mt-1 transition-colors"
+                      rows={3}
+                      autoFocus
+                    />
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={saveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-button-sm bg-primary text-primary-foreground text-[12px] font-semibold">
+                      <Check className="w-3 h-3" strokeWidth={2} /> Save
+                    </button>
+                    <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-button-sm bg-secondary border border-border text-muted-foreground text-[12px] font-medium">
+                      <X className="w-3 h-3" strokeWidth={1.75} /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => startEdit(f.key, value || '')}
+                  className="text-[15px] text-left w-full mt-1"
+                >
+                  {value ? (
+                    isBulletField ? (
+                      <BulletDisplay value={value} />
                     ) : (
-                      <span className="text-muted-foreground italic">Tap to add...</span>
-                    )}
-                  </button>
-                );
-              })()}
+                      <span className="text-foreground">{value}</span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground italic">Tap to add...</span>
+                  )}
+                </button>
+              )}
             </div>
           );
         })}
       </div>
 
       {/* Reminder date */}
-      <div className="rounded-xl bg-card p-4 warm-shadow mt-3">
+      <div className="surface-card p-4 mt-3">
         <div className="flex items-center gap-2 mb-2">
-          <AlertCircle className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">Reminder date</span>
+          <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-[12px] font-medium text-muted-foreground">Reminder date</span>
         </div>
         <Popover>
           <PopoverTrigger asChild>
             <button className={cn(
-              "w-full text-left text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors",
+              "w-full text-left text-[15px] px-3 py-2 rounded-input border border-border bg-secondary hover:border-foreground/20 transition-colors",
               !person.reminder_date && "text-muted-foreground italic"
             )}>
               {person.reminder_date ? format(new Date(person.reminder_date), 'MMMM d, yyyy') : 'Set a reminder date...'}
@@ -392,111 +459,121 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
         </Popover>
       </div>
 
-      {/* Who they know — Connections */}
+      {/* Connections — collapsible */}
       <div className="mt-6">
-        <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setShowConnections(!showConnections)}
+          className="w-full flex items-center justify-between mb-3 group"
+        >
           <div className="flex items-center gap-2">
-            <Link2 className="w-4 h-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium text-muted-foreground">Who they know</h3>
+            <Link2 className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+            <h3 className="text-[13px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+              Who they know {personConnections.length > 0 && `· ${personConnections.length}`}
+            </h3>
           </div>
-          <button
-            onClick={() => setShowConnectPicker(!showConnectPicker)}
-            className="p-1.5 rounded-lg bg-primary text-primary-foreground"
-          >
-            {showConnectPicker ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          <span className="text-[12px] text-muted-foreground">{showConnections ? 'Hide' : 'Show'}</span>
+        </button>
 
-        {/* Free-text notes about who they know */}
-        <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
-          {editing === 'known_people_notes' ? (
-            <div>
-              <textarea
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                placeholder="e.g. They know Sarah from yoga, Mike's cousin..."
-                className="w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                rows={3}
-                autoFocus
-              />
-              <div className="flex gap-2 mt-2">
-                <button onClick={saveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium">
-                  <Check className="w-3 h-3" /> Save
-                </button>
-                <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-medium">
-                  <X className="w-3 h-3" /> Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => startEdit('known_people_notes', (person as any).known_people_notes || '')}
-              className="text-sm text-left w-full"
-            >
-              {(person as any).known_people_notes ? (
-                <span className="text-foreground whitespace-pre-wrap">{(person as any).known_people_notes}</span>
-              ) : (
-                <span className="text-muted-foreground italic">Tap to add who they know...</span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {showConnectPicker && availableToConnect.length > 0 && (
-          <div className="rounded-xl bg-muted/50 p-2 mb-3 max-h-48 overflow-y-auto space-y-1">
-            <p className="text-xs text-muted-foreground px-2 py-1">Link to someone on Facemap:</p>
-            {availableToConnect.map(p => (
-              <button
-                key={p.id}
-                onClick={() => handleConnect(p.id)}
-                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-card transition-colors"
-              >
-                <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                <span className="text-sm text-foreground">{p.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {showConnectPicker && availableToConnect.length === 0 && (
-          <p className="text-xs text-muted-foreground italic mb-3">No more people to connect.</p>
-        )}
-
-        {personConnections.length > 0 && (
-          <div className="space-y-2">
-            {personConnections.map(conn => {
-              const otherId = conn.person_a_id === personId ? conn.person_b_id : conn.person_a_id;
-              const otherPerson = allPeople.find(p => p.id === otherId);
-              if (!otherPerson) return null;
-              return (
-                <div key={conn.id} className="flex items-center gap-3 p-3 rounded-xl bg-card warm-shadow">
-                  <PersonAvatar name={otherPerson.name} photo={otherPerson.photos[0]} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-foreground truncate">{otherPerson.name}</div>
-                    {conn.note && <div className="text-xs text-muted-foreground truncate">{conn.note}</div>}
+        {showConnections && (
+          <div className="space-y-3">
+            <div className="surface-card p-4">
+              {editing === 'known_people_notes' ? (
+                <div>
+                  <textarea
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    placeholder="e.g. They know Sarah from yoga, Mike's cousin..."
+                    className="w-full bg-secondary border border-border rounded-input px-3 py-2 text-[15px] text-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 resize-none transition-colors"
+                    rows={3}
+                    autoFocus
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={saveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-button-sm bg-primary text-primary-foreground text-[12px] font-semibold">
+                      <Check className="w-3 h-3" strokeWidth={2} /> Save
+                    </button>
+                    <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-button-sm bg-secondary border border-border text-muted-foreground text-[12px] font-medium">
+                      <X className="w-3 h-3" strokeWidth={1.75} /> Cancel
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDisconnect(conn.id)}
-                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <UserMinus className="w-4 h-4" />
-                  </button>
                 </div>
-              );
-            })}
+              ) : (
+                <button
+                  onClick={() => startEdit('known_people_notes', (person as any).known_people_notes || '')}
+                  className="text-[15px] text-left w-full"
+                >
+                  {(person as any).known_people_notes ? (
+                    <span className="text-foreground whitespace-pre-wrap">{(person as any).known_people_notes}</span>
+                  ) : (
+                    <span className="text-muted-foreground italic">Tap to add who they know...</span>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-medium text-muted-foreground px-1">Linked people</span>
+              <button
+                onClick={() => setShowConnectPicker(!showConnectPicker)}
+                aria-label={showConnectPicker ? 'Cancel' : 'Add link'}
+                className="p-1.5 rounded-button-sm bg-secondary border border-border text-foreground hover:border-foreground/20"
+              >
+                {showConnectPicker ? <X className="w-3.5 h-3.5" strokeWidth={1.75} /> : <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              </button>
+            </div>
+
+            {showConnectPicker && availableToConnect.length > 0 && (
+              <div className="surface-card p-2 max-h-48 overflow-y-auto">
+                <p className="text-[12px] text-muted-foreground px-2 py-1">Link to someone on Membr:</p>
+                {availableToConnect.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleConnect(p.id)}
+                    className="w-full flex items-center gap-3 p-2 rounded-button-sm hover:bg-foreground/[0.04] transition-colors"
+                  >
+                    <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
+                    <span className="text-[14px] text-foreground">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showConnectPicker && availableToConnect.length === 0 && (
+              <p className="text-[12px] text-muted-foreground italic">No more people to connect.</p>
+            )}
+
+            {personConnections.length > 0 && (
+              <div className="space-y-2">
+                {personConnections.map(conn => {
+                  const otherId = conn.person_a_id === personId ? conn.person_b_id : conn.person_a_id;
+                  const otherPerson = allPeople.find(p => p.id === otherId);
+                  if (!otherPerson) return null;
+                  return (
+                    <div key={conn.id} className="flex items-center gap-3 p-3 surface-card">
+                      <PersonAvatar name={otherPerson.name} photo={otherPerson.photos[0]} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[15px] font-medium text-foreground truncate">{otherPerson.name}</div>
+                        {conn.note && <div className="text-[13px] text-muted-foreground truncate">{conn.note}</div>}
+                      </div>
+                      <button
+                        onClick={() => handleDisconnect(conn.id)}
+                        aria-label="Unlink"
+                        className="p-1.5 rounded-button-sm hover:bg-foreground/[0.04] text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <UserMinus className="w-4 h-4" strokeWidth={1.75} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Meetings log */}
-      <MeetingsSection personId={personId} />
-
-      <button
-        onClick={handleDelete}
-        className="flex items-center gap-2 mx-auto mt-10 text-destructive text-sm hover:opacity-80"
-      >
-        <Trash2 className="w-4 h-4" /> Remove from Facemap
-      </button>
+      <div className="mt-6">
+        <MeetingsSection personId={personId} />
+      </div>
 
       <AnimatePresence>
         {briefOpen && (
