@@ -121,7 +121,7 @@ workflows:
         submit_to_testflight: true
         beta_groups:
           - External Testers
-        # Flip to true when ready for App Store production track.
-        # release_type AFTER_APPROVAL holds the build for manual release.
+        # When ready to ship to the App Store production track, set
+        # submit_to_app_store: true and add release_type: AFTER_APPROVAL
+        # (Codemagic rejects release_type unless submit_to_app_store is true).
         submit_to_app_store: false
-        release_type: AFTER_APPROVAL
