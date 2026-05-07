@@ -12,9 +12,6 @@ definitions:
     node: 20
     xcode: latest
     cocoapods: default
-  ios_signing_app_store: &ios_signing_app_store
-    distribution_type: app_store
-    bundle_identifier: com.acofsky.facemap
   scripts:
     - &install_deps
       name: Install npm dependencies
@@ -64,8 +61,6 @@ workflows:
       app_store_connect: MembrCodeMagicAPIKey
     environment:
       <<: *env_versions
-      ios_signing:
-        <<: *ios_signing_app_store
       vars:
         # Set LIVE_RELOAD_URL in Codemagic UI to your current cloudflared tunnel URL
         # (e.g. https://something.trycloudflare.com). Updated whenever the tunnel changes.
@@ -105,8 +100,6 @@ workflows:
       app_store_connect: MembrCodeMagicAPIKey
     environment:
       <<: *env_versions
-      ios_signing:
-        <<: *ios_signing_app_store
       vars:
         BUILD_NUMBER_OFFSET: 0
     triggering:
