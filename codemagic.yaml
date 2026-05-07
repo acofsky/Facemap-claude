@@ -30,12 +30,20 @@ definitions:
     - &setup_signing
       name: Set up code signing (fetch or create on demand)
       script: |
+        set -e
         keychain initialize
         app-store-connect fetch-signing-files com.acofsky.facemap \
           --type IOS_APP_STORE \
           --create
         keychain add-certificates
-        xcode-project use-profiles
+        # Restrict to the app's xcodeproj so use-profiles isn't distracted by
+        # Pods.xcodeproj (which has no signing requirements and can confuse matching).
+        xcode-project use-profiles \
+          --xcode-project-patterns ios/App/App.xcodeproj \
+          --warnings-as-errors
+        echo "--- Signing settings after use-profiles: ---"
+        grep -E "DEVELOPMENT_TEAM|CODE_SIGN_STYLE|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" \
+          ios/App/App.xcodeproj/project.pbxproj | sort -u
     - &set_build_number
       name: Set iOS build number
       script: |
