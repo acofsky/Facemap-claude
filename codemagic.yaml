@@ -1,0 +1,127 @@
+# Codemagic CI/CD config — two workflows, both Linux-triggered, neither needs a Mac.
+#
+# ios-livereload: dev hot-reload builds for an internal TestFlight group on your phone.
+#                 Bakes CAP_LIVE_RELOAD into the IPA so the installed app loads from
+#                 your laptop's Vite server over a cloudflared tunnel.
+#
+# ios-production: App Store / public TestFlight releases. Never sets CAP_LIVE_RELOAD,
+#                 so the IPA is byte-equivalent to a vanilla Capacitor build.
+
+definitions:
+  env_versions: &env_versions
+    node: 20
+    xcode: latest
+    cocoapods: default
+  ios_signing_app_store: &ios_signing_app_store
+    distribution_type: app_store
+    bundle_identifier: com.acofsky.facemap
+  scripts:
+    - &install_deps
+      name: Install npm dependencies
+      script: npm ci
+    - &web_build
+      name: Build web bundle
+      script: npm run build
+    - &cap_sync
+      name: Capacitor sync iOS
+      script: npx cap sync ios
+    - &pod_install
+      name: Install CocoaPods
+      script: |
+        cd ios/App
+        pod install
+    - &set_build_number
+      name: Set iOS build number
+      script: |
+        cd ios/App
+        # $BUILD_NUMBER is Codemagic's auto-incrementing per-workflow counter.
+        # $BUILD_NUMBER_OFFSET lets each workflow shift its number range
+        # (live-reload uses a high offset so its builds sort above production).
+        agvtool new-version -all $((${BUILD_NUMBER_OFFSET:-0} + $BUILD_NUMBER))
+    - &xcode_build
+      name: Build IPA
+      script: |
+        xcode-project build-ipa \
+          --workspace ios/App/App.xcworkspace \
+          --scheme App
+
+workflows:
+
+  ios-livereload:
+    name: iOS Live-Reload (internal TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: acofsky_appstore
+    environment:
+      <<: *env_versions
+      ios_signing:
+        <<: *ios_signing_app_store
+      vars:
+        # Set LIVE_RELOAD_URL in Codemagic UI to your current cloudflared tunnel URL
+        # (e.g. https://something.trycloudflare.com). Updated whenever the tunnel changes.
+        CAP_LIVE_RELOAD: $LIVE_RELOAD_URL
+        # Shift live-reload bundle versions into the 99000+ range so they sort
+        # above production builds in App Store Connect and are unmistakable.
+        BUILD_NUMBER_OFFSET: 99000
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: claude/ios-simulator-setup-7878D
+          include: true
+    scripts:
+      - *install_deps
+      - *web_build
+      - *cap_sync
+      - *pod_install
+      - *set_build_number
+      - *xcode_build
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - LiveReload
+
+  ios-production:
+    name: iOS Production (App Store / public TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: acofsky_appstore
+    environment:
+      <<: *env_versions
+      ios_signing:
+        <<: *ios_signing_app_store
+      vars:
+        BUILD_NUMBER_OFFSET: 0
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*.*.*'
+          include: true
+    scripts:
+      - *install_deps
+      - *web_build
+      - *cap_sync
+      - *pod_install
+      - *set_build_number
+      - *xcode_build
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - External Testers
+        # Flip to true when ready for App Store production track.
+        # release_type AFTER_APPROVAL holds the build for manual release.
+        submit_to_app_store: false
+        release_type: AFTER_APPROVAL
