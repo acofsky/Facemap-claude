@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Membr app icon — framed (dark) variant. Source of truth for public/app-icon.png -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="#000000"/>
+  <!-- Right bracket — 150° arc on the east side -->
+  <path d="M 584 242 A 290 290 0 0 1 584 782" stroke="#F4F4F4" stroke-width="40" stroke-linecap="round" fill="none"/>
+  <!-- Left bracket — 150° arc on the west side -->
+  <path d="M 440 242 A 290 290 0 0 0 440 782" stroke="#F4F4F4" stroke-width="40" stroke-linecap="round" fill="none"/>
+  <!-- The signal -->
+  <circle cx="512" cy="512" r="38" fill="#E03030"/>
+</svg>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <!-- Membr symbol mark — frameless variant. Use on already-dark surfaces. -->
+  <!-- Right bracket — 150° arc on the east side -->
+  <path d="M 595 203 A 320 320 0 0 1 595 821" stroke="#F4F4F4" stroke-width="48" stroke-linecap="round"/>
+  <!-- Left bracket — 150° arc on the west side -->
+  <path d="M 429 203 A 320 320 0 0 0 429 821" stroke="#F4F4F4" stroke-width="48" stroke-linecap="round"/>
+  <!-- The signal -->
+  <circle cx="512" cy="512" r="42" fill="#E03030"/>
+</svg>
