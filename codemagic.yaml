@@ -58,11 +58,7 @@ definitions:
           --certificate-key="@file:$CERT_KEY_PATH" \
           --create
         keychain add-certificates
-        # Restrict to the app's xcodeproj so use-profiles isn't distracted by
-        # Pods.xcodeproj (which has no signing requirements and can confuse matching).
-        xcode-project use-profiles \
-          --xcode-project-patterns ios/App/App.xcodeproj \
-          --warnings-as-errors
+        xcode-project use-profiles
         echo "--- Signing settings after use-profiles: ---"
         grep -E "DEVELOPMENT_TEAM|CODE_SIGN_STYLE|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" \
           ios/App/App.xcodeproj/project.pbxproj | sort -u
