@@ -32,10 +32,11 @@ There are **two branches** with `codemagic.yaml`:
 
 Two workflows live in `codemagic.yaml`:
 
-### `ios-internal` (the one you'll use 99% of the time)
+### `ios-livereload` (the one you'll use 99% of the time)
 
-- **Trigger:** every push to `claude/ios-simulator-setup-7878D`.
-- **What it does:** builds the iOS IPA with vanilla config (no `server.url`, no live-reload), uploads to TestFlight internal group `LiveReload` (legacy name — group is fine, just labeled oddly).
+- **Workflow ID is `ios-livereload`. Display name is "iOS Internal (TestFlight, every push)".** Don't rename the ID — it's intentionally kept to preserve the Codemagic cache keying that holds the distribution cert + private key. Renaming the ID orphans the cache, forcing a re-mint that Apple will reject (409: cert already exists).
+- **Trigger:** auto on push to `claude/ios-simulator-setup-7878D` *if the user has the auto-build toggle on in Codemagic settings*. The user typically prefers **manual triggers** ("Start new build" in Codemagic UI) because they batch changes.
+- **What it does:** builds the iOS IPA with vanilla config (no `server.url`, no live-reload), uploads to TestFlight internal group `LiveReload`.
 - **Build time:** ~10 min.
 - **Bundle versions:** offset by `+99000` so internal builds sort visibly above production in App Store Connect.
 
@@ -72,15 +73,15 @@ The actual Apple-side API key has **Admin** access — anything less can't auto-
 
 ## Daily workflow (the one we want to optimize for)
 
-User asks Claude to make a change.
+User asks Claude to make changes (typically in **batches** — they prefer to accumulate several edits before triggering a build).
 
-1. Make the change in `src/`.
-2. `git add -A && git commit -m "..." && git push origin claude/ios-simulator-setup-7878D`.
-3. Codemagic auto-builds (~10 min). If it doesn't auto-trigger, user clicks "Start new build" manually or re-checks the auto-trigger toggle in app settings.
+1. Make the change(s) in `src/`.
+2. `git add -A && git commit -m "..." && git push origin claude/ios-simulator-setup-7878D`. Multiple commits are fine — only one build will be triggered when the user manually clicks Start.
+3. **The user manually triggers the Codemagic build** when they're ready: Codemagic UI → Start new build → branch `claude/ios-simulator-setup-7878D` → workflow `iOS Internal (TestFlight, every push)` (ID `ios-livereload`) → Start. ~10 min.
 4. TestFlight notifies the user's iPhone. They install and test.
 5. If broken: iterate. Don't squash-rebase mid-iteration unless asked.
 
-**Be deliberate about commit/push frequency.** Each push = one ~10-min Codemagic build. Free tier = 500 min/month ≈ 50 builds. Batch related changes into single commits when possible.
+**Be deliberate about commit/push frequency.** Each manual build trigger = ~10 min of CI. Free tier = 500 min/month ≈ 50 builds. Batching changes into one build is the user's stated preference.
 
 ## What's NOT set up
 

@@ -1,7 +1,9 @@
 # Codemagic CI/CD config — two workflows, both Linux-triggered, neither needs a Mac.
 #
-# ios-internal:   internal-tester TestFlight builds. Auto-triggered on every push to
-#                 the dev branch. ~10 min per build. Use this for testing on your phone.
+# ios-livereload: internal-tester TestFlight builds. (ID kept as-is to preserve cache
+#                 keying with the minted distribution cert. Display name describes
+#                 actual purpose: "iOS Internal".) Triggered on push to the dev
+#                 branch, or manually from Codemagic UI. ~10 min per build.
 #
 # ios-production: App Store / public TestFlight releases. Triggered only by v*.*.* tags.
 
@@ -77,7 +79,7 @@ definitions:
 
 workflows:
 
-  ios-internal:
+  ios-livereload:
     name: iOS Internal (TestFlight, every push)
     instance_type: mac_mini_m2
     max_build_duration: 30
