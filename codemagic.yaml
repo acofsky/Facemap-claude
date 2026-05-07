@@ -1,11 +1,9 @@
 # Codemagic CI/CD config — two workflows, both Linux-triggered, neither needs a Mac.
 #
-# ios-livereload: dev hot-reload builds for an internal TestFlight group on your phone.
-#                 Bakes CAP_LIVE_RELOAD into the IPA so the installed app loads from
-#                 your laptop's Vite server over a cloudflared tunnel.
+# ios-internal:   internal-tester TestFlight builds. Auto-triggered on every push to
+#                 the dev branch. ~10 min per build. Use this for testing on your phone.
 #
-# ios-production: App Store / public TestFlight releases. Never sets CAP_LIVE_RELOAD,
-#                 so the IPA is byte-equivalent to a vanilla Capacitor build.
+# ios-production: App Store / public TestFlight releases. Triggered only by v*.*.* tags.
 
 definitions:
   env_versions: &env_versions
@@ -67,8 +65,8 @@ definitions:
       script: |
         cd ios/App
         # $BUILD_NUMBER is Codemagic's auto-incrementing per-workflow counter.
-        # $BUILD_NUMBER_OFFSET lets each workflow shift its number range
-        # (live-reload uses a high offset so its builds sort above production).
+        # $BUILD_NUMBER_OFFSET lets each workflow shift its number range so
+        # internal builds sort above production builds in App Store Connect.
         agvtool new-version -all $((${BUILD_NUMBER_OFFSET:-0} + $BUILD_NUMBER))
     - &xcode_build
       name: Build IPA
@@ -79,8 +77,8 @@ definitions:
 
 workflows:
 
-  ios-livereload:
-    name: iOS Live-Reload (internal TestFlight)
+  ios-internal:
+    name: iOS Internal (TestFlight, every push)
     instance_type: mac_mini_m2
     max_build_duration: 30
     integrations:
@@ -88,10 +86,7 @@ workflows:
     environment:
       <<: *env_versions
       vars:
-        # Set LIVE_RELOAD_URL in Codemagic UI to your current cloudflared tunnel URL
-        # (e.g. https://something.trycloudflare.com). Updated whenever the tunnel changes.
-        CAP_LIVE_RELOAD: $LIVE_RELOAD_URL
-        # Shift live-reload bundle versions into the 99000+ range so they sort
+        # Shift internal build numbers into the 99000+ range so they sort
         # above production builds in App Store Connect and are unmistakable.
         BUILD_NUMBER_OFFSET: 99000
     cache:
