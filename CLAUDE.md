@@ -1,0 +1,171 @@
+# FaceMap — repo context for Claude Code
+
+## What this is
+
+**FaceMap** is a Capacitor 7 iOS app: a Vite + React + TypeScript + shadcn/ui PWA wrapped in a native iOS shell.
+
+- Bundle ID: `com.acofsky.facemap`
+- App name: `FaceMap`
+- Apple Team ID: `C59FSCZHFV` (Adam Cofsky)
+- The user works on **iPad only** — no local terminal, no Mac. All editing happens through Claude Code.
+- All builds happen on **Codemagic's cloud Mac**. The user never touches Xcode.
+- The app is already in **TestFlight**.
+
+## The Mac-free pipeline
+
+```
+iPad ── (chat with Claude) ──> Linux VM ── (git push) ──> Lovable proxy ──> GitHub ──> Codemagic cloud Mac ── (xcodebuild + signing) ──> TestFlight ──> iPhone
+```
+
+Three machines, the user only ever touches the iPad. Claude (you) does the editing on the Linux VM. Codemagic does the building. TestFlight delivers.
+
+## Branches
+
+There are **two branches** with `codemagic.yaml`:
+
+- **`claude/ios-simulator-setup-7878D`** — the dev/working branch. **All real work happens here.** Pushing to this branch should auto-trigger the `ios-internal` Codemagic workflow (~10 min build → TestFlight).
+- **`claude/pwa-to-ios-conversion-F3VuG`** — the GitHub default branch. Codemagic discovers `codemagic.yaml` here. Keep this branch in sync with the dev branch's `codemagic.yaml` whenever it changes (Codemagic re-checks the default branch for config). Otherwise no other code lives here that we modify.
+
+**Workflow when changing `codemagic.yaml`:** edit on the dev branch → commit + push → checkout default branch → `git checkout claude/ios-simulator-setup-7878D -- codemagic.yaml` → commit + push → checkout dev branch.
+
+## Codemagic workflows
+
+Two workflows live in `codemagic.yaml`:
+
+### `ios-internal` (the one you'll use 99% of the time)
+
+- **Trigger:** every push to `claude/ios-simulator-setup-7878D`.
+- **What it does:** builds the iOS IPA with vanilla config (no `server.url`, no live-reload), uploads to TestFlight internal group `LiveReload` (legacy name — group is fine, just labeled oddly).
+- **Build time:** ~10 min.
+- **Bundle versions:** offset by `+99000` so internal builds sort visibly above production in App Store Connect.
+
+### `ios-production`
+
+- **Trigger:** push of a tag matching `v*.*.*` (e.g. `v0.1.0`).
+- **What it does:** builds vanilla IPA, uploads to TestFlight `External Testers` group. **Does not yet auto-submit to App Store** — `submit_to_app_store: false`. To ship to the App Store production track: change that to `true` and add `release_type: AFTER_APPROVAL` (Codemagic rejects `release_type` unless `submit_to_app_store: true`).
+- Apple's review still happens out-of-band in App Store Connect (~24–48h).
+
+## Code signing — the painful history that's now solved
+
+The signing pipeline took several iterations to get right. **Don't re-litigate this without a strong reason.** Current state:
+
+- Signing identity: a fresh **iOS Distribution certificate** named `iOS Distribution: Adam Cofsky (R72Z2C534V)`, valid until **May 2027**. It was minted by Codemagic during the first successful build using a private key generated in-build with `openssl genrsa`.
+- The user's friend's original distribution certificate still exists in App Store Connect but is **not used** — its private key only lives on his Mac.
+- Apple allows 3 distribution certs per team; we currently use 1 of 3 slots (or 2, including the friend's).
+- Provisioning profile: `FaceMap ios_app_store 1778153984 (82MQA99PG7)`, auto-created by `app-store-connect fetch-signing-files --create`.
+- The cert + private key are persisted across builds via Codemagic cache (`/Users/builder/Library/codemagic-cli-tools` is in `cache_paths`). A flag file `dist_cert_minted.flag` in that cache prevents re-minting on every build.
+
+If the cache is ever cleared (Codemagic UI → app → Cache → Clear), the next build will mint a NEW cert (using one more of the 3 slots). This is a destructive action — only do it if there's a real reason.
+
+### Gotchas we hit
+
+1. **Codemagic implicit `ios_signing` block was using `fetch-signing-files` without `--create`.** Removed the `environment.ios_signing` block; signing is now driven entirely by an explicit script.
+2. **`certificates create` doesn't auto-generate a private key.** Must pass one in via `--certificate-key`. Generated locally with `openssl genrsa`.
+3. **`xcode-project use-profiles` doesn't accept `--xcode-project-patterns` or `--warnings-as-errors`** in this version of the CLI. Just call it bare.
+4. **`Pods.xcodeproj` exists alongside `App.xcodeproj` after pod install.** Default `**/*.xcodeproj` glob hits both; harmless because Pods has no signing requirements.
+
+## Codemagic integration name
+
+In `codemagic.yaml`, both workflows reference `app_store_connect: MembrCodeMagicAPIKey`. **This must match the alias** the user gave the App Store Connect API key in Codemagic → Teams → Integrations. Don't rename casually.
+
+The actual Apple-side API key has **Admin** access — anything less can't auto-create certs/profiles.
+
+## Daily workflow (the one we want to optimize for)
+
+User asks Claude to make a change.
+
+1. Make the change in `src/`.
+2. `git add -A && git commit -m "..." && git push origin claude/ios-simulator-setup-7878D`.
+3. Codemagic auto-builds (~10 min). If it doesn't auto-trigger, user clicks "Start new build" manually or re-checks the auto-trigger toggle in app settings.
+4. TestFlight notifies the user's iPhone. They install and test.
+5. If broken: iterate. Don't squash-rebase mid-iteration unless asked.
+
+**Be deliberate about commit/push frequency.** Each push = one ~10-min Codemagic build. Free tier = 500 min/month ≈ 50 builds. Batch related changes into single commits when possible.
+
+## What's NOT set up
+
+- **No live-reload to phone.** We considered it (cloudflared / localtunnel / ngrok) but the iPad-only setup means the dev server has nowhere persistent to live. User explicitly chose to skip it. If revisiting: see Capacitor's `server.url` config and the env-gate already present in `capacitor.config.ts` (`process.env.CAP_LIVE_RELOAD`). The infra would need an always-on cloud VM (e.g. Fly.io ~$5/mo) or a tunnel that reliably works from the Lovable Linux VM.
+- **No Capacitor Live Updates / Capgo / CodePush.** Web-bundle OTA updates require a plugin that wasn't included in the build. Adding one is a future project.
+- **No Android workflow.** `@capacitor/android` is in deps but no Codemagic workflow targets it. App Store-only for now.
+
+## Critical files
+
+- **`codemagic.yaml`** — the entire build pipeline. Two workflows, shared script anchors via YAML refs.
+- **`capacitor.config.ts`** — Capacitor config. Has a no-op env-gate for `CAP_LIVE_RELOAD`; production builds always produce a vanilla config.
+- **`ios/App/App.xcodeproj/project.pbxproj`** — the Xcode project. Don't hand-edit signing fields; `xcode-project use-profiles` writes them in the Codemagic build.
+- **`package.json`** — standard Vite scripts. `dev`, `build`, `lint`, `test`. No live-reload tunnel script.
+- **`vite.config.ts`** — Vite config, binds `host: "::"` (IPv6) by default. If running locally on a system that doesn't support IPv6, override with `vite --host 0.0.0.0`.
+
+## Common operations
+
+### "Make a UI change"
+
+Edit React code in `src/`. Commit. Push. ~10 min later it's on the user's phone via TestFlight.
+
+### "Add a Capacitor plugin"
+
+```bash
+npm install @capacitor/<plugin-name>
+npx cap sync ios   # locally — Codemagic does this too in CI
+```
+
+Commit `package.json`, `package-lock.json`, and any iOS plugin config changes. Push.
+
+### "Ship to public TestFlight"
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Triggers `ios-production` workflow. Goes to `External Testers` TestFlight group.
+
+### "Ship to App Store production"
+
+1. Edit `codemagic.yaml` → in `ios-production.publishing.app_store_connect`, set `submit_to_app_store: true` and add `release_type: AFTER_APPROVAL`.
+2. Mirror change to default branch (see Branches section).
+3. Tag a version, push the tag.
+4. Apple reviews (~24–48h).
+5. User clicks "Release" in App Store Connect when notified.
+
+### "Investigate a Codemagic build failure"
+
+1. Look at the failed step's name in the build log.
+2. The `setup_signing` step ends with a `Signing settings after use-profiles:` block — useful for diagnosing signing issues.
+3. The `Build IPA` step is xcodebuild; errors there usually mean signing didn't apply or there's a Capacitor/Pods conflict.
+
+## Hard constraints
+
+- **No Mac access ever.** The user does not have one and will not get one. Don't suggest "open Xcode" or "run on a Mac." Codemagic does Mac things.
+- **No App Store screenshots / store listing edits via code.** Those live in App Store Connect's web UI.
+- **Don't push directly to the default branch** unless it's just to sync `codemagic.yaml` for Codemagic discovery. The dev branch is where work happens.
+- **Don't experiment in `codemagic.yaml` without a reason.** Each test push burns 10 min of CI budget. Read the file carefully and reason from there before pushing speculative changes.
+
+## Apple ecosystem accounts
+
+- Apple Developer team: Adam Cofsky (`C59FSCZHFV`)
+- App Store Connect API key alias in Codemagic: `MembrCodeMagicAPIKey` (Admin access)
+- TestFlight internal group: `LiveReload` (current internal builds land here; name is legacy)
+- TestFlight external group: `External Testers` (production builds land here when tagged)
+
+## Useful command history (for orientation)
+
+```bash
+# Build locally (sanity check, doesn't deploy anywhere)
+npm run build
+
+# Type check
+npx tsc --noEmit
+
+# Lint
+npm run lint
+
+# Tests
+npm test
+```
+
+## When Claude Code starts a fresh session here
+
+If the user says something vague like "make this faster" or "fix the layout," start by skimming `src/` for the relevant component. The actual app code is React. The Capacitor/iOS layer is configured once and rarely changes.
+
+If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the conversation that produced this setup is in git history (commits `17c70a9` through `2552d30` on `claude/ios-simulator-setup-7878D`).
