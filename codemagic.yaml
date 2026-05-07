@@ -32,19 +32,30 @@ definitions:
       script: |
         set -e
         keychain initialize
-        # An existing distribution cert (created on a different Mac) lives in
-        # App Store Connect but its private key is unreachable. Force a brand
-        # new cert + private key here so keychain add-certificates has both.
-        # Cached across builds via cache_paths below; only mints a fresh cert
-        # when the cache is empty (first build, or after a cache flush).
-        CERT_CACHE_FLAG=/Users/builder/Library/codemagic-cli-tools/cache/dist_cert_minted.flag
+        # The team's existing dist cert was created on a different Mac, so its
+        # private key isn't reachable here. We generate a fresh RSA key and
+        # mint a brand new dist cert against it. Both the key and a flag file
+        # live in the cached codemagic-cli-tools dir so subsequent builds
+        # reuse them instead of re-minting (Apple caps dist certs at 3/team).
+        CACHE_DIR=/Users/builder/Library/codemagic-cli-tools/cache
+        CERT_KEY_PATH="$CACHE_DIR/dist_cert_key.pem"
+        CERT_CACHE_FLAG="$CACHE_DIR/dist_cert_minted.flag"
+        mkdir -p "$CACHE_DIR"
+        if [ ! -f "$CERT_KEY_PATH" ]; then
+          echo "Generating new RSA private key for distribution certificate"
+          openssl genrsa -out "$CERT_KEY_PATH" 2048
+        fi
         if [ ! -f "$CERT_CACHE_FLAG" ]; then
-          app-store-connect certificates create --type IOS_DISTRIBUTION --save
-          mkdir -p "$(dirname "$CERT_CACHE_FLAG")"
+          echo "Minting new iOS distribution certificate"
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION \
+            --certificate-key="@file:$CERT_KEY_PATH" \
+            --save
           touch "$CERT_CACHE_FLAG"
         fi
         app-store-connect fetch-signing-files com.acofsky.facemap \
           --type IOS_APP_STORE \
+          --certificate-key="@file:$CERT_KEY_PATH" \
           --create
         keychain add-certificates
         # Restrict to the app's xcodeproj so use-profiles isn't distracted by
