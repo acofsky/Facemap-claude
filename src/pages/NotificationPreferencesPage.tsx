@@ -8,6 +8,7 @@ import {
 } from '@/lib/notifications';
 import { Capacitor } from '@capacitor/core';
 import { cn } from '@/lib/utils';
+import { haptics } from '@/lib/haptics';
 
 interface NotificationPreferencesPageProps {
   onBack: () => void;
@@ -239,7 +240,11 @@ function Switch({
     <button
       role="switch"
       aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
+      onClick={() => {
+        if (disabled) return;
+        haptics.light();
+        onChange(!checked);
+      }}
       disabled={disabled}
       className={cn(
         'relative w-[44px] h-[26px] rounded-full transition-colors shrink-0',

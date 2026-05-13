@@ -181,3 +181,25 @@
   .safe-left   { padding-left:   env(safe-area-inset-left); }
   .safe-right  { padding-right:  env(safe-area-inset-right); }
 }
+
+/*
+ * Spec §12 — when the OS reports prefers-reduced-motion: reduce, kill
+ * every translateY / scale / pulse animation. Plain opacity fades are
+ * fine to keep. Components reading useReduceMotion() handle this for
+ * Framer Motion; this block handles CSS-driven animations.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-red-pulse {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

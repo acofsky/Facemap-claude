@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Plus, Loader2, ChevronDown, Archive } from 'lucide-react';
+import { Plus, Loader2, ChevronDown, Archive, Pencil, Trash2 } from 'lucide-react';
 import {
-  useCircles, useCreateCircle, usePersonCircles, useEvents, usePersonEvents, useArchiveEvent,
+  useCircles, useCreateCircle, usePersonCircles, useEvents, usePersonEvents,
+  useArchiveEvent, useDeleteCircle, useDeleteEvent,
 } from '@/hooks/use-data';
 import { CircleSheet } from '@/components/CircleSheet';
 import { EventSheet } from '@/components/EventSheet';
-import { isValidTone, type Event as MembrEvent, type Tone } from '@/lib/store';
+import { useLongPress } from '@/hooks/use-long-press';
+import { isValidTone, type Event as MembrEvent, type Tone, type Circle } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 interface CirclesPageProps {
@@ -37,12 +39,25 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
   const { data: archivedEvents = [] } = useEvents({ includeArchived: true });
   const { data: personEvents = [] } = usePersonEvents();
   const archiveEvt = useArchiveEvent();
+  const deleteCircle = useDeleteCircle();
+  const deleteEvent = useDeleteEvent();
   const createCircle = useCreateCircle();
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [circleSheetOpen, setCircleSheetOpen] = useState(false);
   const [eventSheetOpen, setEventSheetOpen] = useState<{ event?: MembrEvent } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  // Long-press context menu for circle/event tiles.
+  const [tileMenu, setTileMenu] = useState<
+    | { kind: 'circle'; id: string; x: number; y: number }
+    | { kind: 'event'; id: string; x: number; y: number }
+    | null
+  >(null);
+
+  const openContextMenu = (kind: 'circle' | 'event', id: string, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    setTileMenu({ kind, id, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } as typeof tileMenu);
+  };
 
   const archivedOnly = useMemo(
     () => archivedEvents.filter((e) => e.archived_at !== null),
@@ -126,22 +141,13 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
       {circles.length > 0 ? (
         <div className="px-5 grid grid-cols-2 gap-3">
           {circles.map((circle) => (
-            <button
+            <CircleTile
               key={circle.id}
-              onClick={() => onSelectCircle(circle.id)}
-              className={cn(
-                'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
-                `tile-${circleTone(circle)}`,
-              )}
-            >
-              <div className="text-[15px] font-semibold text-white truncate flex items-center gap-1">
-                {circle.emoji && <span>{circle.emoji}</span>}
-                <span className="truncate">{circle.name}</span>
-              </div>
-              <div className="text-[12px] text-white/70">
-                {circleMemberCount(circle.id)} {circleMemberCount(circle.id) === 1 ? 'member' : 'members'}
-              </div>
-            </button>
+              circle={circle}
+              memberCount={circleMemberCount(circle.id)}
+              onTap={() => onSelectCircle(circle.id)}
+              onLongPress={(target) => openContextMenu('circle', circle.id, target)}
+            />
           ))}
         </div>
       ) : (
@@ -158,24 +164,13 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
       {events.length > 0 ? (
         <div className="px-5 grid grid-cols-2 gap-3">
           {events.map((evt) => (
-            <button
+            <EventTile
               key={evt.id}
-              onClick={() => onSelectEvent(evt.id)}
-              className={cn(
-                'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
-                `tile-${isValidTone(evt.tone) ? evt.tone : 'red'}`,
-              )}
-            >
-              <div className="text-[15px] font-semibold text-white truncate">{evt.name}</div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[12px] text-white/70">
-                  {eventMemberCount(evt.id)} {eventMemberCount(evt.id) === 1 ? 'member' : 'members'}
-                </span>
-                {(evt.start_date || evt.end_date) && (
-                  <span className="text-[11px] text-white/60">{formatRange(evt.start_date, evt.end_date)}</span>
-                )}
-              </div>
-            </button>
+              event={evt}
+              memberCount={eventMemberCount(evt.id)}
+              onTap={() => onSelectEvent(evt.id)}
+              onLongPress={(target) => openContextMenu('event', evt.id, target)}
+            />
           ))}
         </div>
       ) : (
@@ -242,7 +237,187 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
           <EventSheet event={eventSheetOpen.event} onClose={() => setEventSheetOpen(null)} />
         )}
       </AnimatePresence>
+
+      {/* Long-press context menu */}
+      {tileMenu && (
+        <div
+          className="fixed inset-0 z-[55]"
+          onPointerDown={() => setTileMenu(null)}
+        >
+          <div
+            className="absolute w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 shadow-xl"
+            style={{
+              left: Math.max(12, Math.min(window.innerWidth - 188, tileMenu.x - 88)),
+              top: Math.max(12, tileMenu.y),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {tileMenu.kind === 'circle' ? (
+              <>
+                <MenuItem
+                  icon={Pencil}
+                  label="Edit"
+                  onClick={() => {
+                    const c = circles.find((x) => x.id === tileMenu.id);
+                    setTileMenu(null);
+                    if (c) onSelectCircle(c.id);
+                  }}
+                />
+                <MenuItem
+                  icon={Trash2}
+                  destructive
+                  label="Delete"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    if (confirm('Delete this Circle? People will not be removed from Membr.')) {
+                      await deleteCircle.mutateAsync(tileMenu.id);
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <MenuItem
+                  icon={Pencil}
+                  label="Edit"
+                  onClick={() => {
+                    const evt = events.find((x) => x.id === tileMenu.id) || archivedEvents.find((x) => x.id === tileMenu.id);
+                    setTileMenu(null);
+                    if (evt) setEventSheetOpen({ event: evt });
+                  }}
+                />
+                <MenuItem
+                  icon={Archive}
+                  label="Archive"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    await archiveEvt.mutateAsync({ id: tileMenu.id, archived: true });
+                  }}
+                />
+                <MenuItem
+                  icon={Trash2}
+                  destructive
+                  label="Delete"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    if (confirm('Delete this Event? Members stay in your Membr.')) {
+                      await deleteEvent.mutateAsync(tileMenu.id);
+                    }
+                  }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function CircleTile({
+  circle,
+  memberCount,
+  onTap,
+  onLongPress,
+}: {
+  circle: Circle;
+  memberCount: number;
+  onTap: () => void;
+  onLongPress: (target: HTMLElement) => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const longPress = useLongPress(() => {
+    if (ref.current) onLongPress(ref.current);
+  });
+  return (
+    <button
+      ref={ref}
+      onClick={onTap}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (ref.current) onLongPress(ref.current);
+      }}
+      {...longPress}
+      className={cn(
+        'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
+        `tile-${circleTone(circle)}`,
+      )}
+    >
+      <div className="text-[15px] font-semibold text-white truncate flex items-center gap-1">
+        {circle.emoji && <span>{circle.emoji}</span>}
+        <span className="truncate">{circle.name}</span>
+      </div>
+      <div className="text-[12px] text-white/70">
+        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+      </div>
+    </button>
+  );
+}
+
+function EventTile({
+  event,
+  memberCount,
+  onTap,
+  onLongPress,
+}: {
+  event: MembrEvent;
+  memberCount: number;
+  onTap: () => void;
+  onLongPress: (target: HTMLElement) => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const longPress = useLongPress(() => {
+    if (ref.current) onLongPress(ref.current);
+  });
+  return (
+    <button
+      ref={ref}
+      onClick={onTap}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (ref.current) onLongPress(ref.current);
+      }}
+      {...longPress}
+      className={cn(
+        'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
+        `tile-${isValidTone(event.tone) ? event.tone : 'red'}`,
+      )}
+    >
+      <div className="text-[15px] font-semibold text-white truncate">{event.name}</div>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[12px] text-white/70">
+          {memberCount} {memberCount === 1 ? 'member' : 'members'}
+        </span>
+        {(event.start_date || event.end_date) && (
+          <span className="text-[11px] text-white/60">{formatRange(event.start_date, event.end_date)}</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  destructive,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center gap-2',
+        destructive ? 'text-destructive' : 'text-foreground',
+      )}
+    >
+      <Icon className="w-4 h-4" strokeWidth={1.75} />
+      {label}
+    </button>
   );
 }
 

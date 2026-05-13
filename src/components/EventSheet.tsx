@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Loader2, Trash2, Sparkles } from 'lucide-react';
+import { DragHandle } from '@/components/DragHandle';
+import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { ColorPicker } from '@/components/ColorPicker';
 import { PersonAvatar } from '@/components/PersonAvatar';
@@ -133,9 +135,19 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 32, stiffness: 400 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 100 || info.velocity.y > 500) {
+            haptics.light();
+            onClose();
+          }
+        }}
         className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] z-50 max-h-[88vh] flex flex-col safe-bottom"
       >
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <DragHandle />
+        <div className="flex items-center justify-between px-5 pt-2 pb-3">
           <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">
             {isEdit ? 'Edit Event' : 'New Event'}
           </h2>

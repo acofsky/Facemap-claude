@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Zap, CalendarPlus } from "lucide-react";
+import { haptics } from "@/lib/haptics";
 
 interface CornerFabsProps {
   onAddPerson: () => void;
@@ -42,6 +43,7 @@ export function CornerFabs({ onAddPerson, onLogEncounter }: CornerFabsProps) {
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.15 }}
               onClick={() => {
+                haptics.light();
                 setMenuOpen(false);
                 onLogEncounter();
               }}
@@ -55,7 +57,10 @@ export function CornerFabs({ onAddPerson, onLogEncounter }: CornerFabsProps) {
 
         {/* Secondary FAB — Quick Actions */}
         <button
-          onClick={() => setMenuOpen((v) => !v)}
+          onClick={() => {
+            haptics.light();
+            setMenuOpen((v) => !v);
+          }}
           aria-label="Quick actions"
           aria-expanded={menuOpen}
           className="w-12 h-12 rounded-full bg-surface-2 border border-[hsl(0_0%_100%/0.12)] flex items-center justify-center text-foreground active:scale-95 transition-transform"
@@ -65,7 +70,10 @@ export function CornerFabs({ onAddPerson, onLogEncounter }: CornerFabsProps) {
 
         {/* Primary FAB — Add Person */}
         <button
-          onClick={onAddPerson}
+          onClick={() => {
+            haptics.medium();
+            onAddPerson();
+          }}
           aria-label="Add new person"
           className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
           style={{ boxShadow: "0 4px 16px hsl(var(--primary) / 0.35)" }}

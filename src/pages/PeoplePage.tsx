@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
 import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
-import { Search, Loader2, ListFilter, ChevronRight, ChevronDown } from 'lucide-react';
+import { SwipeRow } from '@/components/SwipeRow';
+import { LogEncounterModal } from '@/components/LogEncounterModal';
+import { MeetingBriefModal } from '@/components/MeetingBriefModal';
+import { Search, Loader2, ListFilter, ChevronRight, ChevronDown, CalendarPlus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 
@@ -25,6 +28,8 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   const [filter, setFilter] = useState<FilterKey>(null);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [sortOpen, setSortOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [briefFor, setBriefFor] = useState<{ id: string; name: string } | null>(null);
 
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
@@ -188,31 +193,60 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
             const cIds = personCircleMap[p.id] || [];
             const cs = cIds.map((id) => circles.find((c) => c.id === id)).filter(Boolean);
             return (
-              <button
+              <SwipeRow
                 key={p.id}
-                onClick={() => onSelectPerson(p.id)}
-                className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left active:scale-[0.99]"
+                className="rounded-lg"
+                actions={[
+                  {
+                    key: 'log',
+                    label: 'Log',
+                    background: 'hsl(var(--warning))',
+                    icon: <CalendarPlus className="w-4 h-4" strokeWidth={1.75} />,
+                    onTap: () => setLogOpen(true),
+                  },
+                  {
+                    key: 'brief',
+                    label: 'Brief',
+                    background: 'hsl(var(--primary))',
+                    icon: <Sparkles className="w-4 h-4" strokeWidth={1.75} />,
+                    onTap: () => setBriefFor({ id: p.id, name: p.name }),
+                  },
+                ]}
               >
-                <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-semibold text-foreground truncate">{p.name}</div>
-                  {cs.length > 0 ? (
-                    <div className="text-[12px] text-muted-text truncate">
-                      {cs.map((c) => c!.name).join(' · ')}
-                    </div>
-                  ) : (
-                    p.misc_notes && (
+                <button
+                  onClick={() => onSelectPerson(p.id)}
+                  className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                >
+                  <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-semibold text-foreground truncate">{p.name}</div>
+                    {cs.length > 0 ? (
                       <div className="text-[12px] text-muted-text truncate">
-                        {p.misc_notes.replace(/^\s*[•\-*]\s*/gm, '').slice(0, 60)}
+                        {cs.map((c) => c!.name).join(' · ')}
                       </div>
-                    )
-                  )}
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
-              </button>
+                    ) : (
+                      p.misc_notes && (
+                        <div className="text-[12px] text-muted-text truncate">
+                          {p.misc_notes.replace(/^\s*[•\-*]\s*/gm, '').slice(0, 60)}
+                        </div>
+                      )
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+                </button>
+              </SwipeRow>
             );
           })}
         </div>
+      )}
+
+      <LogEncounterModal open={logOpen} onClose={() => setLogOpen(false)} />
+      {briefFor && (
+        <MeetingBriefModal
+          personId={briefFor.id}
+          personName={briefFor.name}
+          onClose={() => setBriefFor(null)}
+        />
       )}
     </div>
   );
