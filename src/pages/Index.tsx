@@ -39,7 +39,11 @@ const Index = () => {
   if (selectedPersonId) {
     return (
       <div className="max-w-md mx-auto min-h-screen bg-background">
-        <PersonProfilePage personId={selectedPersonId} onBack={() => setSelectedPersonId(null)} />
+        <PersonProfilePage
+          personId={selectedPersonId}
+          onBack={() => setSelectedPersonId(null)}
+          onSelectPerson={(id) => setSelectedPersonId(id)}
+        />
       </div>
     );
   }
