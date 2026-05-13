@@ -208,6 +208,15 @@ Approved approach: ship one TestFlight build at the end of each milestone, not o
 - **M2 — Screen restructure + Events object.** 5-tab IA (add Recall). New Home, Person Detail, Circles & Events two-tier list. Corner-anchored Add Person FAB (red) + secondary Quick Actions FAB (dark) per spec §4.2. Migrate sheets (SHEET-AP, SHEET-LE, SHEET-MB, SHEET-CC) to native `UISheetPresentationController` detents. Replace any remaining legacy utility classes (`.warm-shadow`, `.icon-tile*`, etc.) that the M1 compat shim in `src/index.css` currently bridges.
 - **M3 — New features.** Smart Circle Engine (on-device clustering, three suggestion surfaces per spec §7). End-of-Day push notification with the "Who'd you meet today?" sheet variant. Onboarding flow (ONBD-01..04) + Profile re-trigger row.
 
+### Status as of M2+M3 completion
+
+Everything from the spec that is implementable in JS-over-WebView is shipped. Two items are intentionally **not** as the spec describes them:
+
+- **Sheets are Framer-Motion bottom sheets, not native `UISheetPresentationController`.** The visible chrome matches spec (drag handle, drag-to-dismiss, .large() height equivalent) but the underlying widget is web. Real native detents would require a custom Capacitor plugin (no maintained community one wraps `UISheetPresentationController` cleanly with WebView embedding) plus per-build TestFlight validation. Not worth the dependency churn for the visible delta. Revisit if the spec ever calls for multi-detent behaviour the user actually drags between.
+- **Brief reminder notifications** (15/30/60 min before a scheduled encounter) are not scheduled. There's no UI for scheduling future encounters yet, so there's nothing to remind from. The toggle is shown as "Soon" in PROFILE-02. Adding scheduled-encounter data first is the prerequisite.
+
+Everything else from the spec is wired: 5-tab IA, all screens (HOME, PEOPLE-01/02/03, CIRCLES-01/02/03/05/06, RECALL, PROFILE-01/02/03, ONBD-01..04, Auth + Forgot/Reset Password), all sheets, Smart Circle Engine all three surfaces, Events object + Supabase migration, EoD + weekly summary local notifications, haptics (light/medium/selection on FABs, toggles, swipes, long-press, drag-release), long-press context menus on Circle/Event tiles, swipe-to-reveal Log/Brief on People rows, prefers-reduced-motion handling, AI disclosure surfaces (Apple GL 2.5.18).
+
 ### Brand assets in the repo
 
 - **App icon master:** `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` (1024×1024, opaque). Source: the embedded `app-icon.png` from the Visual Design Brief docx, resized from 1254×1254.

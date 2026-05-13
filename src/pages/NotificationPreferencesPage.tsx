@@ -119,13 +119,12 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
         <SectionCard>
           <ToggleRow
             label="Weekly summary"
-            sub="Friday evening digest of who you added and saw this week"
+            sub="Friday evening reminder to look back at who you added and saw this week"
             value={prefs.weeklySummary}
             onChange={(v) => {
               update({ weeklySummary: v });
-              toast.message('Weekly summary arrives in a future update.');
+              toast.success(v ? 'Weekly summary scheduled for Friday 7 PM.' : 'Weekly summary off.');
             }}
-            comingSoon
           />
         </SectionCard>
 

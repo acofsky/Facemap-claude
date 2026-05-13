@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DEFAULT_EOD_PREFS, scheduleEoDNotification, type EoDPrefs } from '@/lib/notifications';
+import { DEFAULT_EOD_PREFS, scheduleEoDNotification, scheduleWeeklySummary, type EoDPrefs } from '@/lib/notifications';
 
 const STORAGE_KEY = 'membr_notification_prefs_v1';
 
@@ -36,12 +36,14 @@ function save(p: NotificationPrefs) {
 export function useNotificationPrefs() {
   const [prefs, setPrefs] = useState<NotificationPrefs>(() => load());
 
-  // Re-schedule the native notifications whenever EoD prefs change.
+  // Re-schedule the native notifications whenever the prefs they depend on
+  // change. Each effect is independent so toggling one doesn't ripple.
   useEffect(() => {
-    scheduleEoDNotification(prefs.eod).catch(() => {
-      /* native plugin throws on web — ignore */
-    });
+    scheduleEoDNotification(prefs.eod).catch(() => { /* web no-op */ });
   }, [prefs.eod]);
+  useEffect(() => {
+    scheduleWeeklySummary(prefs.weeklySummary).catch(() => { /* web no-op */ });
+  }, [prefs.weeklySummary]);
 
   const update = useCallback((patch: Partial<NotificationPrefs>) => {
     setPrefs((cur) => {

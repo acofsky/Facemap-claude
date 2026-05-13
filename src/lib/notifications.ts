@@ -8,6 +8,7 @@ import { LocalNotifications, type ScheduleOn } from '@capacitor/local-notificati
  */
 
 const EOD_BASE_ID = 1000;
+const WEEKLY_SUMMARY_ID = 2000;
 
 export type EoDFrequency = 'daily' | 'weekdays' | 'mwf' | 'weekly-fri';
 
@@ -99,6 +100,38 @@ export async function cancelEoDNotification(): Promise<void> {
   } catch {
     /* ignore — nothing scheduled yet on first run */
   }
+}
+
+/**
+ * Weekly summary — Friday 7 PM digest. Single recurring local notification.
+ * Tapping it routes nowhere special (just opens the app).
+ */
+export async function scheduleWeeklySummary(enabled: boolean): Promise<void> {
+  if (!isNative()) return;
+  await cancelWeeklySummary();
+  if (!enabled) return;
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: WEEKLY_SUMMARY_ID,
+        title: 'Your week in Membr',
+        body: 'See who you added and saw this week.',
+        schedule: {
+          on: { hour: 19, minute: 0, weekday: 6 } as ScheduleOn, // Friday
+          allowWhileIdle: true,
+          repeats: true,
+        },
+        extra: { kind: 'weekly-summary' as const },
+      },
+    ],
+  });
+}
+
+export async function cancelWeeklySummary(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: WEEKLY_SUMMARY_ID }] });
+  } catch { /* ignore */ }
 }
 
 /**
