@@ -181,38 +181,3 @@
   .safe-left   { padding-left:   env(safe-area-inset-left); }
   .safe-right  { padding-right:  env(safe-area-inset-right); }
 }
-
-/*
- * v1 → v2 compatibility shim.
- * These classes are referenced by pages that haven't been restructured yet (M2 work).
- * They map old visual treatments to the closest v2-compliant equivalent so the app
- * still renders correctly during the transition. Remove each one as its callers are
- * rewritten in M2.
- */
-@layer utilities {
-  .warm-shadow {
-    background-color: hsl(var(--surface-1));
-    border: 1px solid hsl(0 0% 100% / 0.08);
-  }
-  .warm-shadow-lg {
-    background-color: hsl(var(--surface-2));
-    border: 1px solid hsl(0 0% 100% / 0.12);
-    box-shadow:
-      0 4px 20px hsl(0 0% 0% / 0.7),
-      0 0 0 1px hsl(var(--primary) / 0.08);
-  }
-  .shadow-glow-primary {
-    box-shadow: 0 4px 16px hsl(var(--primary) / 0.35);
-  }
-  .bg-gradient-primary {
-    background-color: hsl(var(--primary));
-  }
-  .icon-tile {
-    @apply w-11 h-11 rounded-md flex items-center justify-center text-white;
-  }
-  .icon-tile-red    { background: linear-gradient(135deg, hsl(var(--tile-red-from))    0%, hsl(var(--tile-red-to))    100%); }
-  .icon-tile-blue   { background: linear-gradient(135deg, hsl(var(--tile-blue-from))   0%, hsl(var(--tile-blue-to))   100%); }
-  .icon-tile-purple { background: linear-gradient(135deg, hsl(var(--tile-purple-from)) 0%, hsl(var(--tile-purple-to)) 100%); }
-  .icon-tile-green  { background: linear-gradient(135deg, hsl(var(--tile-green-from))  0%, hsl(var(--tile-green-to))  100%); }
-  .icon-tile-amber  { background: linear-gradient(135deg, hsl(var(--tile-amber-from))  0%, hsl(var(--tile-amber-to))  100%); }
-}
