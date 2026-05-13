@@ -48,31 +48,31 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/60 z-50"
         onClick={onClose}
       />
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-card rounded-t-3xl z-50 warm-shadow-lg max-h-[85vh] flex flex-col"
+        transition={{ type: 'spring', damping: 32, stiffness: 400 }}
+        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] z-50 max-h-[85vh] flex flex-col safe-bottom"
       >
-        <div className="flex items-center justify-between p-6 pb-3">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <h2 className="font-display text-xl text-foreground">Brief: {personName}</h2>
+            <Sparkles className="w-4 h-4 text-primary" strokeWidth={1.75} />
+            <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">Brief: {personName}</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-md hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text">
+            <X className="w-5 h-5" strokeWidth={1.75} />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 pb-6">
+        <div className="overflow-y-auto flex-1 px-5 pb-5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating your brief...</p>
+              <p className="text-sm text-muted-text">Generating your brief…</p>
             </div>
           ) : brief ? (
             <>
@@ -82,17 +82,17 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
               </div>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground italic text-center py-12">No brief available.</p>
+            <p className="text-sm text-muted-text italic text-center py-12">No brief available.</p>
           )}
         </div>
 
         {brief && !loading && (
-          <div className="p-6 pt-3 border-t border-border">
+          <div className="px-5 pt-3 pb-5 border-t border-[hsl(0_0%_100%/0.08)]">
             <button
               onClick={handleCopy}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all"
+              className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
             >
-              {copied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy brief</>}
+              {copied ? <><Check className="w-4 h-4" strokeWidth={1.75} /> Copied!</> : <><Copy className="w-4 h-4" strokeWidth={1.75} /> Copy brief</>}
             </button>
           </div>
         )}

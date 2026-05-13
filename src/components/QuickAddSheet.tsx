@@ -3,17 +3,19 @@ import { motion } from 'framer-motion';
 import { X, ImagePlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCreatePerson, useUploadPhoto, useCircles, useSetPersonCircles, useCreateMeeting } from '@/hooks/use-data';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface QuickAddSheetProps {
   onClose: () => void;
+  /** Variant header copy. EoD notification opens with "Who'd you meet today?" (Q9). */
+  variant?: 'default' | 'end-of-day';
 }
 
-export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
+export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetProps) {
   const [name, setName] = useState('');
   const [whereWhen, setWhereWhen] = useState('');
   const [dateMet, setDateMet] = useState('');
   const [note, setNote] = useState('');
-  // More details
   const [howWeMet, setHowWeMet] = useState('');
   const [physicalDescription, setPhysicalDescription] = useState('');
   const [importantInfo, setImportantInfo] = useState('');
@@ -42,16 +44,14 @@ export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
   };
 
   const toggleCircle = (id: string) => {
-    setSelectedCircles(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    );
+    setSelectedCircles((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
   };
 
-  const setToday = () => {
-    setDateMet(format(new Date(), 'yyyy-MM-dd'));
-  };
+  const setToday = () => setDateMet(format(new Date(), 'yyyy-MM-dd'));
 
-  const hasAnything = name || photoFile || note || howWeMet || whereWhen || dateMet || physicalDescription || importantInfo || knownPeopleNotes || reminderDate || reminderNote || selectedCircles.length > 0;
+  const hasAnything =
+    name || photoFile || note || howWeMet || whereWhen || dateMet || physicalDescription ||
+    importantInfo || knownPeopleNotes || reminderDate || reminderNote || selectedCircles.length > 0;
 
   const handleSave = async () => {
     if (!hasAnything) return;
@@ -76,7 +76,6 @@ export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
     if (selectedCircles.length > 0) {
       await setPersonCircles.mutateAsync({ personId: person.id, circleIds: selectedCircles });
     }
-    // Auto-create the first meeting
     await createMeeting.mutateAsync({
       person_id: person.id,
       meeting_date: dateMet || format(new Date(), 'yyyy-MM-dd'),
@@ -87,8 +86,9 @@ export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
   };
 
   const saving = createPerson.isPending || uploadPhoto.isPending;
-
-  const inputClass = "w-full px-4 py-2.5 rounded-xl bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm";
+  const headerCopy = variant === 'end-of-day' ? "Who'd you meet today?" : 'Add Person';
+  const inputClass =
+    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
 
   return (
     <>
@@ -96,97 +96,98 @@ export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/60 z-50"
         onClick={onClose}
       />
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-card rounded-t-3xl z-50 warm-shadow-lg max-h-[85vh] flex flex-col"
+        transition={{ type: 'spring', damping: 32, stiffness: 400 }}
+        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] z-50 max-h-[88vh] flex flex-col safe-bottom"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 pb-0">
-          <h2 className="font-display text-xl text-foreground">Quick Add</h2>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground">
-            <X className="w-5 h-5" />
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">{headerCopy}</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-md hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text">
+            <X className="w-5 h-5" strokeWidth={1.75} />
           </button>
         </div>
 
-        {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1 p-6 pt-4 space-y-3">
+        <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-3">
           {/* Photo */}
           <div className="flex justify-center">
             <button
               onClick={() => fileRef.current?.click()}
-              className="w-20 h-20 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center overflow-hidden hover:border-primary transition-colors"
+              className="w-20 h-20 rounded-full bg-surface-1 border border-dashed border-[hsl(0_0%_100%/0.12)] flex items-center justify-center overflow-hidden hover:border-primary transition-colors"
             >
               {photoPreview ? (
                 <img src={photoPreview} alt="" className="w-full h-full object-cover" />
               ) : (
-                <ImagePlus className="w-6 h-6 text-muted-foreground" />
+                <ImagePlus className="w-5 h-5 text-muted-text" strokeWidth={1.75} />
               )}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
           </div>
 
-          {/* 4 core fields */}
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Name..." className={inputClass} autoFocus />
-          <input value={whereWhen} onChange={e => setWhereWhen(e.target.value)} placeholder="Where we met..." className={inputClass} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name…" className={inputClass} autoFocus />
+          <input value={whereWhen} onChange={(e) => setWhereWhen(e.target.value)} placeholder="Where we met…" className={inputClass} />
 
-          {/* When — date input with Today button */}
           <div className="flex gap-2">
             <input
               type="date"
               value={dateMet}
-              onChange={e => setDateMet(e.target.value)}
-              className={`${inputClass} flex-1`}
-              placeholder="When..."
+              onChange={(e) => setDateMet(e.target.value)}
+              className={cn(inputClass, 'flex-1')}
             />
             <button
               type="button"
               onClick={setToday}
-              className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-colors whitespace-nowrap ${
+              className={cn(
+                'h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors border',
                 dateMet === format(new Date(), 'yyyy-MM-dd')
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+              )}
             >
               Today
             </button>
           </div>
 
-          <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Notes..." rows={2} className={`${inputClass} resize-none`} />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Notes…"
+            rows={2}
+            className={cn(inputClass, 'resize-none py-2.5 h-auto')}
+          />
 
-          {/* Circles */}
           {circles.length > 0 && (
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Circles</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Circles</span>
               <div className="flex flex-wrap gap-1.5">
-                {circles.map(c => (
+                {circles.map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => toggleCircle(c.id)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    className={cn(
+                      'px-2.5 py-1 rounded-sm text-[12px] font-medium transition-colors border',
                       selectedCircles.includes(c.id)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                    )}
                   >
-                    {c.emoji} {c.name}
+                    {c.emoji ? `${c.emoji} ` : ''}{c.name}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Expand for more fields */}
           <button
             type="button"
-            onClick={() => setShowMore(!showMore)}
-            className="flex items-center gap-1 text-xs text-primary font-medium mx-auto"
+            onClick={() => setShowMore((v) => !v)}
+            className="flex items-center gap-1 text-[12px] font-medium text-primary mx-auto"
           >
             {showMore ? 'Less details' : 'More details'}
             {showMore ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -194,27 +195,54 @@ export function QuickAddSheet({ onClose }: QuickAddSheetProps) {
 
           {showMore && (
             <div className="space-y-3 animate-fade-in">
-              <input value={howWeMet} onChange={e => setHowWeMet(e.target.value)} placeholder="How we met..." className={inputClass} />
-              <textarea value={physicalDescription} onChange={e => setPhysicalDescription(e.target.value)} placeholder="Physical description..." rows={2} className={`${inputClass} resize-none`} />
-              <textarea value={importantInfo} onChange={e => setImportantInfo(e.target.value)} placeholder="Important info..." rows={2} className={`${inputClass} resize-none`} />
-              <textarea value={knownPeopleNotes} onChange={e => setKnownPeopleNotes(e.target.value)} placeholder="Who they know..." rows={2} className={`${inputClass} resize-none`} />
+              <input value={howWeMet} onChange={(e) => setHowWeMet(e.target.value)} placeholder="How we met…" className={inputClass} />
+              <textarea
+                value={physicalDescription}
+                onChange={(e) => setPhysicalDescription(e.target.value)}
+                placeholder="Physical description…"
+                rows={2}
+                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
+              />
+              <textarea
+                value={importantInfo}
+                onChange={(e) => setImportantInfo(e.target.value)}
+                placeholder="Important info…"
+                rows={2}
+                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
+              />
+              <textarea
+                value={knownPeopleNotes}
+                onChange={(e) => setKnownPeopleNotes(e.target.value)}
+                placeholder="Who they know…"
+                rows={2}
+                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
+              />
               <div>
-                <span className="text-xs font-medium text-muted-foreground mb-1 block">Reminder date</span>
-                <input type="date" value={reminderDate} onChange={e => setReminderDate(e.target.value)} className={inputClass} />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-1 block">Reminder date</span>
+                <input
+                  type="date"
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                  className={inputClass}
+                />
               </div>
-              <input value={reminderNote} onChange={e => setReminderNote(e.target.value)} placeholder="Reminder note..." className={inputClass} />
+              <input
+                value={reminderNote}
+                onChange={(e) => setReminderNote(e.target.value)}
+                placeholder="Reminder note…"
+                className={inputClass}
+              />
             </div>
           )}
         </div>
 
-        {/* Save button pinned at bottom */}
-        <div className="p-6 pt-3 border-t border-border">
+        <div className="px-5 pt-3 pb-5 border-t border-[hsl(0_0%_100%/0.08)]">
           <button
             onClick={handleSave}
             disabled={!hasAnything || saving}
-            className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-base disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition-all"
+            className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-40 active:scale-[0.98] transition-transform"
           >
-            {saving ? 'Saving...' : 'Save Person'}
+            {saving ? 'Saving…' : 'Save Person'}
           </button>
         </div>
       </motion.div>

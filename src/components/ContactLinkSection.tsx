@@ -98,28 +98,29 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   if (iosContactId) {
     return (
-      <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Contact2 className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">iPhone Contact</span>
+      <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+        <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
+          <Contact2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+          iPhone Contact
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => openIOSContact(iosContactId)}
             disabled={!native}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 active:scale-[0.98] transition-transform"
           >
-            <ExternalLink className="w-4 h-4" /> Open in Contacts
+            <ExternalLink className="w-4 h-4" strokeWidth={1.75} /> Open in Contacts
           </button>
           <button
             onClick={handleUnlink}
-            className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-muted text-muted-foreground text-sm"
+            aria-label="Unlink contact"
+            className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-muted-text hover:border-[hsl(0_0%_100%/0.18)] transition-colors"
           >
-            <Link2Off className="w-4 h-4" />
+            <Link2Off className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
         {!native && (
-          <p className="text-[11px] text-muted-foreground italic mt-2">
+          <p className="text-[11px] text-muted-text italic mt-2">
             Opens the Contacts app on your iPhone (in the native build).
           </p>
         )}
@@ -129,45 +130,44 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   return (
     <>
-      <div className="rounded-xl bg-card p-4 warm-shadow mb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Contact2 className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">iPhone Contact</span>
+      <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+        <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
+          <Contact2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+          iPhone Contact
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleLink}
             disabled={busy || !native}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground text-sm font-medium disabled:opacity-50 hover:border-[hsl(0_0%_100%/0.18)] transition-colors"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Contact2 className="w-4 h-4" />}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Contact2 className="w-4 h-4" strokeWidth={1.75} />}
             Link existing
           </button>
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={busy || !native || !person.name}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-sm font-medium disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground text-sm font-medium disabled:opacity-50 hover:border-[hsl(0_0%_100%/0.18)] transition-colors"
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-4 h-4" strokeWidth={1.75} />
             Create new
           </button>
         </div>
         {!native && (
-          <p className="text-[11px] text-muted-foreground italic mt-2">
+          <p className="text-[11px] text-muted-text italic mt-2">
             Available in the iPhone app — does nothing in web preview.
           </p>
         )}
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm bg-surface-2 border border-[hsl(0_0%_100%/0.12)]">
           <DialogHeader>
-            <DialogTitle className="font-display flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" /> Create iPhone Contact
+            <DialogTitle className="font-display flex items-center gap-2 tracking-[-0.02em]">
+              <UserPlus className="w-5 h-5 text-primary" strokeWidth={1.75} /> Create iPhone Contact
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Membr will port what fits cleanly into Contacts — and scan your notes for
-              anything iOS can use.
+            <DialogDescription className="text-[12px] text-muted-text">
+              Membr will port what fits cleanly into Contacts — and scan your notes for anything iOS can use.
             </DialogDescription>
           </DialogHeader>
 
@@ -175,38 +175,36 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
             {items.map(it => (
               <div key={it.label} className="flex items-start gap-2 text-sm">
                 {it.smart ? (
-                  <Sparkles className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
+                  <Sparkles className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" strokeWidth={1.75} />
                 ) : (
-                  <Check className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
+                  <Check className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" strokeWidth={1.75} />
                 )}
                 <div className="flex-1">
                   <span className="text-foreground font-medium">{it.label}</span>
-                  {it.detail && (
-                    <span className="text-muted-foreground"> — {it.detail}</span>
-                  )}
+                  {it.detail && <span className="text-muted-text"> — {it.detail}</span>}
                 </div>
               </div>
             ))}
           </div>
 
-          <p className="text-[11px] text-muted-foreground italic">
+          <p className="text-[11px] text-muted-text italic">
             One-time export. Editing this profile later won't change the contact.
           </p>
 
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               onClick={() => setConfirmOpen(false)}
-              className="px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium"
+              className="px-4 h-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-muted-text text-sm font-medium"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirmCreate}
               disabled={busy}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-4 h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-              {busy ? 'Creating...' : 'Create contact'}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" strokeWidth={1.75} />}
+              {busy ? 'Creating…' : 'Create contact'}
             </button>
           </DialogFooter>
         </DialogContent>
