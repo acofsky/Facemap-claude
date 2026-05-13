@@ -1,0 +1,35 @@
+name: Supabase deploy (migrations + edge functions)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Push migrations + deploy edge functions
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_REF: sgkjdtbrnxrirymneyyq
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Push migrations
+        run: supabase db push --include-all
+
+      - name: Set ANTHROPIC_API_KEY function secret
+        run: supabase secrets set ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+
+      - name: Deploy edge functions
+        run: |
+          supabase functions deploy describe-from-photo
+          supabase functions deploy meeting-brief
+          supabase functions deploy recall-search

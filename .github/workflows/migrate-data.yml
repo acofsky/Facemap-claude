@@ -1,0 +1,43 @@
+name: Migrate user data (Lovable Supabase → Membr Supabase)
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_account_password:
+        description: "Password for your new account on the Membr Supabase project. Use the same one you'll sign in with on iPhone. Must be 8+ chars."
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    name: Export from old, import to new
+    runs-on: ubuntu-latest
+    env:
+      OLD_SUPABASE_URL: https://qlsigdhtrjlplmeqcexu.supabase.co
+      OLD_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsc2lnZGh0cmpscGxtZXFjZXh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjgzOTcsImV4cCI6MjA5MTY0NDM5N30.TvhipD6XAbwOdC8xC1rgBQ7wNIZ95CFcqYCdWZMvvSE
+      NEW_SUPABASE_URL: https://sgkjdtbrnxrirymneyyq.supabase.co
+      NEW_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OLD_APP_EMAIL: ${{ secrets.OLD_APP_EMAIL }}
+      OLD_APP_PASSWORD: ${{ secrets.OLD_APP_PASSWORD }}
+      NEW_APP_PASSWORD: ${{ github.event.inputs.new_account_password }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install supabase-js
+        run: npm install --no-save @supabase/supabase-js@2.45.0
+
+      - name: Run migration script
+        run: node scripts/migrate-from-lovable.mjs
+
+      - name: Upload export dump as artifact (safety net)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-export
+          path: migration-export.json
+          if-no-files-found: ignore
+          retention-days: 30
