@@ -8,11 +8,14 @@ import { AuthPage } from "@/pages/AuthPage";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
+import { useOnboarded } from "@/hooks/use-onboarded";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { onboarded, markOnboarded } = useOnboarded();
 
   if (loading) {
     return (
@@ -32,6 +35,7 @@ function AppContent() {
         <Route path="/" element={<Index />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      {!onboarded && <OnboardingFlow onDone={markOnboarded} />}
     </BrowserRouter>
   );
 }

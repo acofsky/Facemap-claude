@@ -1,15 +1,17 @@
 import { useState, type ComponentType } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil } from 'lucide-react';
+import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
 import { cn } from '@/lib/utils';
+import { useOnboarded } from '@/hooks/use-onboarded';
 
 const APP_VERSION = '1.0.0';
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
+  const { resetOnboarding } = useOnboarded();
   const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password'>(null);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -125,6 +127,14 @@ export function ProfilePage() {
       {/* Preferences */}
       <SectionLabel>Preferences</SectionLabel>
       <SectionCard>
+        <SettingRow
+          icon={Sparkles}
+          label="Reintroduce me to Membr"
+          onClick={() => {
+            resetOnboarding();
+            toast.success('Onboarding will replay momentarily.');
+          }}
+        />
         <SettingRow
           icon={Bell}
           label="Notifications"
