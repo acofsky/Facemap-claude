@@ -1,12 +1,14 @@
-# FaceMap — repo context for Claude Code
+# Membr (formerly FaceMap) — repo context for Claude Code
 
 ## What this is
 
-**FaceMap** is a Capacitor 7 iOS app: a Vite + React + TypeScript + shadcn/ui PWA wrapped in a native iOS shell.
+**Membr** (renamed from FaceMap; iOS bundle ID kept for App Store continuity) is a Capacitor 7 iOS app: a Vite + React + TypeScript + shadcn/ui PWA wrapped in a native iOS shell.
 
-- Bundle ID: `com.acofsky.facemap`
-- App name: `FaceMap`
+- Bundle ID: `com.acofsky.facemap` (legacy — app display name is `Membr`)
+- App display name: `Membr`
 - Apple Team ID: `C59FSCZHFV` (Adam Cofsky)
+- Supabase project: `sgkjdtbrnxrirymneyyq` (in user's own account; was previously a Lovable-managed project `qlsigdhtrjlplmeqcexu`)
+- AI provider: Anthropic Claude Haiku 4.5 via `api.anthropic.com` (replaced Lovable's AI gateway)
 - The user works on **iPad only** — no local terminal, no Mac. All editing happens through Claude Code.
 - All builds happen on **Codemagic's cloud Mac**. The user never touches Xcode.
 - The app is already in **TestFlight**.
@@ -135,12 +137,22 @@ Triggers `ios-production` workflow. Goes to `External Testers` TestFlight group.
 2. The `setup_signing` step ends with a `Signing settings after use-profiles:` block — useful for diagnosing signing issues.
 3. The `Build IPA` step is xcodebuild; errors there usually mean signing didn't apply or there's a Capacitor/Pods conflict.
 
+## Backend deploys (Supabase)
+
+The Linux VM used by Claude Code on the web cannot reach `api.supabase.com` or `*.supabase.co` (proxy allowlist). So all Supabase work happens through GitHub Actions:
+
+- `.github/workflows/supabase-deploy.yml` — manual trigger. Runs `supabase db push` against the new project and deploys the 3 edge functions (`describe-from-photo`, `meeting-brief`, `recall-search`). Also sets the `ANTHROPIC_API_KEY` function secret. Needs repo secrets: `SUPABASE_ACCESS_TOKEN`, `ANTHROPIC_API_KEY`.
+- `.github/workflows/migrate-data.yml` — one-shot, manual trigger. Runs `scripts/migrate-from-lovable.mjs` to copy people / circles / meetings / connections from the old Lovable project into Membr's new project. Needs additional repo secrets: `SUPABASE_SERVICE_ROLE_KEY`, `OLD_APP_EMAIL`, `OLD_APP_PASSWORD`. Skips photos.
+
+To add/edit a migration or edge function: edit locally, commit, push, then trigger `supabase-deploy.yml` from the GitHub Actions tab.
+
 ## Hard constraints
 
 - **No Mac access ever.** The user does not have one and will not get one. Don't suggest "open Xcode" or "run on a Mac." Codemagic does Mac things.
 - **No App Store screenshots / store listing edits via code.** Those live in App Store Connect's web UI.
 - **Don't push directly to the default branch** unless it's just to sync `codemagic.yaml` for Codemagic discovery. The dev branch is where work happens.
 - **Don't experiment in `codemagic.yaml` without a reason.** Each test push burns 10 min of CI budget. Read the file carefully and reason from there before pushing speculative changes.
+- **Don't try to run the Supabase CLI from this Linux VM.** Outbound to `api.supabase.com` is blocked. Use the GitHub Actions workflows above.
 
 ## Apple ecosystem accounts
 
