@@ -21,7 +21,9 @@ const Index = () => {
 
   return (
     <AppLayout activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab === 'home' && <HomePage onSelectPerson={setSelectedPersonId} />}
+      {activeTab === 'home' && (
+        <HomePage onSelectPerson={setSelectedPersonId} onNavigateToRecall={() => setActiveTab('recall')} />
+      )}
       {activeTab === 'people' && <PeoplePage onSelectPerson={setSelectedPersonId} />}
       {activeTab === 'circles' && <CirclesPage onSelectPerson={setSelectedPersonId} />}
       {activeTab === 'recall' && <RecallPage onSelectPerson={setSelectedPersonId} />}

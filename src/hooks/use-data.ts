@@ -6,7 +6,7 @@ import {
   addPersonToCircle, removePersonFromCircle,
   uploadPhoto,
   fetchConnections, createConnection, deleteConnection,
-  fetchMeetingsForPerson, createMeeting, updateMeeting, deleteMeeting,
+  fetchMeetingsForPerson, fetchRecentMeetings, createMeeting, updateMeeting, deleteMeeting,
 } from '@/lib/store';
 import type { TablesUpdate } from '@/integrations/supabase/types';
 
@@ -154,6 +154,13 @@ export function useMeetings(personId: string | null) {
     queryKey: ['meetings', personId],
     queryFn: () => fetchMeetingsForPerson(personId!),
     enabled: !!personId,
+  });
+}
+
+export function useRecentMeetings(sinceISODate: string) {
+  return useQuery({
+    queryKey: ['meetings', 'recent', sinceISODate],
+    queryFn: () => fetchRecentMeetings(sinceISODate),
   });
 }
 

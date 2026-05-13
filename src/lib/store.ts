@@ -201,6 +201,16 @@ export async function fetchMeetingsForPerson(personId: string): Promise<Meeting[
   return data;
 }
 
+export async function fetchRecentMeetings(sinceISODate: string): Promise<Meeting[]> {
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('*')
+    .gte('meeting_date', sinceISODate)
+    .order('meeting_date', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function createMeeting(input: { person_id: string; meeting_date: string; place?: string; notes?: string }): Promise<Meeting> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
