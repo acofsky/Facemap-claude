@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
 import { NotificationPreferencesPage } from '@/pages/NotificationPreferencesPage';
+import { AppPermissionsPage } from '@/pages/AppPermissionsPage';
 import { cn } from '@/lib/utils';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
@@ -16,6 +17,7 @@ export function ProfilePage() {
   const { resetOnboarding } = useOnboarded();
   const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password'>(null);
   const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -146,7 +148,7 @@ export function ProfilePage() {
         <SettingRow
           icon={ShieldCheck}
           label="App Permissions"
-          onClick={() => toast.message('Manage in iOS Settings → Membr.')}
+          onClick={() => setPermsOpen(true)}
           last
         />
       </SectionCard>
@@ -186,6 +188,9 @@ export function ProfilePage() {
       <AnimatePresence>
         {notifPrefsOpen && (
           <NotificationPreferencesPage onBack={() => setNotifPrefsOpen(false)} />
+        )}
+        {permsOpen && (
+          <AppPermissionsPage onBack={() => setPermsOpen(false)} />
         )}
       </AnimatePresence>
 
