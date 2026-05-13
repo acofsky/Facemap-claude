@@ -4,6 +4,7 @@ import { usePersons, useCircles } from '@/hooks/use-data';
 import { User, Users, CircleDot, LogOut, Settings, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AIDisclosure } from '@/components/AIDisclosure';
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -106,6 +107,11 @@ export function ProfilePage() {
           <div className="text-2xl font-display text-foreground">{circles.length}</div>
           <div className="text-xs text-muted-foreground">Circles</div>
         </div>
+      </div>
+
+      {/* AI disclosure — Apple Review Guideline 2.5.18 */}
+      <div className="mb-3">
+        <AIDisclosure />
       </div>
 
       {/* Sign out */}

@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout, type Tab } from '@/components/AppLayout';
 import { HomePage } from './HomePage';
 import { PeoplePage } from './PeoplePage';
 import { CirclesPage } from './CirclesPage';
+import { RecallPage } from './RecallPage';
 import { ProfilePage } from './ProfilePage';
 import { PersonProfilePage } from './PersonProfilePage';
-
-type Tab = 'home' | 'people' | 'circles' | 'profile';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -21,10 +20,11 @@ const Index = () => {
   }
 
   return (
-    <AppLayout activeTab={activeTab} onTabChange={setActiveTab} onSelectPerson={setSelectedPersonId}>
+    <AppLayout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'home' && <HomePage onSelectPerson={setSelectedPersonId} />}
       {activeTab === 'people' && <PeoplePage onSelectPerson={setSelectedPersonId} />}
       {activeTab === 'circles' && <CirclesPage onSelectPerson={setSelectedPersonId} />}
+      {activeTab === 'recall' && <RecallPage onSelectPerson={setSelectedPersonId} />}
       {activeTab === 'profile' && <ProfilePage />}
     </AppLayout>
   );

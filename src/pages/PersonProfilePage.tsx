@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
+import { AIBadge } from '@/components/AIBadge';
 
 interface PersonProfilePageProps {
   personId: string;
@@ -301,14 +302,17 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
                   <span className="text-xs font-medium text-muted-foreground">{f.label}</span>
                 </div>
                 {f.key === 'physical_description' && person.photos.length > 0 && !isEditing && (
-                  <button
-                    onClick={handleGenerateDescription}
-                    disabled={generatingDesc}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
-                  >
-                    {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                    {generatingDesc ? 'Generating...' : 'From photo'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {value && <AIBadge feature="description" />}
+                    <button
+                      onClick={handleGenerateDescription}
+                      disabled={generatingDesc}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                    >
+                      {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                      {generatingDesc ? 'Generating...' : 'From photo'}
+                    </button>
+                  </div>
                 )}
               </div>
               {(() => {

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Loader2, Sparkles, Copy, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AIBadge } from '@/components/AIBadge';
 
 interface MeetingBriefModalProps {
   personId: string;
@@ -74,7 +75,12 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
               <p className="text-sm text-muted-foreground">Generating your brief...</p>
             </div>
           ) : brief ? (
-            <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">{brief}</pre>
+            <>
+              <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">{brief}</pre>
+              <div className="mt-3">
+                <AIBadge feature="brief" />
+              </div>
+            </>
           ) : (
             <p className="text-sm text-muted-foreground italic text-center py-12">No brief available.</p>
           )}
