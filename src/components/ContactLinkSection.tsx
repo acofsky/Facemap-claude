@@ -166,7 +166,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
               <UserPlus className="w-5 h-5 text-primary" /> Create iPhone Contact
             </DialogTitle>
             <DialogDescription className="text-xs">
-              FaceMap will port what fits cleanly into Contacts — and scan your notes for
+              Membr will port what fits cleanly into Contacts — and scan your notes for
               anything iOS can use.
             </DialogDescription>
           </DialogHeader>

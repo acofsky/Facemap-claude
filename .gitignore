@@ -37,3 +37,8 @@ ios/App/App.xcodeproj/xcuserdata/
 
 # Capacitor
 ios/App/public/
+
+# Local-only files (created during Lovable→Membr migration)
+.env.lovable-backup
+.env.membr-secrets
+migration-export.json

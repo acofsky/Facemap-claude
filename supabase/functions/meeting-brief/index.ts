@@ -6,6 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const SYSTEM_PROMPT = `You write concise, useful pre-meeting briefs to help someone remember a person before seeing them again. Format the brief in plain text with these short sections (use the exact headings):
+
+QUICK REFRESHER
+(2 sentences: who they are, how you know them)
+
+KEY FACTS
+(3-5 bullets of the most important things to remember)
+
+LAST TIME
+(what you discussed/did at the most recent meeting, if any)
+
+CONVERSATION STARTERS
+(2-3 specific things to ask about based on past meetings or known info — be concrete, not generic)
+
+Keep it tight. No filler. If info is missing, omit that section rather than guessing.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -51,11 +68,11 @@ serve(async (req) => {
 
     const { data: pcs = [] } = await supabase
       .from("person_circles").select("circle_id").eq("person_id", personId);
-    const circleIds = (pcs || []).map((r: any) => r.circle_id);
+    const circleIds = (pcs || []).map((r: { circle_id: string }) => r.circle_id);
     let circleNames: string[] = [];
     if (circleIds.length) {
       const { data: cs = [] } = await supabase.from("circles").select("name, emoji").in("id", circleIds);
-      circleNames = (cs || []).map((c: any) => `${c.emoji} ${c.name}`);
+      circleNames = (cs || []).map((c: { name: string; emoji: string }) => `${c.emoji} ${c.name}`);
     }
 
     const profile = [
@@ -71,36 +88,28 @@ serve(async (req) => {
     ].filter(Boolean).join("\n");
 
     const meetingsText = (meetings || []).length
-      ? (meetings || []).map((m: any) => `- ${m.meeting_date}${m.place ? ` @ ${m.place}` : ""}${m.notes ? `: ${m.notes}` : ""}`).join("\n")
+      ? (meetings || [])
+          .map((m: { meeting_date: string; place: string | null; notes: string | null }) =>
+            `- ${m.meeting_date}${m.place ? ` @ ${m.place}` : ""}${m.notes ? `: ${m.notes}` : ""}`
+          )
+          .join("\n")
       : "(no past meetings logged)";
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: ANTHROPIC_MODEL,
+        max_tokens: 800,
+        system: SYSTEM_PROMPT,
         messages: [
-          {
-            role: "system",
-            content: `You write concise, useful pre-meeting briefs to help someone remember a person before seeing them again. Format the brief in plain text with these short sections (use the exact headings):
-
-QUICK REFRESHER
-(2 sentences: who they are, how you know them)
-
-KEY FACTS
-(3-5 bullets of the most important things to remember)
-
-LAST TIME
-(what you discussed/did at the most recent meeting, if any)
-
-CONVERSATION STARTERS
-(2-3 specific things to ask about based on past meetings or known info — be concrete, not generic)
-
-Keep it tight. No filler. If info is missing, omit that section rather than guessing.`,
-          },
           {
             role: "user",
             content: `PROFILE:\n${profile}\n\nPAST MEETINGS (most recent first):\n${meetingsText}`,
@@ -114,21 +123,20 @@ Keep it tight. No filler. If info is missing, omit that section rather than gues
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (response.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     if (!response.ok) {
       const t = await response.text();
-      console.error("AI error:", response.status, t);
+      console.error("Anthropic error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI request failed" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const brief = data.choices?.[0]?.message?.content?.trim() || "";
+    const brief = (data.content ?? [])
+      .filter((b: { type: string }) => b.type === "text")
+      .map((b: { text: string }) => b.text)
+      .join("")
+      .trim();
 
     return new Response(JSON.stringify({ brief }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

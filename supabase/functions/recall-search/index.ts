@@ -11,6 +11,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -23,7 +25,6 @@ serve(async (req) => {
       });
     }
 
-    // Authenticate the caller
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -42,14 +43,13 @@ serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // SCOPE: only this user's persons
     const { data: persons, error: pErr } = await admin
       .from("persons")
       .select("*")
       .eq("user_id", user.id);
     if (pErr) throw pErr;
 
-    const personIds = (persons || []).map((p: any) => p.id);
+    const personIds = (persons || []).map((p: { id: string }) => p.id);
     const { data: personCircles } = await admin
       .from("person_circles")
       .select("person_id, circle_id")
@@ -60,15 +60,15 @@ serve(async (req) => {
       .select("id, name, emoji")
       .eq("user_id", user.id);
 
-    const circleMap = new Map((circles || []).map((c: any) => [c.id, c]));
+    type Circle = { id: string; name: string; emoji: string };
+    const circleMap = new Map((circles || []).map((c: Circle) => [c.id, c]));
 
-    // Build a text profile for each person and sign their photo paths
-    const personProfiles = await Promise.all((persons || []).map(async (p: any) => {
+    const personProfiles = await Promise.all((persons || []).map(async (p: Record<string, unknown>) => {
       const pCircles = (personCircles || [])
-        .filter((pc: any) => pc.person_id === p.id)
-        .map((pc: any) => circleMap.get(pc.circle_id))
-        .filter(Boolean)
-        .map((c: any) => `${c.emoji} ${c.name}`);
+        .filter((pc: { person_id: string }) => pc.person_id === p.id)
+        .map((pc: { circle_id: string }) => circleMap.get(pc.circle_id))
+        .filter((c): c is Circle => Boolean(c))
+        .map((c) => `${c.emoji} ${c.name}`);
 
       const fields = [
         `Name: ${p.name}`,
@@ -80,20 +80,18 @@ serve(async (req) => {
         pCircles.length && `Circles: ${pCircles.join(", ")}`,
       ].filter(Boolean);
 
-      // Sign photo paths so the AI gateway can fetch them.
-      // Photos may be stored as raw paths OR as full Supabase storage URLs
-      // (public/sign URLs). Since the bucket is private, we always re-sign.
+      // Photos may be stored as raw paths OR as full Supabase storage URLs.
+      // The bucket is private, so always re-sign so Anthropic can fetch them.
       const signedPhotos: string[] = [];
-      for (const photo of (p.photos || []).slice(0, 2)) {
+      const photos = Array.isArray(p.photos) ? (p.photos as unknown[]) : [];
+      for (const photo of photos.slice(0, 2)) {
         if (typeof photo !== "string") continue;
 
         let path = photo;
-        // Extract storage path from a full Supabase storage URL if needed
         const m = photo.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/person-photos\/([^?]+)/);
         if (m) {
           path = decodeURIComponent(m[1]);
         } else if (photo.startsWith("http://") || photo.startsWith("https://")) {
-          // Non-Supabase URL — pass through
           signedPhotos.push(photo);
           continue;
         }
@@ -105,13 +103,13 @@ serve(async (req) => {
         if (signed?.signedUrl) signedPhotos.push(signed.signedUrl);
       }
 
-      return { id: p.id, name: p.name, profile: fields.join("\n"), photos: signedPhotos };
+      return { id: p.id as string, name: p.name as string, profile: fields.join("\n"), photos: signedPhotos };
     }));
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-    const systemPrompt = `You are a person-matching assistant for a personal CRM called Facemap.
+    const systemPrompt = `You are a person-matching assistant for a personal CRM called Membr.
 The user will describe someone they're trying to find. You have a list of people profiles below, some with photos.
 Analyze BOTH the text profiles AND any attached photos to find matches.
 For photo-based queries (e.g. "blonde hair", "tall guy", "wears glasses"), carefully examine the photos.
@@ -119,59 +117,57 @@ Return the IDs of people that match the description, ranked by relevance (best m
 Only return people that are plausible matches. If nobody matches, return an empty array.
 
 People:
-${personProfiles.map((p: any) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
+${personProfiles.map((p) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
 
-    const userContent: any[] = [{ type: "text", text: query }];
+    type AnthropicBlock =
+      | { type: "text"; text: string }
+      | { type: "image"; source: { type: "url"; url: string } };
+    const userContent: AnthropicBlock[] = [{ type: "text", text: query }];
     for (const p of personProfiles) {
       if (p.photos && p.photos.length > 0) {
         userContent.push({ type: "text", text: `[Photos for ID: ${p.id}, Name: ${p.name}]` });
         for (const photoUrl of p.photos) {
-          userContent.push({ type: "image_url", image_url: { url: photoUrl } });
+          userContent.push({ type: "image", source: { type: "url", url: photoUrl } });
         }
       }
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
         tools: [
           {
-            type: "function",
-            function: {
-              name: "return_matches",
-              description: "Return matching person IDs ranked by relevance",
-              parameters: {
-                type: "object",
-                properties: {
-                  matches: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string", description: "Person UUID" },
-                        reason: { type: "string", description: "Why this person matches" },
-                      },
-                      required: ["id", "reason"],
-                      additionalProperties: false,
+            name: "return_matches",
+            description: "Return matching person IDs ranked by relevance",
+            input_schema: {
+              type: "object",
+              properties: {
+                matches: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", description: "Person UUID" },
+                      reason: { type: "string", description: "Why this person matches" },
                     },
+                    required: ["id", "reason"],
                   },
                 },
-                required: ["matches"],
-                additionalProperties: false,
               },
+              required: ["matches"],
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "return_matches" } },
+        tool_choice: { type: "tool", name: "return_matches" },
       }),
     });
 
@@ -182,26 +178,18 @@ ${personProfiles.map((p: any) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, t);
-      throw new Error("AI gateway error");
+      console.error("Anthropic error:", aiResponse.status, t);
+      throw new Error("Anthropic request failed");
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    let matches: { id: string; reason: string }[] = [];
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      matches = parsed.matches || [];
-    }
+    const toolUse = (aiData.content ?? []).find(
+      (b: { type: string }) => b.type === "tool_use"
+    ) as { input?: { matches?: { id: string; reason: string }[] } } | undefined;
+    let matches: { id: string; reason: string }[] = toolUse?.input?.matches ?? [];
 
-    const validIds = new Set(personProfiles.map((p: any) => p.id));
+    const validIds = new Set(personProfiles.map((p) => p.id));
     matches = matches.filter((m) => validIds.has(m.id));
 
     return new Response(JSON.stringify({ results: matches }), {

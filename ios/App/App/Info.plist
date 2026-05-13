@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>FaceMap</string>
+        <string>Membr</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,10 +46,10 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>FaceMap uses the camera to take photos of people you meet so you can remember them.</string>
+	<string>Membr uses the camera to take photos of people you meet so you can remember them.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>FaceMap can attach photos from your library to people you meet.</string>
+	<string>Membr can attach photos from your library to people you meet.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>FaceMap links the people you remember to entries in your iOS Contacts.</string>
+	<string>Membr links the people you remember to entries in your iOS Contacts.</string>
 </dict>
 </plist>

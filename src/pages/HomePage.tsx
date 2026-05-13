@@ -93,7 +93,7 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
       {/* Header */}
       <div className="mb-6 pr-14">
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{greeting}</p>
-        <h1 className="text-4xl font-display text-foreground leading-tight">Facemap</h1>
+        <h1 className="text-4xl font-display text-foreground leading-tight">Membr</h1>
       </div>
 
       {people.length === 0 ? (
@@ -101,7 +101,7 @@ export function HomePage({ onSelectPerson }: HomePageProps) {
           <div className="w-20 h-20 mx-auto mb-5 icon-tile icon-tile-red !w-20 !h-20 !rounded-3xl">
             <Sparkles className="w-9 h-9" />
           </div>
-          <h2 className="font-display text-xl text-foreground mb-2">Your Facemap is empty</h2>
+          <h2 className="font-display text-xl text-foreground mb-2">Your Membr is empty</h2>
           <p className="text-muted-foreground text-sm max-w-xs mx-auto">
             Tap the + button below to add someone you've met.
           </p>

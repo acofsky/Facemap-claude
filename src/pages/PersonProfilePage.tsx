@@ -139,7 +139,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   };
 
   const handleDelete = () => {
-    if (confirm('Remove this person from your Facemap?')) {
+    if (confirm('Remove this person from your Membr?')) {
       deletePersonMut.mutate(personId);
       onBack();
     }
@@ -444,7 +444,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
 
         {showConnectPicker && availableToConnect.length > 0 && (
           <div className="rounded-xl bg-muted/50 p-2 mb-3 max-h-48 overflow-y-auto space-y-1">
-            <p className="text-xs text-muted-foreground px-2 py-1">Link to someone on Facemap:</p>
+            <p className="text-xs text-muted-foreground px-2 py-1">Link to someone on Membr:</p>
             {availableToConnect.map(p => (
               <button
                 key={p.id}
@@ -495,7 +495,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
         onClick={handleDelete}
         className="flex items-center gap-2 mx-auto mt-10 text-destructive text-sm hover:opacity-80"
       >
-        <Trash2 className="w-4 h-4" /> Remove from Facemap
+        <Trash2 className="w-4 h-4" /> Remove from Membr
       </button>
 
       <AnimatePresence>
