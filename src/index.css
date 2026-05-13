@@ -1,188 +1,218 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Membr v2 — Visual Design Brief tokens.
+ * HSL is the source of truth. Hex equivalents are documented in the brief.
+ * Black canvas. White text. One red signal per frame.
+ */
+
 @layer base {
   :root {
-    /* Pure black base */
-    --background: 0 0% 0%;
-    --foreground: 0 0% 96%;
+    /* Foundation — black to white */
+    --background: 0 0% 0%;            /* #000000 */
+    --foreground: 0 0% 96%;           /* #F4F4F4 */
+    --surface-1: 0 0% 6%;             /* #0F0F0F — cards, list rows */
+    --surface-2: 0 0% 10%;            /* #1A1A1A — elevated, sheets, inputs */
+    --border-hairline: 0 0% 100%;     /* used as rgba(255,255,255,0.08) via opacity */
+    --muted-text: 0 0% 40%;           /* #666666 */
+    --disabled: 0 0% 25%;             /* #404040 */
 
-    /* Glassy elevated cards (slightly raised off pure black) */
-    --card: 0 0% 6%;
-    --card-foreground: 0 0% 96%;
-
-    --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 96%;
-
-    /* Red primary kept */
-    --primary: 0 78% 55%;
+    /* The signal — Membr Red */
+    --primary: 0 75% 53%;             /* #E03030 */
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 8 90% 62%;
+    --red-deep: 0 60% 15%;            /* #3D0F0F — hover fills, subtle accents */
+    --red-muted: 0 50% 35%;           /* #852828 — pressed states */
 
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 88%;
-
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 58%;
-
-    --accent: 0 50% 18%;
-    --accent-foreground: 0 0% 96%;
-
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 14%;
-    --input: 0 0% 12%;
-    --ring: 0 78% 55%;
-
-    --radius: 1rem;
-
-    --sidebar-background: 0 0% 0%;
-    --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 0 78% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 10%;
-    --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 0 78% 55%;
-
-    /* Custom semantic tokens */
-    --warm-glow: 0 78% 55%;
-    --warm-surface: 0 0% 8%;
-    --warm-highlight: 8 90% 62%;
-    --success: 145 65% 48%;
+    /* System colors */
+    --success: 145 55% 42%;           /* #2D9E5C */
     --success-foreground: 0 0% 100%;
-
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(0 80% 55%) 0%, hsl(15 90% 60%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 7%) 0%, hsl(0 0% 4%) 100%);
-    --gradient-tile-red: linear-gradient(135deg, hsl(0 80% 58%) 0%, hsl(15 90% 60%) 100%);
-    --gradient-tile-blue: linear-gradient(135deg, hsl(210 90% 58%) 0%, hsl(195 95% 55%) 100%);
-    --gradient-tile-purple: linear-gradient(135deg, hsl(265 75% 60%) 0%, hsl(290 70% 60%) 100%);
-    --gradient-tile-green: linear-gradient(135deg, hsl(150 70% 45%) 0%, hsl(170 75% 45%) 100%);
-    --gradient-tile-amber: linear-gradient(135deg, hsl(35 95% 58%) 0%, hsl(20 90% 58%) 100%);
-
-    /* Shadows / glows */
-    --shadow-soft: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
-    --shadow-elevated: 0 20px 50px -12px hsl(0 0% 0% / 0.8);
-    --shadow-glow-primary: 0 10px 40px -10px hsl(0 80% 55% / 0.45);
-
-    font-family: 'DM Sans', system-ui, sans-serif;
-  }
-
-  .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 6%;
-    --card-foreground: 0 0% 96%;
-    --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 0 78% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 88%;
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 58%;
-    --accent: 0 50% 18%;
-    --accent-foreground: 0 0% 96%;
-    --destructive: 0 70% 50%;
+    --warning: 38 90% 52%;            /* #F5A623 */
+    --warning-foreground: 0 0% 0%;
+    --destructive: 0 65% 44%;         /* #C42222 */
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 14%;
-    --input: 0 0% 12%;
-    --ring: 0 78% 55%;
-    --sidebar-background: 0 0% 0%;
-    --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 0 78% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 10%;
+
+    /* shadcn compatibility aliases — map to the v2 tokens above */
+    --card: var(--surface-1);
+    --card-foreground: var(--foreground);
+    --popover: var(--surface-2);
+    --popover-foreground: var(--foreground);
+    --secondary: var(--surface-2);
+    --secondary-foreground: 0 0% 88%;
+    --muted: var(--surface-1);
+    --muted-foreground: var(--muted-text);
+    --accent: var(--surface-2);
+    --accent-foreground: var(--foreground);
+    --border: 0 0% 17%;               /* #2A2A2A — used as solid border in some shadcn components */
+    --input: var(--surface-2);
+    --ring: var(--primary);
+
+    /* Radii — buttons 8, cards 10, modal/featured 12 */
+    --radius: 0.5rem;                 /* 8px — button + input baseline */
+    --radius-card: 0.625rem;          /* 10px */
+    --radius-card-elevated: 0.75rem;  /* 12px */
+    --radius-sheet: 1rem;             /* 16px (top corners only on bottom sheets) */
+
+    /* Circle / Event tile gradients — 8 options, all at 135°. Red is the only full-saturation tile. */
+    --tile-red-from:    0 75% 42%;    /* #B52020 */
+    --tile-red-to:     10 80% 45%;    /* #BE3A15 */
+    --tile-blue-from:  210 40% 40%;   /* #3D5C7A */
+    --tile-blue-to:    195 45% 38%;   /* #326675 */
+    --tile-purple-from:265 30% 42%;   /* #5A4870 */
+    --tile-purple-to:  285 28% 42%;   /* #5C426B */
+    --tile-green-from: 150 30% 35%;   /* #3B6650 */
+    --tile-green-to:   165 32% 35%;   /* #367060 */
+    --tile-amber-from:  35 45% 40%;   /* #7A5E2B */
+    --tile-amber-to:    22 42% 38%;   /* #73472A */
+    --tile-slate-from: 215 20% 30%;   /* #3A4455 */
+    --tile-slate-to:   215 22% 24%;   /* #2E3A4A */
+    --tile-rose-from:  345 30% 32%;   /* #6B3A4A */
+    --tile-rose-to:    355 45% 33%;   /* #7A3040 */
+    --tile-teal-from:  180 35% 26%;   /* #2A5A5A */
+    --tile-teal-to:    190 45% 26%;   /* #245060 */
+
+    /* Sidebar — aliases to the same tokens (kept for shadcn sidebar component) */
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--surface-2);
     --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 0 78% 55%;
+    --sidebar-border: 0 0% 17%;
+    --sidebar-ring: var(--primary);
+
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
   }
+
+  /* The app is dark-only by design (Q6). The .dark class exists so any
+     shadcn helper that toggles it doesn't break, but the values match :root. */
+  .dark { color-scheme: dark; }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+
+  html, body, #root {
+    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
   }
 
   body {
-    @apply bg-background text-foreground;
-    background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, hsl(0 80% 25% / 0.18), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(15 80% 30% / 0.10), transparent 60%);
-    background-attachment: fixed;
+    /* No ambient red glow. Pure black canvas — the brief is explicit. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4 {
-    font-family: 'DM Serif Display', serif;
+  h1, h2, h3 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    letter-spacing: -0.02em;
   }
+
+  /* Native iOS form chrome cleanup */
+  input, textarea, select { font-family: inherit; }
 }
 
 @layer utilities {
   .font-display {
-    font-family: 'DM Serif Display', serif;
+    font-family: 'DM Serif Display', Georgia, serif;
+    letter-spacing: -0.02em;
   }
 
-  /* Glassy card surface — used wherever .warm-shadow / .bg-card was used */
-  .warm-shadow {
-    background: linear-gradient(180deg, hsl(0 0% 8% / 0.85) 0%, hsl(0 0% 4% / 0.9) 100%);
-    border: 1px solid hsl(0 0% 100% / 0.06);
+  /* Surfaces — Visual Brief §4 */
+  .surface-1 {
+    background-color: hsl(var(--surface-1));
+    border: 1px solid hsl(0 0% 100% / 0.08);
+    border-radius: var(--radius-card);
+  }
+  .surface-1:hover {
+    border-color: hsl(0 0% 100% / 0.14);
+  }
+
+  .surface-2 {
+    background-color: hsl(var(--surface-2));
+    border: 1px solid hsl(0 0% 100% / 0.12);
+    border-radius: var(--radius-card-elevated);
+  }
+
+  /* Elevated / featured card — whisper-thin red ring per spec */
+  .surface-elevated {
+    background-color: hsl(var(--surface-2));
+    border: 1px solid hsl(0 0% 100% / 0.12);
+    border-radius: var(--radius-card-elevated);
     box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.04) inset,
-      0 8px 24px -10px hsl(0 0% 0% / 0.6);
-    backdrop-filter: blur(8px);
+      0 4px 20px hsl(0 0% 0% / 0.7),
+      0 0 0 1px hsl(var(--primary) / 0.08);
   }
 
-  .warm-shadow-lg {
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.05) inset,
-      0 20px 50px -12px hsl(0 0% 0% / 0.8),
-      0 10px 30px -10px hsl(0 80% 50% / 0.35);
-  }
-
-  /* Gradient surfaces */
-  .bg-gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .shadow-glow-primary {
-    box-shadow: var(--shadow-glow-primary);
-  }
-
-  /* Vibrant icon tiles (rounded-square with glow) */
-  .icon-tile {
-    @apply w-11 h-11 rounded-2xl flex items-center justify-center text-white;
-    box-shadow:
-      0 1px 0 hsl(0 0% 100% / 0.2) inset,
-      0 8px 20px -6px hsl(0 0% 0% / 0.5);
-  }
-  .icon-tile-red    { background: var(--gradient-tile-red);    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(0 80% 55% / 0.45); }
-  .icon-tile-blue   { background: var(--gradient-tile-blue);   box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(210 90% 55% / 0.45); }
-  .icon-tile-purple { background: var(--gradient-tile-purple); box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(270 75% 55% / 0.45); }
-  .icon-tile-green  { background: var(--gradient-tile-green);  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(160 75% 45% / 0.4); }
-  .icon-tile-amber  { background: var(--gradient-tile-amber);  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.2) inset, 0 8px 24px -6px hsl(30 90% 55% / 0.4); }
-
-  /* Make all primary buttons gradient + glow by default */
-  .bg-primary {
-    background: var(--gradient-primary) !important;
-    box-shadow: 0 8px 24px -8px hsl(0 80% 55% / 0.5);
-  }
-
-  /* Subtle hairline divider */
+  /* Hairline divider — implied, not asserted */
   .hairline {
-    background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.08), transparent);
+    background: hsl(0 0% 100% / 0.08);
+    height: 1px;
+    width: 100%;
   }
+  .border-hairline { border-color: hsl(0 0% 100% / 0.08); }
+  .border-hairline-stronger { border-color: hsl(0 0% 100% / 0.12); }
 
+  /* Circle tile gradients (135°) */
+  .tile-red    { background: linear-gradient(135deg, hsl(var(--tile-red-from))    0%, hsl(var(--tile-red-to))    100%); }
+  .tile-blue   { background: linear-gradient(135deg, hsl(var(--tile-blue-from))   0%, hsl(var(--tile-blue-to))   100%); }
+  .tile-purple { background: linear-gradient(135deg, hsl(var(--tile-purple-from)) 0%, hsl(var(--tile-purple-to)) 100%); }
+  .tile-green  { background: linear-gradient(135deg, hsl(var(--tile-green-from))  0%, hsl(var(--tile-green-to))  100%); }
+  .tile-amber  { background: linear-gradient(135deg, hsl(var(--tile-amber-from))  0%, hsl(var(--tile-amber-to))  100%); }
+  .tile-slate  { background: linear-gradient(135deg, hsl(var(--tile-slate-from))  0%, hsl(var(--tile-slate-to))  100%); }
+  .tile-rose   { background: linear-gradient(135deg, hsl(var(--tile-rose-from))   0%, hsl(var(--tile-rose-to))   100%); }
+  .tile-teal   { background: linear-gradient(135deg, hsl(var(--tile-teal-from))   0%, hsl(var(--tile-teal-to))   100%); }
+
+  /* Hidden scrollbar utility (preserved from v1) */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* iOS safe-area helpers */
+  .safe-top    { padding-top:    env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-left   { padding-left:   env(safe-area-inset-left); }
+  .safe-right  { padding-right:  env(safe-area-inset-right); }
+}
+
+/*
+ * v1 → v2 compatibility shim.
+ * These classes are referenced by pages that haven't been restructured yet (M2 work).
+ * They map old visual treatments to the closest v2-compliant equivalent so the app
+ * still renders correctly during the transition. Remove each one as its callers are
+ * rewritten in M2.
+ */
+@layer utilities {
+  .warm-shadow {
+    background-color: hsl(var(--surface-1));
+    border: 1px solid hsl(0 0% 100% / 0.08);
   }
+  .warm-shadow-lg {
+    background-color: hsl(var(--surface-2));
+    border: 1px solid hsl(0 0% 100% / 0.12);
+    box-shadow:
+      0 4px 20px hsl(0 0% 0% / 0.7),
+      0 0 0 1px hsl(var(--primary) / 0.08);
+  }
+  .shadow-glow-primary {
+    box-shadow: 0 4px 16px hsl(var(--primary) / 0.35);
+  }
+  .bg-gradient-primary {
+    background-color: hsl(var(--primary));
+  }
+  .icon-tile {
+    @apply w-11 h-11 rounded-md flex items-center justify-center text-white;
+  }
+  .icon-tile-red    { background: linear-gradient(135deg, hsl(var(--tile-red-from))    0%, hsl(var(--tile-red-to))    100%); }
+  .icon-tile-blue   { background: linear-gradient(135deg, hsl(var(--tile-blue-from))   0%, hsl(var(--tile-blue-to))   100%); }
+  .icon-tile-purple { background: linear-gradient(135deg, hsl(var(--tile-purple-from)) 0%, hsl(var(--tile-purple-to)) 100%); }
+  .icon-tile-green  { background: linear-gradient(135deg, hsl(var(--tile-green-from))  0%, hsl(var(--tile-green-to))  100%); }
+  .icon-tile-amber  { background: linear-gradient(135deg, hsl(var(--tile-amber-from))  0%, hsl(var(--tile-amber-to))  100%); }
 }

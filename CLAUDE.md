@@ -182,3 +182,52 @@ npm test
 If the user says something vague like "make this faster" or "fix the layout," start by skimming `src/` for the relevant component. The actual app code is React. The Capacitor/iOS layer is configured once and rarely changes.
 
 If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the conversation that produced this setup is in git history under earlier `claude/ios-simulator-setup-*` branches (search for commits modifying `codemagic.yaml`).
+
+## v2 design overhaul — locked decisions
+
+A full UX/UI redesign is underway. The guiding documents are `Membr_UX_UI_Spec_v2.docx` and `Membr_Visual_Design_Brief_Updated.docx`. The brand identity (new logo, app icon, wordmark, hands mark) is documented in `Membr — Logo IdentityV2.pdf`. Those documents govern visuals; this section captures the founder decisions made during M1 kickoff so future sessions don't re-litigate them.
+
+### Resolved Open Questions (Section 13 of the spec)
+
+- **Q1 — Paywall:** None. Free, unlimited people/Circles/Events.
+- **Q2 — Photo AI describe:** Output appears as pre-filled, inline-editable bullets in the About field. No accept/reject card.
+- **Q3 — Encounter reminder toggle:** Removed entirely from Notification Preferences. The spec mentions it but the trigger source is undefined; revisit later.
+- **Q4 — Recall search ranking:** Best semantic match first. Recency only as tiebreaker. No relevance indicators on result cards.
+- **Q5 — Onboarding skip:** Shown once after account creation. Re-accessible via Profile → "Reintroduce me to Membr."
+- **Q6 — Dark mode:** Permanent. `UIUserInterfaceStyle = Dark` in `Info.plist`. No light theme will ever ship.
+- **Q7 + Q10 — Smart Circle Engine thresholds:** Trigger on 2+ people added in 48h with keyword overlap, OR 3+ people added in 24h regardless. Easy to retune post-launch.
+- **Q8 — Archived Events access:** Small "Archived" link below the Events grid on CIRCLES-01 → archived list. Members and their data remain searchable everywhere.
+- **Q9 — End-of-Day notification deep link:** Opens the Add Person sheet with the contextual variant header "Who'd you meet today?" instead of "Add Person."
+- **Q11 — Person count display:** Shown as a small chip on the Home greeting line (alongside the date), not in the People List.
+
+### Sequencing — milestone builds
+
+Approved approach: ship one TestFlight build at the end of each milestone, not one giant push at the end. Each milestone is a clean checkpoint.
+
+- **M1 — Visual foundation.** Tokens (`tailwind.config.ts` + `src/index.css` rewritten against the Visual Brief), DM Serif Display + DM Sans wired, new app icon (1024 master), new launch screen (wordmark on black), `Info.plist` set dark-only with status-bar light and `CFBundleDisplayName = Membr`, permission strings rewritten per spec, tab bar restyled (Surface 1, hairline border, Primary Red selected, no backdrop blur), `<Wordmark />` component, `Button`/`Card`/`Input` rewritten to v2 surfaces, FaceMap→Membr branding sweep in user-visible strings. Tab structure stays at 4 (Home/People/Circles/Profile) for M1; Recall becomes its own tab in M2.
+- **M2 — Screen restructure + Events object.** 5-tab IA (add Recall). New Home, Person Detail, Circles & Events two-tier list. Corner-anchored Add Person FAB (red) + secondary Quick Actions FAB (dark) per spec §4.2. Migrate sheets (SHEET-AP, SHEET-LE, SHEET-MB, SHEET-CC) to native `UISheetPresentationController` detents. Replace any remaining legacy utility classes (`.warm-shadow`, `.icon-tile*`, etc.) that the M1 compat shim in `src/index.css` currently bridges.
+- **M3 — New features.** Smart Circle Engine (on-device clustering, three suggestion surfaces per spec §7). End-of-Day push notification with the "Who'd you meet today?" sheet variant. Onboarding flow (ONBD-01..04) + Profile re-trigger row.
+
+### Brand assets in the repo
+
+- **App icon master:** `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` (1024×1024, opaque). Source: the embedded `app-icon.png` from the Visual Design Brief docx, resized from 1254×1254.
+- **Launch screen images:** `ios/App/App/Assets.xcassets/Splash.imageset/*.png` — all 2732×2732, black background with centered "membr." wordmark in DM Serif Display, red period. Generated from the downloaded `DMSerifDisplay-Regular.ttf`.
+- **Web favicon / OG:** `public/app-icon.png` (512×512). Same brand mark.
+- **In-app wordmark:** `<Wordmark />` from `src/components/Wordmark.tsx` — renders DM Serif Display + red period span. Use this everywhere the brand name appears in the React UI (auth, onboarding, etc.). Do NOT use a raster wordmark inline.
+- **Bare-hands SVG mark:** NOT in the repo yet. Spec calls for it at ≤32px (favicon, tab icons, notifications). Currently no UI uses it; will be vector-traced from the PDF or supplied by founder in M2.
+
+### Visual Brief hard rules — quick reference
+
+If you find yourself violating any of these, stop and re-read the brief:
+
+- **One red moment per frame.** Primary Red (#E03030) appears exactly once per screen. If you use it twice, remove one.
+- **No ambient red glow.** The body background is pure `#000000`. No radial gradients, no warm wash. Glow was intentionally removed in M1.
+- **No glassmorphism / backdrop-blur.** Surfaces are flat with hairline borders. The old `.warm-shadow` with backdrop-filter is gone.
+- **No pill buttons.** Buttons are 8px radius. Never fully rounded.
+- **Two fonts only:** DM Serif Display (400) for emotionally-loaded headings; DM Sans (400/500/600/700) for everything operational. Never mix within a line.
+- **Lucide icons only, stroke 1.5–2px.** No filled icons, no mixed icon families.
+- **Tile colors are muted (~35% sat).** Only the Red tile is full saturation. New 8-tile palette lives in `src/index.css` as `--tile-{name}-from/to` and as Tailwind utility classes `.tile-red` through `.tile-teal`.
+
+### Legacy compatibility shim
+
+`src/index.css` has a `@layer utilities` block at the bottom marked "v1 → v2 compatibility shim" that maps old utility classes (`.warm-shadow`, `.warm-shadow-lg`, `.icon-tile`, `.icon-tile-red`, `.shadow-glow-primary`, `.bg-gradient-primary`) to v2-compliant equivalents. These exist only so M1 ships without breaking the existing pages — they will be removed in M2 as each screen gets a full rewrite. Don't add new usages of these classes; write to the v2 tokens directly.
