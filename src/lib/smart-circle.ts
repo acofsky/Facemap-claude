@@ -201,3 +201,29 @@ export function matchSheetInputToCluster(
   }
   return null;
 }
+
+/**
+ * Surface 3 helper — given an Event name and the full people list, find
+ * up to N members who probably belong based on overlapping tokens in their
+ * how_we_met / where_when fields. Excludes anyone already in the event.
+ */
+export function suggestEventMembers(
+  eventName: string,
+  people: Person[],
+  currentMemberIds: string[],
+  limit = 4,
+): Person[] {
+  const nameTokens = new Set(tokenize(eventName));
+  if (nameTokens.size === 0) return [];
+  const memberSet = new Set(currentMemberIds);
+  const scored: { p: Person; score: number }[] = [];
+  for (const p of people) {
+    if (memberSet.has(p.id)) continue;
+    const tokens = personSignals(p);
+    let score = 0;
+    for (const t of tokens) if (nameTokens.has(t)) score++;
+    if (score > 0) scored.push({ p, score });
+  }
+  scored.sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name));
+  return scored.slice(0, limit).map((x) => x.p);
+}

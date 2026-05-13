@@ -8,15 +8,17 @@ import { useAuth } from '@/hooks/use-auth';
 
 interface HomePageProps {
   onSelectPerson: (id: string) => void;
+  onSelectCircle: (id: string) => void;
   onNavigateToRecall: () => void;
 }
 
-// Deterministic tile gradient per circle until CIRCLES-03 adds a real
-// `color` column (M2 Phase C). Keys match `.tile-*` utilities in index.css.
+// Prefer the persisted `tone` column; fall back to a deterministic hash for
+// circles created before CIRCLES-03 introduced it.
 const TILE_PALETTE = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
-function circleTone(id: string): typeof TILE_PALETTE[number] {
+function circleTone(c: { id: string; tone?: string | null }): typeof TILE_PALETTE[number] {
+  if (c.tone && (TILE_PALETTE as readonly string[]).includes(c.tone)) return c.tone as typeof TILE_PALETTE[number];
   let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
   return TILE_PALETTE[hash % TILE_PALETTE.length];
 }
 
@@ -36,7 +38,7 @@ function timeOfDayGreeting(): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
-export function HomePage({ onSelectPerson, onNavigateToRecall }: HomePageProps) {
+export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }: HomePageProps) {
   const { user } = useAuth();
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
@@ -188,15 +190,16 @@ export function HomePage({ onSelectPerson, onNavigateToRecall }: HomePageProps) 
           <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-3">Your Circles</h2>
           <div className="grid grid-cols-2 gap-3">
             {activeCircles.map((c) => (
-              <div
+              <button
                 key={c.id}
-                className={`rounded-xl p-4 aspect-[3/2] flex flex-col justify-end tile-${circleTone(c.id)}`}
+                onClick={() => onSelectCircle(c.id)}
+                className={`rounded-xl p-4 aspect-[3/2] flex flex-col justify-end text-left transition-transform active:scale-[0.98] tile-${circleTone(c)}`}
               >
                 <div className="text-[15px] font-semibold text-white truncate">{c.emoji ? `${c.emoji} ` : ''}{c.name}</div>
                 <div className="text-[12px] text-white/70">
                   {c.members} {c.members === 1 ? 'member' : 'members'}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
