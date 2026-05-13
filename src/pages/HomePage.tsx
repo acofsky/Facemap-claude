@@ -96,7 +96,7 @@ export function HomePage({ onSelectPerson, onNavigateToRecall }: HomePageProps) 
   }
 
   return (
-    <div className="px-5 pt-12 pb-8 animate-fade-in space-y-7">
+    <div className="px-5 pt-5 pb-8 animate-fade-in space-y-7">
       {/* Greeting */}
       <header>
         <h1 className="font-display text-[26px] leading-[1.15] text-foreground tracking-[-0.02em]">

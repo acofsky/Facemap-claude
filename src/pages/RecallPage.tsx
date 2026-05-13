@@ -45,7 +45,7 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
   const hasInput = query.trim().length > 0;
 
   return (
-    <div className="px-5 pt-12 pb-8 animate-fade-in">
+    <div className="px-5 pt-5 pb-8 animate-fade-in">
       <header className="mb-5">
         <p className="text-xs uppercase tracking-widest text-muted-text mb-1">Recall</p>
         <h1 className="font-display text-3xl text-foreground tracking-[-0.02em] leading-tight">

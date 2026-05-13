@@ -76,7 +76,7 @@ export function ProfilePage() {
   return (
     <div className="pb-10 animate-fade-in">
       {/* Nav bar */}
-      <div className="flex items-center justify-center pt-12 mb-4">
+      <div className="flex items-center justify-center pt-3 mb-4">
         <h1 className="text-[17px] font-semibold text-foreground">Profile</h1>
       </div>
 

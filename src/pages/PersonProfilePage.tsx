@@ -2,9 +2,10 @@ import { useState, useRef, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import {
   usePerson, usePersons, useCircles, useUpdatePerson, useDeletePerson,
-  useSetPersonCircles, useUploadPhoto,
+  useSetPersonCircles, useSetPersonEvents, useEvents, useUploadPhoto,
   useConnections, useCreateConnection, useDeleteConnection,
 } from '@/hooks/use-data';
+import { isValidTone } from '@/lib/store';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { PhotoImg } from '@/components/PhotoImg';
 import { MeetingsSection } from '@/components/MeetingsSection';
@@ -34,10 +35,12 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   const { data: person, isLoading } = usePerson(personId);
   const { data: allPeople = [] } = usePersons();
   const { data: circles = [] } = useCircles();
+  const { data: events = [] } = useEvents({ includeArchived: false });
   const { data: connections = [] } = useConnections();
   const updatePerson = useUpdatePerson();
   const deletePersonMut = useDeletePerson();
   const setPersonCircles = useSetPersonCircles();
+  const setPersonEvents = useSetPersonEvents();
   const uploadPhoto = useUploadPhoto();
   const createConnection = useCreateConnection();
   const deleteConnection = useDeleteConnection();
@@ -143,6 +146,14 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
     setPersonCircles.mutate({ personId, circleIds: next });
   };
 
+  const toggleEvent = (eventId: string) => {
+    const current = person.eventIds || [];
+    const next = current.includes(eventId)
+      ? current.filter((id: string) => id !== eventId)
+      : [...current, eventId];
+    setPersonEvents.mutate({ personId, eventIds: next });
+  };
+
   const handleDelete = () => {
     if (confirm('Remove this person from your Membr?')) {
       deletePersonMut.mutate(personId);
@@ -174,6 +185,7 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
   };
 
   const personCircleObjects = circles.filter(c => (person.circleIds || []).includes(c.id));
+  const personEventObjects = events.filter(e => (person.eventIds || []).includes(e.id));
 
   const firstName = (person.name || '').split(' ')[0] || 'Person';
 
@@ -249,8 +261,8 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
           </button>
         )}
 
-        {/* Circle pills */}
-        {personCircleObjects.length > 0 && (
+        {/* Circle + Event pills */}
+        {(personCircleObjects.length > 0 || personEventObjects.length > 0) && (
           <div className="flex flex-wrap justify-center gap-1.5 mt-2.5 px-4">
             {personCircleObjects.map(c => (
               <span
@@ -260,6 +272,21 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
                 {c.emoji ? `${c.emoji} ` : ''}{c.name}
               </span>
             ))}
+            {personEventObjects.map(e => {
+              const tone = isValidTone(e.tone) ? e.tone : 'red';
+              return (
+                <span
+                  key={e.id}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border text-[11px] font-medium text-white/95',
+                    `tile-${tone}`,
+                  )}
+                  style={{ borderColor: 'hsl(0 0% 100% / 0.18)' }}
+                >
+                  {e.name}
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -493,6 +520,35 @@ export function PersonProfilePage({ personId, onBack }: PersonProfilePageProps) 
           </div>
         ) : (
           <p className="text-[13px] text-muted-text italic">No Circles yet. Create one in the Circles tab.</p>
+        )}
+      </div>
+
+      {/* Events toggles */}
+      <SectionLabel>Events</SectionLabel>
+      <div className="px-5 mb-6">
+        {events.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {events.map(e => {
+              const on = (person.eventIds || []).includes(e.id);
+              const tone = isValidTone(e.tone) ? e.tone : 'red';
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => toggleEvent(e.id)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-sm text-[12px] font-medium transition-all border',
+                    on
+                      ? `${`tile-${tone}`} text-white border-transparent`
+                      : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                  )}
+                >
+                  {e.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[13px] text-muted-text italic">No Events yet. Create one in the Circles tab.</p>
         )}
       </div>
 

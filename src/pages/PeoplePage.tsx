@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { usePersons, useCircles, usePersonCircles } from '@/hooks/use-data';
+import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { Search, Loader2, ListFilter, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isValidTone } from '@/lib/store';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
@@ -16,15 +17,20 @@ const SORT_LABELS: Record<SortKey, string> = {
   circle: 'By Circle',
 };
 
+// Active filter is one chip at a time: 'all' or `${'circle'|'event'}:${id}`.
+type FilterKey = string | null;
+
 export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   const [search, setSearch] = useState('');
-  const [filterCircle, setFilterCircle] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>(null);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [sortOpen, setSortOpen] = useState(false);
 
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
   const { data: personCircles = [] } = usePersonCircles();
+  const { data: events = [] } = useEvents({ includeArchived: false });
+  const { data: personEvents = [] } = usePersonEvents();
 
   const personCircleMap = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -34,6 +40,15 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
     });
     return map;
   }, [personCircles]);
+
+  const personEventMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    personEvents.forEach((pe) => {
+      if (!map[pe.person_id]) map[pe.person_id] = [];
+      map[pe.person_id].push(pe.event_id);
+    });
+    return map;
+  }, [personEvents]);
 
   const filtered = useMemo(() => {
     let result = people;
@@ -46,8 +61,13 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
           p.important_info?.toLowerCase().includes(q),
       );
     }
-    if (filterCircle) {
-      result = result.filter((p) => (personCircleMap[p.id] || []).includes(filterCircle));
+    if (filter) {
+      const [kind, id] = filter.split(':');
+      if (kind === 'circle') {
+        result = result.filter((p) => (personCircleMap[p.id] || []).includes(id));
+      } else if (kind === 'event') {
+        result = result.filter((p) => (personEventMap[p.id] || []).includes(id));
+      }
     }
     if (sortBy === 'az') {
       result = [...result].sort((a, b) => a.name.localeCompare(b.name));
@@ -59,7 +79,7 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
       });
     }
     return result;
-  }, [people, search, filterCircle, sortBy, personCircleMap]);
+  }, [people, search, filter, sortBy, personCircleMap, personEventMap]);
 
   if (isLoading) {
     return (
@@ -72,7 +92,7 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   return (
     <div className="pb-8 animate-fade-in">
       {/* Nav bar */}
-      <div className="flex items-center justify-between px-5 pt-12 mb-4">
+      <div className="flex items-center justify-between px-5 pt-3 mb-4">
         <span className="w-9" />
         <h1 className="text-[17px] font-semibold text-foreground">People</h1>
         <div className="relative">
@@ -121,17 +141,33 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
       </div>
 
       {/* Filter chips */}
-      {circles.length > 0 && (
+      {(circles.length > 0 || events.length > 0) && (
         <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 px-5 scrollbar-hide">
-          <FilterChip active={!filterCircle} onClick={() => setFilterCircle(null)} label="All" />
-          {circles.map((c) => (
-            <FilterChip
-              key={c.id}
-              active={filterCircle === c.id}
-              onClick={() => setFilterCircle(filterCircle === c.id ? null : c.id)}
-              label={`${c.emoji ? `${c.emoji} ` : ''}${c.name}`}
-            />
-          ))}
+          <FilterChip active={!filter} onClick={() => setFilter(null)} label="All" />
+          {circles.map((c) => {
+            const key = `circle:${c.id}`;
+            return (
+              <FilterChip
+                key={key}
+                active={filter === key}
+                onClick={() => setFilter(filter === key ? null : key)}
+                label={`${c.emoji ? `${c.emoji} ` : ''}${c.name}`}
+              />
+            );
+          })}
+          {events.map((e) => {
+            const key = `event:${e.id}`;
+            const tone = isValidTone(e.tone) ? e.tone : 'red';
+            return (
+              <FilterChip
+                key={key}
+                active={filter === key}
+                onClick={() => setFilter(filter === key ? null : key)}
+                label={e.name}
+                tone={tone}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -182,14 +218,27 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   );
 }
 
-function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+function FilterChip({
+  active,
+  onClick,
+  label,
+  tone,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  /** Event chips get a gradient when active; circle/all chips stay Primary Red. */
+  tone?: string;
+}) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'shrink-0 px-3 h-8 inline-flex items-center rounded-sm text-[12px] font-medium whitespace-nowrap transition-colors border',
         active
-          ? 'bg-primary text-primary-foreground border-primary'
+          ? tone
+            ? `tile-${tone} text-white border-transparent`
+            : 'bg-primary text-primary-foreground border-primary'
           : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
       )}
     >
