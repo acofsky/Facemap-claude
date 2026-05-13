@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { usePersons, useCircles, usePersonCircles, useRecentMeetings } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
+import { SmartCircleBanner } from '@/components/SmartCircleBanner';
 import { Search, Loader2, Sparkles, CalendarPlus } from 'lucide-react';
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
@@ -111,6 +112,9 @@ export function HomePage({ onSelectPerson, onNavigateToRecall }: HomePageProps) 
           )}
         </div>
       </header>
+
+      {/* Smart Circle suggestion banner (engine surface 1) */}
+      <SmartCircleBanner />
 
       {/* Tappable search bar */}
       <button

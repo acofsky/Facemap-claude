@@ -1,7 +1,12 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, ImagePlus, ChevronDown, ChevronUp } from 'lucide-react';
-import { useCreatePerson, useUploadPhoto, useCircles, useSetPersonCircles, useCreateMeeting } from '@/hooks/use-data';
+import { X, ImagePlus, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import {
+  useCreatePerson, useUploadPhoto, useCircles, useSetPersonCircles, useCreateMeeting,
+  useCreateEvent, useSetPersonEvents, usePersons,
+} from '@/hooks/use-data';
+import { useSmartClusters } from '@/hooks/use-smart-clusters';
+import { matchSheetInputToCluster } from '@/lib/smart-circle';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -31,8 +36,21 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
   const createPerson = useCreatePerson();
   const uploadPhoto = useUploadPhoto();
   const setPersonCircles = useSetPersonCircles();
+  const setPersonEventsMut = useSetPersonEvents();
   const createMeeting = useCreateMeeting();
+  const createEvtMut = useCreateEvent();
   const { data: circles = [] } = useCircles();
+  const { data: peopleAll = [] } = usePersons();
+  const { clusters } = useSmartClusters();
+
+  // Smart Circle inline strip (engine surface 2): suggest adding the new
+  // person to a pending cluster's Event if their inputs match the vocab.
+  const matchedCluster = useMemo(
+    () => matchSheetInputToCluster({ how_we_met: howWeMet, where_when: whereWhen }, clusters, peopleAll),
+    [clusters, peopleAll, howWeMet, whereWhen],
+  );
+  const [pendingEventJoin, setPendingEventJoin] = useState<{ name: string; fingerprint: string } | null>(null);
+  const [stripDismissed, setStripDismissed] = useState(false);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,6 +100,30 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
       place: whereWhen || undefined,
       notes: '• First encounter',
     });
+
+    // Smart Circle surface-2 join: if the user accepted, attach this person to
+    // the suggested Event. Create the Event lazily if it doesn't exist yet.
+    if (pendingEventJoin) {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: existing } = await supabase
+        .from('events')
+        .select('id')
+        .eq('name', pendingEventJoin.name)
+        .is('archived_at', null)
+        .limit(1);
+      let eventId = existing?.[0]?.id;
+      if (!eventId) {
+        const evt = await createEvtMut.mutateAsync({
+          name: pendingEventJoin.name,
+          tone: 'red',
+          start_date: format(new Date(), 'yyyy-MM-dd'),
+          end_date: null,
+        });
+        eventId = evt.id;
+      }
+      await setPersonEventsMut.mutateAsync({ personId: person.id, eventIds: [eventId] });
+    }
+
     onClose();
   };
 
@@ -232,6 +274,44 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
                 placeholder="Reminder note…"
                 className={inputClass}
               />
+            </div>
+          )}
+
+          {/* Smart Circle inline strip (engine surface 2) */}
+          {matchedCluster && !stripDismissed && !pendingEventJoin && (
+            <div className="rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.08)] px-3 py-2 flex items-center gap-2">
+              <Sparkles className="w-3 h-3 text-primary shrink-0" strokeWidth={1.75} />
+              <p className="flex-1 text-[13px] text-foreground leading-snug">
+                Add to <span className="font-semibold">{matchedCluster.suggestedName}</span>?
+              </p>
+              <button
+                onClick={() => setStripDismissed(true)}
+                className="text-[12px] text-muted-text"
+              >
+                No thanks
+              </button>
+              <button
+                onClick={() =>
+                  setPendingEventJoin({ name: matchedCluster.suggestedName, fingerprint: matchedCluster.fingerprint })
+                }
+                className="text-[12px] font-semibold text-primary"
+              >
+                Yes
+              </button>
+            </div>
+          )}
+          {pendingEventJoin && (
+            <div className="rounded-md bg-surface-1 border border-primary/30 px-3 py-2 flex items-center gap-2">
+              <Sparkles className="w-3 h-3 text-primary shrink-0" strokeWidth={1.75} />
+              <p className="flex-1 text-[13px] text-foreground leading-snug">
+                Joining <span className="font-semibold">{pendingEventJoin.name}</span> on save.
+              </p>
+              <button
+                onClick={() => setPendingEventJoin(null)}
+                className="text-[12px] text-muted-text"
+              >
+                Undo
+              </button>
             </div>
           )}
         </div>
