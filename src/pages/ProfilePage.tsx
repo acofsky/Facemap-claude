@@ -1,9 +1,11 @@
 import { useState, type ComponentType } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
+import { NotificationPreferencesPage } from '@/pages/NotificationPreferencesPage';
 import { cn } from '@/lib/utils';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
@@ -13,6 +15,7 @@ export function ProfilePage() {
   const { user, signOut } = useAuth();
   const { resetOnboarding } = useOnboarded();
   const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password'>(null);
+  const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -138,7 +141,7 @@ export function ProfilePage() {
         <SettingRow
           icon={Bell}
           label="Notifications"
-          onClick={() => toast.message('Notification preferences arrive in M3.')}
+          onClick={() => setNotifPrefsOpen(true)}
         />
         <SettingRow
           icon={ShieldCheck}
@@ -180,6 +183,12 @@ export function ProfilePage() {
       </div>
 
       {/* Settings inline sheet */}
+      <AnimatePresence>
+        {notifPrefsOpen && (
+          <NotificationPreferencesPage onBack={() => setNotifPrefsOpen(false)} />
+        )}
+      </AnimatePresence>
+
       {settingsOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 animate-fade-in"
