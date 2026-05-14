@@ -158,9 +158,11 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   }
 
   return (
-    <div className="px-5 pt-5 pb-8 animate-fade-in space-y-7">
-      {/* Greeting */}
-      <header>
+    <div className="pb-8 animate-fade-in">
+      {/* Sticky greeting header — pinned to the top of the scroll area so
+          the user always sees who Membr is greeting, even when scrolled
+          deep into the Recent/Today/Your Circles sections below. */}
+      <header className="sticky top-0 z-20 bg-background px-5 pt-5 pb-3">
         <h1 className="font-display text-[26px] leading-[1.15] text-foreground tracking-[-0.02em]">
           Good {tod}{firstName ? `, ${firstName}` : ''}<span className="text-primary">.</span>
         </h1>
@@ -173,6 +175,8 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
           )}
         </div>
       </header>
+
+      <div className="px-5 pt-4 space-y-7">
 
       <SmartCircleBanner />
 
@@ -360,6 +364,8 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
           </p>
         </div>
       )}
+
+      </div>{/* /content (px-5 space-y-7) */}
 
       {/* Brief picker + modal */}
       <AnimatePresence>

@@ -35,12 +35,13 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         aria-hidden="true"
         className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
       />
-      <main className="flex-1 overflow-y-auto pb-24 safe-top">
+      <main className="flex-1 overflow-y-auto pb-44 safe-top">
         {children}
       </main>
 
-      {/* Corner-anchored FABs (Visual Brief §4.2). Hidden when Recall tab is
-          active so the search field has breathing room. */}
+      {/* Bottom-center FAB cluster. Hidden when Recall tab is active so the
+          search field has breathing room. The pb-44 above keeps content
+          scrollable past the FAB's vertical extent. */}
       {activeTab !== 'recall' && (
         <CornerFabs
           onAddPerson={() => setAddPersonOpen(true)}
