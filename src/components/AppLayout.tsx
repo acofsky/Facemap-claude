@@ -48,9 +48,10 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         />
       )}
 
-      {/* Bottom Nav — Surface 1, hairline top border, no blur. */}
+      {/* Bottom Nav — Surface 1, hairline top border, no blur. Hidden via CSS
+          when the keyboard is open (see html.kb-open .bottom-tabs in index.css). */}
       <nav
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 safe-bottom"
+        className="bottom-tabs fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 safe-bottom"
         style={{ backgroundColor: 'hsl(var(--surface-1))', borderTop: '1px solid hsl(0 0% 100% / 0.08)' }}
       >
         <div className="flex items-stretch justify-around h-16 px-1">

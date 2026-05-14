@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePersons, useCircles, usePersonCircles, useRecentMeetings } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { SmartCircleBanner } from '@/components/SmartCircleBanner';
 import { AIBadge } from '@/components/AIBadge';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
-import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight } from 'lucide-react';
+import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight, X } from 'lucide-react';
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +57,7 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   const [recallResults, setRecallResults] = useState<{ id: string; reason: string }[]>([]);
   const [recallLoading, setRecallLoading] = useState(false);
   const [recallSearched, setRecallSearched] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -151,15 +152,35 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
       {/* Inline Recall search — same edge function as the Recall tab */}
       <section>
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text pointer-events-none" strokeWidth={1.75} />
           <input
+            ref={searchInputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
             placeholder="Recall anyone…"
-            className="w-full h-11 pl-10 pr-9 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
+            enterKeyHint="search"
+            className="w-full h-11 pl-10 pr-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
           />
-          {recallLoading && (
+          {recallLoading ? (
             <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text animate-spin" />
+          ) : (
+            hasQuery && (
+              <button
+                onClick={() => {
+                  setQuery('');
+                  searchInputRef.current?.blur();
+                }}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text"
+              >
+                <X className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            )
           )}
         </div>
 
@@ -215,7 +236,11 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">Recent</h2>
           </div>
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide -mx-5 px-5">
+          {/* overflow-x-scroll + explicit overflow-y-visible + vertical padding
+              gives the red ring room to render past the avatar without being
+              clipped by the scroll container (iOS Safari treats overflow-x-auto
+              as both axes). */}
+          <div className="flex gap-4 overflow-x-scroll overflow-y-visible scrollbar-hide -mx-5 px-5 py-1">
             {recentPeople.map((p) => (
               <button
                 key={p.id}
@@ -318,7 +343,9 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
             closeOnPick
             onPick={(id, name) => {
               setBriefPickerOpen(false);
-              setBriefTarget({ id, name });
+              // Wait for the picker's exit animation to finish before mounting
+              // the brief modal so they don't slide past each other.
+              window.setTimeout(() => setBriefTarget({ id, name }), 260);
             }}
             onClose={() => setBriefPickerOpen(false)}
           />

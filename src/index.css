@@ -183,6 +183,38 @@
 }
 
 /*
+ * Manual keyboard handling — driven by Capacitor Keyboard listeners in App.tsx.
+ * When the iOS keyboard is open, `<html>` gets `.kb-open` and the keyboard's
+ * height is published as `--keyboard-height`. UI that needs to sit flush
+ * with the keyboard reads from these. See useKeyboardSetup() in App.tsx.
+ */
+:root { --keyboard-height: 0px; }
+
+/* Hide the safe-bottom inset while the keyboard is up — iOS sets it to 0
+   automatically there anyway, but our class-based version sometimes lags. */
+html.kb-open .safe-bottom { padding-bottom: 0 !important; }
+
+/* Bottom tab bar slides off-screen when the keyboard takes over. */
+.bottom-tabs { transition: transform 0.18s ease-out; }
+html.kb-open .bottom-tabs { transform: translateY(100%); }
+
+/* The corner-anchored FABs also slide off so they don't peek above the keyboard. */
+.corner-fabs { transition: transform 0.18s ease-out, opacity 0.18s ease-out; }
+html.kb-open .corner-fabs {
+  transform: translateY(calc(100% + var(--keyboard-height)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Sheets that opt-in to keyboard-aware positioning. The Y animation comes
+   from Framer Motion; the bottom offset comes from CSS so it tracks the
+   keyboard fluidly. */
+.kb-aware-sheet {
+  bottom: var(--keyboard-height, 0px);
+  transition: bottom 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/*
  * Spec §12 — when the OS reports prefers-reduced-motion: reduce, kill
  * every translateY / scale / pulse animation. Plain opacity fades are
  * fine to keep. Components reading useReduceMotion() handle this for

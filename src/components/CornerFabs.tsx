@@ -33,7 +33,7 @@ export function CornerFabs({ onAddPerson, onLogEncounter }: CornerFabsProps) {
         )}
       </AnimatePresence>
 
-      <div className="fixed z-40 bottom-24 right-4 flex flex-col items-end gap-3 safe-bottom">
+      <div className="corner-fabs fixed z-40 bottom-24 right-4 flex flex-col items-end gap-3 safe-bottom">
         <AnimatePresence>
           {menuOpen && (
             <motion.button

@@ -18,14 +18,39 @@ const queryClient = new QueryClient();
 
 function useKeyboardSetup() {
   // iOS WebView's default keyboard behaviour wreaks havoc on fixed-bottom
-  // sheets — focusing an input scrolls the page up and pushes the sheet
-  // header off-screen. Native resize mode lets iOS shrink the WebView
-  // above the keyboard cleanly, which keeps sheets pinned and their
-  // contents visible.
+  // sheets. We take full manual control here:
+  //   1. Disable native WebView resize — we don't want the WebView height to
+  //      change, so positions stay stable.
+  //   2. Listen for keyboardWill(Show|Hide) and push the height into a CSS
+  //      custom property + a `kb-open` class on <html>.
+  //   3. Sheets, the tab bar, and any "stuck to bottom" UI read from
+  //      var(--keyboard-height) so they sit flush against the keyboard.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    Keyboard.setResizeMode({ mode: KeyboardResize.Native }).catch(() => {});
+    Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {});
     Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
+
+    const root = document.documentElement;
+    const onShow = (info: { keyboardHeight: number }) => {
+      root.style.setProperty('--keyboard-height', `${info.keyboardHeight}px`);
+      root.classList.add('kb-open');
+    };
+    const onHide = () => {
+      root.style.setProperty('--keyboard-height', '0px');
+      root.classList.remove('kb-open');
+    };
+
+    const cleanups: Array<() => void> = [];
+    Keyboard.addListener('keyboardWillShow', onShow).then((h) => cleanups.push(() => h.remove()));
+    Keyboard.addListener('keyboardDidShow', onShow).then((h) => cleanups.push(() => h.remove()));
+    Keyboard.addListener('keyboardWillHide', onHide).then((h) => cleanups.push(() => h.remove()));
+    Keyboard.addListener('keyboardDidHide', onHide).then((h) => cleanups.push(() => h.remove()));
+
+    return () => {
+      cleanups.forEach((c) => c());
+      root.style.removeProperty('--keyboard-height');
+      root.classList.remove('kb-open');
+    };
   }, []);
 }
 
