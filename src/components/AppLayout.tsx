@@ -42,15 +42,14 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         {children}
       </main>
 
-      {/* Central Add button. Suppressed on Recall so the search field has
-          breathing room. The bubble menu fans out above the button. */}
-      {activeTab !== 'recall' && (
-        <MainButton
-          onAddPerson={() => setAddPersonOpen(true)}
-          onLogEncounter={() => setLogEncounterOpen(true)}
-          onNewEvent={() => setNewEventOpen(true)}
-        />
-      )}
+      {/* Central Add button. Available on every tab — sits above the nav
+          bar so it doesn't compete with the Recall search input the way
+          the old corner FAB did. */}
+      <MainButton
+        onAddPerson={() => setAddPersonOpen(true)}
+        onLogEncounter={() => setLogEncounterOpen(true)}
+        onNewEvent={() => setNewEventOpen(true)}
+      />
 
       {/* Bottom Nav — 4 tabs split 2/2 around a transparent middle slot.
           The MainButton above sits visually in the middle slot. Surface 1
