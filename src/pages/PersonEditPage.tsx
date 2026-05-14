@@ -53,6 +53,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       where_when: person?.where_when ?? '',
       misc_notes: person?.misc_notes ?? '',
       physical_description: person?.physical_description ?? '',
+      physical_ai: person?.physical_description_ai_generated ?? false,
       important_info: person?.important_info ?? '',
       known_people_notes: person?.known_people_notes ?? '',
       circleIds: person?.circleIds ?? [],
@@ -67,6 +68,10 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   const [whereWhen, setWhereWhen] = useState(initial.where_when);
   const [miscNotes, setMiscNotes] = useState(initial.misc_notes);
   const [physical, setPhysical] = useState(initial.physical_description);
+  // Track whether the current physical_description was AI-generated. Set
+  // true when describe-from-photo writes the field; cleared whenever the
+  // user edits the textarea so manual edits don't keep the AI badge.
+  const [physicalAi, setPhysicalAi] = useState(initial.physical_ai);
   const [important, setImportant] = useState(initial.important_info);
   const [known, setKnown] = useState(initial.known_people_notes);
   const [circleIds, setCircleIds] = useState<string[]>(initial.circleIds);
@@ -121,6 +126,10 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
           where_when: whereWhen || null,
           misc_notes: miscNotes || null,
           physical_description: physical || null,
+          // A cleared description can't be AI-generated. Persist the flag
+          // alongside the text so the profile page knows whether to show
+          // the AI badge next to it.
+          physical_description_ai_generated: physical ? physicalAi : false,
           important_info: important || null,
           known_people_notes: known || null,
         },
@@ -168,7 +177,10 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const description = data?.description || '';
-      if (description) setPhysical(description);
+      if (description) {
+        setPhysical(description);
+        setPhysicalAi(true);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to generate description';
       toast.error(msg);
@@ -375,7 +387,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                   right={
                     photos[0] && (
                       <div className="flex items-center gap-2">
-                        {physical && <AIBadge feature="description" />}
+                        {physicalAi && <AIBadge feature="description" />}
                         <button
                           onClick={handleGenerateDescription}
                           disabled={generatingDesc}
@@ -390,7 +402,12 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                 >
                   <textarea
                     value={physical}
-                    onChange={(e) => setPhysical(e.target.value)}
+                    onChange={(e) => {
+                      setPhysical(e.target.value);
+                      // Manual edit overrides AI authorship — drop the flag
+                      // so the profile page won't claim Membr wrote this.
+                      if (physicalAi) setPhysicalAi(false);
+                    }}
                     placeholder="Tall, dark beard, wears glasses…"
                     rows={3}
                     className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}

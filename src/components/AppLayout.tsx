@@ -38,7 +38,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         aria-hidden="true"
         className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
       />
-      <main className="flex-1 overflow-y-auto pb-44 safe-top">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-44 safe-top">
         {children}
       </main>
 

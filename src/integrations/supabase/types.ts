@@ -245,6 +245,7 @@ export type Database = {
           name: string
           photos: string[]
           physical_description: string | null
+          physical_description_ai_generated: boolean
           reminder_date: string | null
           reminder_note: string | null
           updated_at: string
@@ -263,6 +264,7 @@ export type Database = {
           name?: string
           photos?: string[]
           physical_description?: string | null
+          physical_description_ai_generated?: boolean
           reminder_date?: string | null
           reminder_note?: string | null
           updated_at?: string
@@ -281,6 +283,7 @@ export type Database = {
           name?: string
           photos?: string[]
           physical_description?: string | null
+          physical_description_ai_generated?: boolean
           reminder_date?: string | null
           reminder_note?: string | null
           updated_at?: string
