@@ -5,12 +5,15 @@ import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { NotificationPreferencesPage } from '@/pages/NotificationPreferencesPage';
 import { AppPermissionsPage } from '@/pages/AppPermissionsPage';
 import { cn } from '@/lib/utils';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
 const APP_VERSION = '1.0.0';
+// TODO when the policy is hosted, replace with the live URL.
+const PRIVACY_POLICY_URL: string | null = null;
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -25,6 +28,8 @@ export function ProfilePage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [nameLoading, setNameLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const currentFirstName =
     ((user?.user_metadata as { first_name?: string } | undefined)?.first_name ?? '').trim();
@@ -96,8 +101,23 @@ export function ProfilePage() {
     if (confirm('Sign out of Membr?')) signOut();
   };
 
-  const handleDelete = () => {
-    toast.message('Account deletion coming soon. Email support@membr.app meanwhile.');
+  const handleDeleteConfirmed = async () => {
+    setDeleting(true);
+    try {
+      // Wipes the user's owned rows in every table + the photo folder in
+      // storage + auth.users itself. Lives in supabase/functions/delete-account.
+      // Required for App Store Guideline 5.1.1(v).
+      const { error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+      // Drop the local session — onAuthStateChange will bounce us back
+      // to AuthPage now that the JWT is invalid.
+      await signOut();
+      toast.success('Account deleted.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not delete account. Try again.');
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
   };
 
   const displayName =
@@ -191,25 +211,39 @@ export function ProfilePage() {
           rightLabel={APP_VERSION}
           nonInteractive
         />
-        <SettingRow
-          label="Privacy Policy"
-          onClick={() => toast.message('Privacy Policy link coming soon.')}
-        />
-        <SettingRow
-          label="Terms of Service"
-          onClick={() => toast.message('Terms of Service link coming soon.')}
-          last
-        />
+        {/* Terms-of-Service row removed: Apple doesn't require ToS and we
+            don't have one. Privacy Policy stays, opens the live URL once
+            it's set — until then the row is hidden so the App Store
+            reviewer doesn't tap a dead link. */}
+        {PRIVACY_POLICY_URL && (
+          <SettingRow
+            label="Privacy Policy"
+            onClick={() => window.open(PRIVACY_POLICY_URL!, '_blank', 'noopener,noreferrer')}
+            last
+          />
+        )}
       </SectionCard>
 
       <div className="px-5 mt-2">
         <button
-          onClick={handleDelete}
-          className="text-[14px] text-muted-text hover:text-destructive transition-colors"
+          onClick={() => setDeleteConfirmOpen(true)}
+          disabled={deleting}
+          className="text-[14px] text-muted-text hover:text-destructive transition-colors disabled:opacity-50"
         >
-          Delete Account
+          {deleting ? 'Deleting…' : 'Delete Account'}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete your account?"
+        description="This permanently removes your account, all the people you've added, your circles and events, encounters, and any photos. This cannot be undone."
+        confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
+        cancelLabel="Keep account"
+        destructive
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
 
       {/* Settings inline sheet */}
       <AnimatePresence>

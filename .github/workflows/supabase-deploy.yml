@@ -49,3 +49,4 @@ jobs:
           supabase functions deploy describe-from-photo
           supabase functions deploy meeting-brief
           supabase functions deploy recall-search
+          supabase functions deploy delete-account
