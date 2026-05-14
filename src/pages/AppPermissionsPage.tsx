@@ -6,6 +6,7 @@ import { App } from '@capacitor/app';
 import { Contacts } from '@capacitor-community/contacts';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { cn } from '@/lib/utils';
+import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface AppPermissionsPageProps {
   onBack: () => void;
@@ -37,6 +38,7 @@ const STATE_LABEL: Record<PermissionState, string> = {
 export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
   const [contacts, setContacts] = useState<PermissionState>('unknown');
   const [notifications, setNotifications] = useState<PermissionState>('unknown');
+  const swipe = useSwipeBack(onBack);
 
   const isNative = Capacitor.isNativePlatform();
 
@@ -83,8 +85,16 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 36, stiffness: 380 }}
       className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
+      style={{
+        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+        transition: swipe.dragging ? 'none' : undefined,
+      }}
+      {...swipe.bind}
     >
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
         </button>

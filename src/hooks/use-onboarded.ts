@@ -1,35 +1,50 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 const ONBOARDED_KEY = 'membr_onboarded';
+const CHANGE_EVENT = 'membr:onboarding-changed';
 
-/** Tracks whether the user has finished the onboarding sequence on this device. */
+function subscribe(callback: () => void): () => void {
+  const onChange = () => callback();
+  window.addEventListener('storage', onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+function getSnapshot(): boolean {
+  return window.localStorage.getItem(ONBOARDED_KEY) === 'true';
+}
+
+// Server / SSR snapshot. Treated as "already onboarded" so the overlay
+// doesn't flash during hydration when there's no localStorage.
+function getServerSnapshot(): boolean {
+  return true;
+}
+
+/**
+ * Onboarding completion flag backed by localStorage. All consumers share
+ * one source of truth via `useSyncExternalStore` + a custom window event,
+ * so writes from any component re-render every other component reading
+ * the value in the same tab.
+ */
 export function useOnboarded(): {
   onboarded: boolean;
   markOnboarded: () => void;
   resetOnboarding: () => void;
 } {
-  const [onboarded, setOnboarded] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.localStorage.getItem(ONBOARDED_KEY) === 'true';
-  });
+  const onboarded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === ONBOARDED_KEY) setOnboarded(e.newValue === 'true');
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+  const markOnboarded = useCallback(() => {
+    window.localStorage.setItem(ONBOARDED_KEY, 'true');
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   }, []);
 
-  return {
-    onboarded,
-    markOnboarded: () => {
-      window.localStorage.setItem(ONBOARDED_KEY, 'true');
-      setOnboarded(true);
-    },
-    resetOnboarding: () => {
-      window.localStorage.removeItem(ONBOARDED_KEY);
-      setOnboarded(false);
-    },
-  };
+  const resetOnboarding = useCallback(() => {
+    window.localStorage.removeItem(ONBOARDED_KEY);
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  }, []);
+
+  return { onboarded, markOnboarded, resetOnboarding };
 }

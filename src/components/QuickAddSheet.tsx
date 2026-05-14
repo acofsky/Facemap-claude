@@ -1,14 +1,19 @@
 import { useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, ImagePlus, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { X, ImagePlus, Sparkles, Loader2, Wand2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { DragHandle } from '@/components/DragHandle';
+import { AIBadge } from '@/components/AIBadge';
+import { BulletTextarea } from '@/components/BulletTextarea';
 import { haptics } from '@/lib/haptics';
 import {
   useCreatePerson, useUploadPhoto, useCircles, useSetPersonCircles, useCreateMeeting,
-  useCreateEvent, useSetPersonEvents, usePersons,
+  useCreateEvent, useSetPersonEvents, usePersons, useEvents,
 } from '@/hooks/use-data';
 import { useSmartClusters } from '@/hooks/use-smart-clusters';
 import { matchSheetInputToCluster } from '@/lib/smart-circle';
+import { isValidTone } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -22,26 +27,26 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
   const [name, setName] = useState('');
   const [whereWhen, setWhereWhen] = useState('');
   const [dateMet, setDateMet] = useState('');
-  const [note, setNote] = useState('');
   const [howWeMet, setHowWeMet] = useState('');
   const [physicalDescription, setPhysicalDescription] = useState('');
-  const [importantInfo, setImportantInfo] = useState('');
+  const [background, setBackground] = useState(''); // formerly "Important info"
+  const [misc, setMisc] = useState('');
   const [knownPeopleNotes, setKnownPeopleNotes] = useState('');
-  const [reminderDate, setReminderDate] = useState('');
-  const [reminderNote, setReminderNote] = useState('');
   const [selectedCircles, setSelectedCircles] = useState<string[]>([]);
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [showMore, setShowMore] = useState(false);
+  const [generatingDesc, setGeneratingDesc] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const createPerson = useCreatePerson();
   const uploadPhoto = useUploadPhoto();
-  const setPersonCircles = useSetPersonCircles();
+  const setPersonCirclesMut = useSetPersonCircles();
   const setPersonEventsMut = useSetPersonEvents();
   const createMeeting = useCreateMeeting();
   const createEvtMut = useCreateEvent();
   const { data: circles = [] } = useCircles();
+  const { data: events = [] } = useEvents({ includeArchived: false });
   const { data: peopleAll = [] } = usePersons();
   const { clusters } = useSmartClusters();
 
@@ -64,21 +69,64 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
   };
 
   const toggleCircle = (id: string) => {
+    haptics.light();
     setSelectedCircles((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+  };
+  const toggleEvent = (id: string) => {
+    haptics.light();
+    setSelectedEvents((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
   };
 
   const setToday = () => setDateMet(format(new Date(), 'yyyy-MM-dd'));
 
+  // AI from photo: needs the photo to be uploaded first so the edge function
+  // can fetch it via signed URL. Upload-on-demand if the user hits the wand
+  // before saving.
+  const handleGenerateDescription = async () => {
+    if (!photoFile && !photoPreview) {
+      toast.error('Add a photo first');
+      return;
+    }
+    setGeneratingDesc(true);
+    try {
+      let uploadedPath: string;
+      if (photoFile) {
+        uploadedPath = await uploadPhoto.mutateAsync(photoFile);
+        // Replace file with the already-uploaded path so save doesn't re-upload.
+        setPhotoFile(null);
+        setPhotoPreview(uploadedPath);
+      } else {
+        uploadedPath = photoPreview!;
+      }
+      const { getPhotoUrl } = await import('@/lib/store');
+      const photoUrl = await getPhotoUrl(uploadedPath);
+      const { data, error } = await supabase.functions.invoke('describe-from-photo', { body: { photoUrl } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const description = data?.description || '';
+      if (description) setPhysicalDescription(description);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to generate description';
+      toast.error(msg);
+    } finally {
+      setGeneratingDesc(false);
+    }
+  };
+
   const hasAnything =
-    name || photoFile || note || howWeMet || whereWhen || dateMet || physicalDescription ||
-    importantInfo || knownPeopleNotes || reminderDate || reminderNote || selectedCircles.length > 0;
+    name || photoFile || misc || howWeMet || whereWhen || dateMet || physicalDescription ||
+    background || knownPeopleNotes || selectedCircles.length > 0 || selectedEvents.length > 0;
 
   const handleSave = async () => {
     if (!hasAnything) return;
+    haptics.medium();
     let photos: string[] = [];
     if (photoFile) {
       const url = await uploadPhoto.mutateAsync(photoFile);
       photos = [url];
+    } else if (photoPreview && !photoPreview.startsWith('data:')) {
+      // Already-uploaded path (from photo-AI flow).
+      photos = [photoPreview];
     }
     const person = await createPerson.mutateAsync({
       name: name || 'Unknown',
@@ -87,14 +135,15 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
       where_when: whereWhen || undefined,
       date_met: dateMet || undefined,
       physical_description: physicalDescription || undefined,
-      important_info: importantInfo || undefined,
+      important_info: background || undefined,
       known_people_notes: knownPeopleNotes || undefined,
-      misc_notes: note || undefined,
-      reminder_date: reminderDate || undefined,
-      reminder_note: reminderNote || undefined,
+      misc_notes: misc || undefined,
     });
     if (selectedCircles.length > 0) {
-      await setPersonCircles.mutateAsync({ personId: person.id, circleIds: selectedCircles });
+      await setPersonCirclesMut.mutateAsync({ personId: person.id, circleIds: selectedCircles });
+    }
+    if (selectedEvents.length > 0) {
+      await setPersonEventsMut.mutateAsync({ personId: person.id, eventIds: selectedEvents });
     }
     await createMeeting.mutateAsync({
       person_id: person.id,
@@ -106,7 +155,6 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
     // Smart Circle surface-2 join: if the user accepted, attach this person to
     // the suggested Event. Create the Event lazily if it doesn't exist yet.
     if (pendingEventJoin) {
-      const { supabase } = await import('@/integrations/supabase/client');
       const { data: existing } = await supabase
         .from('events')
         .select('id')
@@ -123,7 +171,10 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
         });
         eventId = evt.id;
       }
-      await setPersonEventsMut.mutateAsync({ personId: person.id, eventIds: [eventId] });
+      await setPersonEventsMut.mutateAsync({
+        personId: person.id,
+        eventIds: Array.from(new Set([...selectedEvents, eventId])),
+      });
     }
 
     onClose();
@@ -132,7 +183,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
   const saving = createPerson.isPending || uploadPhoto.isPending;
   const headerCopy = variant === 'end-of-day' ? "Who'd you meet today?" : 'Add Person';
   const inputClass =
-    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
 
   return (
     <>
@@ -157,7 +208,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
             onClose();
           }
         }}
-        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] z-50 max-h-[88vh] flex flex-col safe-bottom"
+        className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] z-50 max-h-[92vh] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-center justify-between px-5 pt-2 pb-3">
@@ -167,57 +218,138 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-3">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-5 pb-5 space-y-5">
           {/* Photo */}
           <div className="flex justify-center">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="w-20 h-20 rounded-full bg-surface-1 border border-dashed border-[hsl(0_0%_100%/0.12)] flex items-center justify-center overflow-hidden hover:border-primary transition-colors"
-            >
-              {photoPreview ? (
-                <img src={photoPreview} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <ImagePlus className="w-5 h-5 text-muted-text" strokeWidth={1.75} />
+            <div className="relative">
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="w-20 h-20 rounded-full bg-surface-1 border border-dashed border-[hsl(0_0%_100%/0.2)] flex items-center justify-center overflow-hidden hover:border-primary transition-colors"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview.startsWith('data:') ? photoPreview : photoPreview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <ImagePlus className="w-5 h-5 text-muted-text" strokeWidth={1.75} />
+                )}
+              </button>
+              {photoPreview && (
+                <button
+                  onClick={handleGenerateDescription}
+                  disabled={generatingDesc}
+                  aria-label="Describe from photo"
+                  className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
+                  style={{ boxShadow: '0 4px 12px hsl(var(--primary) / 0.35)' }}
+                >
+                  {generatingDesc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                </button>
               )}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+            </div>
           </div>
 
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name…" className={inputClass} autoFocus />
-          <input value={whereWhen} onChange={(e) => setWhereWhen(e.target.value)} placeholder="Where we met…" className={inputClass} />
-
-          <div className="flex gap-2">
+          {/* Name */}
+          <Field label="Name" required>
             <input
-              type="date"
-              value={dateMet}
-              onChange={(e) => setDateMet(e.target.value)}
-              className={cn(inputClass, 'flex-1')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Their name"
+              className={inputClass}
+              autoFocus
             />
-            <button
-              type="button"
-              onClick={setToday}
-              className={cn(
-                'h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors border',
-                dateMet === format(new Date(), 'yyyy-MM-dd')
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
-              )}
-            >
-              Today
-            </button>
-          </div>
+          </Field>
 
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Notes…"
-            rows={2}
-            className={cn(inputClass, 'resize-none py-2.5 h-auto')}
-          />
+          {/* Where we met */}
+          <Field label="Where we met">
+            <input
+              value={whereWhen}
+              onChange={(e) => setWhereWhen(e.target.value)}
+              placeholder="Tribeca Rooftop, NYC"
+              className={inputClass}
+            />
+          </Field>
 
+          {/* When we met */}
+          <Field label="When we met">
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={dateMet}
+                onChange={(e) => setDateMet(e.target.value)}
+                className={cn(inputClass, 'flex-1 min-w-0')}
+              />
+              <button
+                type="button"
+                onClick={setToday}
+                className={cn(
+                  'h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors border',
+                  dateMet === format(new Date(), 'yyyy-MM-dd')
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                )}
+              >
+                Today
+              </button>
+            </div>
+          </Field>
+
+          {/* How we met */}
+          <Field label="How we met">
+            <input
+              value={howWeMet}
+              onChange={(e) => setHowWeMet(e.target.value)}
+              placeholder="Sat next to each other at the dinner"
+              className={inputClass}
+            />
+          </Field>
+
+          {/* Physical description (with optional AI hint) */}
+          <Field
+            label="Physical description"
+            right={photoPreview && physicalDescription ? <AIBadge feature="description" /> : undefined}
+          >
+            <textarea
+              value={physicalDescription}
+              onChange={(e) => setPhysicalDescription(e.target.value)}
+              placeholder="Tall, dark beard, wears glasses…"
+              rows={2}
+              className={cn(inputClass, 'h-auto py-2.5 resize-none')}
+            />
+          </Field>
+
+          {/* Background (renamed from Important info) */}
+          <Field label="Background">
+            <BulletTextarea
+              value={background}
+              onChange={setBackground}
+              placeholder="Work, school, or anything you should know about them…"
+              rows={3}
+            />
+          </Field>
+
+          {/* Notes */}
+          <Field label="Notes">
+            <BulletTextarea
+              value={misc}
+              onChange={setMisc}
+              placeholder="What should you remember about them?"
+              rows={3}
+            />
+          </Field>
+
+          {/* Who they know */}
+          <Field label="Who they know">
+            <textarea
+              value={knownPeopleNotes}
+              onChange={(e) => setKnownPeopleNotes(e.target.value)}
+              placeholder="They know Sarah from yoga, Mike's cousin…"
+              rows={2}
+              className={cn(inputClass, 'h-auto py-2.5 resize-none')}
+            />
+          </Field>
+
+          {/* Circles */}
           {circles.length > 0 && (
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Circles</span>
+            <Field label="Circles">
               <div className="flex flex-wrap gap-1.5">
                 {circles.map((c) => (
                   <button
@@ -235,58 +367,34 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
                   </button>
                 ))}
               </div>
-            </div>
+            </Field>
           )}
 
-          <button
-            type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className="flex items-center gap-1 text-[12px] font-medium text-primary mx-auto"
-          >
-            {showMore ? 'Less details' : 'More details'}
-            {showMore ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-
-          {showMore && (
-            <div className="space-y-3 animate-fade-in">
-              <input value={howWeMet} onChange={(e) => setHowWeMet(e.target.value)} placeholder="How we met…" className={inputClass} />
-              <textarea
-                value={physicalDescription}
-                onChange={(e) => setPhysicalDescription(e.target.value)}
-                placeholder="Physical description…"
-                rows={2}
-                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
-              />
-              <textarea
-                value={importantInfo}
-                onChange={(e) => setImportantInfo(e.target.value)}
-                placeholder="Important info…"
-                rows={2}
-                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
-              />
-              <textarea
-                value={knownPeopleNotes}
-                onChange={(e) => setKnownPeopleNotes(e.target.value)}
-                placeholder="Who they know…"
-                rows={2}
-                className={cn(inputClass, 'resize-none py-2.5 h-auto')}
-              />
-              <div>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-1 block">Reminder date</span>
-                <input
-                  type="date"
-                  value={reminderDate}
-                  onChange={(e) => setReminderDate(e.target.value)}
-                  className={inputClass}
-                />
+          {/* Events */}
+          {events.length > 0 && (
+            <Field label="Events">
+              <div className="flex flex-wrap gap-1.5">
+                {events.map((e) => {
+                  const tone = isValidTone(e.tone) ? e.tone : 'red';
+                  const on = selectedEvents.includes(e.id);
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => toggleEvent(e.id)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-sm text-[12px] font-medium transition-all border',
+                        on
+                          ? `tile-${tone} text-white border-transparent`
+                          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                      )}
+                    >
+                      {e.name}
+                    </button>
+                  );
+                })}
               </div>
-              <input
-                value={reminderNote}
-                onChange={(e) => setReminderNote(e.target.value)}
-                placeholder="Reminder note…"
-                className={inputClass}
-              />
-            </div>
+            </Field>
           )}
 
           {/* Smart Circle inline strip (engine surface 2) */}
@@ -296,10 +404,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
               <p className="flex-1 text-[13px] text-foreground leading-snug">
                 Add to <span className="font-semibold">{matchedCluster.suggestedName}</span>?
               </p>
-              <button
-                onClick={() => setStripDismissed(true)}
-                className="text-[12px] text-muted-text"
-              >
+              <button onClick={() => setStripDismissed(true)} className="text-[12px] text-muted-text">
                 No thanks
               </button>
               <button
@@ -318,26 +423,50 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
               <p className="flex-1 text-[13px] text-foreground leading-snug">
                 Joining <span className="font-semibold">{pendingEventJoin.name}</span> on save.
               </p>
-              <button
-                onClick={() => setPendingEventJoin(null)}
-                className="text-[12px] text-muted-text"
-              >
+              <button onClick={() => setPendingEventJoin(null)} className="text-[12px] text-muted-text">
                 Undo
               </button>
             </div>
           )}
         </div>
 
+        {/* Sticky footer — Save Person always reachable above the keyboard */}
         <div className="px-5 pt-3 pb-5 border-t border-[hsl(0_0%_100%/0.08)]">
           <button
             onClick={handleSave}
             disabled={!hasAnything || saving}
-            className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-40 active:scale-[0.98] transition-transform"
+            className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saving ? 'Saving…' : 'Save Person'}
           </button>
         </div>
       </motion.div>
     </>
+  );
+}
+
+function Field({
+  label,
+  required,
+  right,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
+          {label}
+          {required && <span className="text-primary ml-1">*</span>}
+        </span>
+        {right}
+      </div>
+      {children}
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import { AIBadge } from '@/components/AIBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { isValidTone } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonEditPageProps {
   personId: string;
@@ -92,6 +93,9 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
     }
     onClose();
   };
+
+  // Swipe-from-edge to cancel (with the same discard guard).
+  const swipe = useSwipeBack(handleCancel);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -180,9 +184,19 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen safe-top">
+    <div
+      className="flex flex-col min-h-screen safe-top"
+      style={{
+        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+        transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+      }}
+      {...swipe.bind}
+    >
       {/* Nav bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button onClick={handleCancel} className="h-10 px-2 -ml-1 text-[15px] text-muted-text">
           Cancel
         </button>
@@ -370,11 +384,11 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                   />
                 </Field>
 
-                <Field label="Important info">
+                <Field label="Background">
                   <BulletTextarea
                     value={important}
                     onChange={setImportant}
-                    placeholder="Anything you don't want to forget."
+                    placeholder="Work, school, or anything you should know about them…"
                     rows={3}
                   />
                 </Field>

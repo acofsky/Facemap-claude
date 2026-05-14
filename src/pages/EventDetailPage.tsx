@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Sparkles } from 'lucide-react';
 import {
   useEvents, usePersons, usePersonEvents, useSetPersonEvents,
 } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { EventSheet } from '@/components/EventSheet';
+import { PersonPickerSheet } from '@/components/PersonPickerSheet';
+import { useSwipeBack } from '@/hooks/use-swipe-back';
 import { suggestEventMembers } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -35,7 +37,8 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
   const setPersonEventsMut = useSetPersonEvents();
 
   const [editOpen, setEditOpen] = useState(false);
-  const [addingPeople, setAddingPeople] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const swipe = useSwipeBack(onBack, { disabled: editOpen || pickerOpen });
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [pendingAddIds, setPendingAddIds] = useState<Set<string>>(new Set());
 
@@ -51,7 +54,6 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
     [personEvents, eventId],
   );
   const members = useMemo(() => people.filter((p) => memberIds.includes(p.id)), [people, memberIds]);
-  const nonMembers = useMemo(() => people.filter((p) => !memberIds.includes(p.id)), [people, memberIds]);
 
   const surface3People = useMemo(() => {
     if (!event || suggestionsDismissed) return [];
@@ -106,9 +108,19 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
   }
 
   return (
-    <div className="pb-10 animate-fade-in safe-top">
-      {/* Nav bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+    <div
+      className="pb-10 animate-fade-in safe-top"
+      style={{
+        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+        transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+      }}
+      {...swipe.bind}
+    >
+      {/* Nav bar — sticky just below the notch cover */}
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
         </button>
@@ -185,33 +197,12 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
       <div className="flex items-center justify-between px-5 mb-3">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">Members</h2>
         <button
-          onClick={() => setAddingPeople((v) => !v)}
+          onClick={() => setPickerOpen(true)}
           className="inline-flex items-center gap-1 text-[12px] font-medium text-primary"
         >
-          {addingPeople ? <><X className="w-3.5 h-3.5" strokeWidth={1.75} /> Done</> : <><Plus className="w-3.5 h-3.5" strokeWidth={1.75} /> Add</>}
+          <Plus className="w-3.5 h-3.5" strokeWidth={1.75} /> Add
         </button>
       </div>
-
-      {addingPeople && nonMembers.length > 0 && (
-        <div className="px-5 mb-5">
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-2 space-y-1 max-h-72 overflow-y-auto">
-            {nonMembers.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => addPersonToEvent(p.id)}
-                className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-[hsl(0_0%_100%/0.04)] transition-colors text-left"
-              >
-                <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                <span className="text-sm text-foreground flex-1">{p.name}</span>
-                <Plus className="w-3.5 h-3.5 text-primary" strokeWidth={1.75} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {addingPeople && nonMembers.length === 0 && (
-        <p className="px-5 text-[13px] text-muted-text italic mb-5">Everyone is already in this Event.</p>
-      )}
 
       <div className="px-5 space-y-2">
         {members.length === 0 ? (
@@ -225,9 +216,12 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           members.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)]"
+              className="flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden"
             >
-              <button onClick={() => onSelectPerson(p.id)} className="flex-1 flex items-center gap-3 text-left">
+              <button
+                onClick={() => onSelectPerson(p.id)}
+                className="flex-1 min-w-0 flex items-center gap-3 text-left"
+              >
                 <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold text-foreground truncate">{p.name}</div>
@@ -256,6 +250,15 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           <EventSheet
             event={event}
             onClose={() => setEditOpen(false)}
+          />
+        )}
+        {pickerOpen && (
+          <PersonPickerSheet
+            title="Add to Event"
+            subtitle={event.name}
+            excludePersonIds={memberIds}
+            onPick={(personId) => addPersonToEvent(personId)}
+            onClose={() => setPickerOpen(false)}
           />
         )}
       </AnimatePresence>

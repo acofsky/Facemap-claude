@@ -38,7 +38,11 @@ const Index = () => {
   // Detail pages are exclusive — fullscreen overlays that suspend the tab UI.
   if (selectedPersonId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background">
+      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+        <div
+          aria-hidden="true"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+        />
         <PersonProfilePage
           personId={selectedPersonId}
           onBack={() => setSelectedPersonId(null)}
@@ -49,7 +53,11 @@ const Index = () => {
   }
   if (selectedCircleId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background">
+      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+        <div
+          aria-hidden="true"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+        />
         <CircleDetailPage
           circleId={selectedCircleId}
           onBack={() => setSelectedCircleId(null)}
@@ -63,7 +71,11 @@ const Index = () => {
   }
   if (selectedEventId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background">
+      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+        <div
+          aria-hidden="true"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+        />
         <EventDetailPage
           eventId={selectedEventId}
           onBack={() => setSelectedEventId(null)}
@@ -83,7 +95,6 @@ const Index = () => {
           <HomePage
             onSelectPerson={setSelectedPersonId}
             onSelectCircle={setSelectedCircleId}
-            onNavigateToRecall={() => setActiveTab('recall')}
           />
         )}
         {activeTab === 'people' && <PeoplePage onSelectPerson={setSelectedPersonId} />}

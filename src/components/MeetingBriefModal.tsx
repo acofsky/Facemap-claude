@@ -80,7 +80,7 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 pb-5">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-5 pb-5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />

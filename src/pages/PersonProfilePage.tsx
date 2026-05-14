@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 import { isNativeIOS, openIOSContact } from '@/lib/ios-contacts';
+import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonProfilePageProps {
   personId: string;
@@ -44,6 +45,9 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
     [connections, personId],
   );
 
+  // Swipe gesture is mounted before any early returns so hook order is stable.
+  const swipe = useSwipeBack(onBack, { disabled: editOpen });
+
   if (isLoading || !person) {
     return (
       <div className="flex items-center justify-center pt-32 safe-top">
@@ -67,9 +71,19 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
   }
 
   return (
-    <div className="pb-10 animate-fade-in safe-top">
-      {/* Nav bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+    <div
+      className="pb-10 animate-fade-in safe-top"
+      style={{
+        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+        transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+      }}
+      {...swipe.bind}
+    >
+      {/* Nav bar — sticky just below the notch cover */}
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
         </button>
@@ -193,7 +207,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
                 </DetailCard>
               )}
               {person.important_info && (
-                <DetailCard label="Important info">
+                <DetailCard label="Background">
                   <BulletDisplay value={person.important_info} />
                 </DetailCard>
               )}

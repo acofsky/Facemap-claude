@@ -1,19 +1,21 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePersons, useCircles, usePersonCircles, useRecentMeetings } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { SmartCircleBanner } from '@/components/SmartCircleBanner';
-import { Search, Loader2, Sparkles, CalendarPlus } from 'lucide-react';
+import { AIBadge } from '@/components/AIBadge';
+import { PersonPickerSheet } from '@/components/PersonPickerSheet';
+import { MeetingBriefModal } from '@/components/MeetingBriefModal';
+import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight } from 'lucide-react';
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
+import { supabase } from '@/integrations/supabase/client';
+import { AnimatePresence } from 'framer-motion';
 
 interface HomePageProps {
   onSelectPerson: (id: string) => void;
   onSelectCircle: (id: string) => void;
-  onNavigateToRecall: () => void;
 }
 
-// Prefer the persisted `tone` column; fall back to a deterministic hash for
-// circles created before CIRCLES-03 introduced it.
 const TILE_PALETTE = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
 function circleTone(c: { id: string; tone?: string | null }): typeof TILE_PALETTE[number] {
   if (c.tone && (TILE_PALETTE as readonly string[]).includes(c.tone)) return c.tone as typeof TILE_PALETTE[number];
@@ -22,7 +24,9 @@ function circleTone(c: { id: string; tone?: string | null }): typeof TILE_PALETT
   return TILE_PALETTE[hash % TILE_PALETTE.length];
 }
 
-function getFirstName(user: { email?: string | null; user_metadata?: { full_name?: string; first_name?: string } } | null): string | null {
+function getFirstName(
+  user: { email?: string | null; user_metadata?: { full_name?: string; first_name?: string } } | null,
+): string | null {
   if (!user) return null;
   const meta = user.user_metadata;
   if (meta?.first_name) return meta.first_name;
@@ -38,7 +42,7 @@ function timeOfDayGreeting(): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
-export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }: HomePageProps) {
+export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   const { user } = useAuth();
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
@@ -47,28 +51,56 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const { data: recentMeetings = [] } = useRecentMeetings(todayISO);
 
+  // Inline Recall search — same edge function as the dedicated tab, just
+  // rendered on Home so users get to results without a tab switch.
+  const [query, setQuery] = useState('');
+  const [recallResults, setRecallResults] = useState<{ id: string; reason: string }[]>([]);
+  const [recallLoading, setRecallLoading] = useState(false);
+  const [recallSearched, setRecallSearched] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setRecallResults([]);
+      setRecallSearched(false);
+      return;
+    }
+    setRecallLoading(true);
+    const id = window.setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('recall-search', { body: { query: trimmed } });
+        if (error) throw error;
+        setRecallResults(data?.results || []);
+      } catch {
+        setRecallResults([]);
+      } finally {
+        setRecallLoading(false);
+        setRecallSearched(true);
+      }
+    }, 320); // small debounce so each keystroke doesn't fire a request
+    return () => window.clearTimeout(id);
+  }, [query]);
+
+  // Brief CTA: tap → opens person picker → opens MeetingBriefModal
+  const [briefPickerOpen, setBriefPickerOpen] = useState(false);
+  const [briefTarget, setBriefTarget] = useState<{ id: string; name: string } | null>(null);
+
   const firstName = getFirstName(user);
   const tod = timeOfDayGreeting();
 
-  // Recent people: most recently created, up to 4
   const recentPeople = useMemo(() => people.slice(0, 4), [people]);
-
-  // People added in the last 48h get the Primary Red ring per spec
   const isFresh = (created_at: string) => differenceInHours(new Date(), new Date(created_at)) <= 48;
 
-  // Today's encounters — meetings logged with today's date
   const todaysMeetings = useMemo(
     () => recentMeetings.filter((m) => m.meeting_date === todayISO),
     [recentMeetings, todayISO],
   );
 
-  // Subtitle (spec greeting subtitle logic, client-side only)
   const subtitle = useMemo(() => {
     const justAdded = people.find((p) => differenceInHours(new Date(), new Date(p.created_at)) <= 24);
     if (justAdded) {
       return `You added ${justAdded.name} ${formatDistanceToNow(new Date(justAdded.created_at), { addSuffix: true })}. Want to add more context?`;
     }
-    // No encounters logged in 7+ days
     const sinceLatest =
       recentMeetings[0] ? differenceInHours(new Date(), new Date(recentMeetings[0].created_at)) : Infinity;
     if (sinceLatest > 7 * 24 && people.length > 0) {
@@ -77,7 +109,6 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
     return 'Everyone you’ve met, ready when you need them.';
   }, [people, recentMeetings]);
 
-  // Your Circles — 4 most recently active by member count or recency
   const activeCircles = useMemo(() => {
     const memberCount = new Map<string, number>();
     for (const pc of personCircles) memberCount.set(pc.circle_id, (memberCount.get(pc.circle_id) || 0) + 1);
@@ -87,8 +118,8 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
       .slice(0, 4);
   }, [circles, personCircles]);
 
-  // Person count chip text (Q11)
   const countLabel = people.length === 1 ? '1 person' : `${people.length} people`;
+  const hasQuery = query.trim().length > 0;
 
   if (isLoading) {
     return (
@@ -115,18 +146,68 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
         </div>
       </header>
 
-      {/* Smart Circle suggestion banner (engine surface 1) */}
       <SmartCircleBanner />
 
-      {/* Tappable search bar */}
-      <button
-        onClick={onNavigateToRecall}
-        className="w-full h-11 flex items-center gap-2.5 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
-        aria-label="Open Recall search"
-      >
-        <Search className="w-4 h-4 text-muted-text" strokeWidth={1.75} />
-        <span className="text-sm text-muted-text">Recall anyone…</span>
-      </button>
+      {/* Inline Recall search — same edge function as the Recall tab */}
+      <section>
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Recall anyone…"
+            className="w-full h-11 pl-10 pr-9 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
+          />
+          {recallLoading && (
+            <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text animate-spin" />
+          )}
+        </div>
+
+        {hasQuery && (
+          <div className="mt-2.5 space-y-2">
+            {recallResults.slice(0, 5).map((r) => {
+              const p = people.find((x) => x.id === r.id);
+              if (!p) return null;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => onSelectPerson(r.id)}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                >
+                  <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-medium text-foreground truncate">{p.name}</div>
+                    <div className="text-[12px] text-muted-text line-clamp-2 leading-snug">{r.reason}</div>
+                  </div>
+                </button>
+              );
+            })}
+            {recallSearched && !recallLoading && recallResults.length === 0 && (
+              <p className="text-[13px] text-muted-text italic">No matches. Try a different description.</p>
+            )}
+            {recallResults.length > 0 && <AIBadge feature="search" />}
+          </div>
+        )}
+      </section>
+
+      {/* Brief CTA card */}
+      {people.length > 0 && (
+        <button
+          onClick={() => setBriefPickerOpen(true)}
+          className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] active:scale-[0.99] transition text-left"
+        >
+          <div className="w-10 h-10 rounded-md tile-red flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-white" strokeWidth={1.75} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">Pull a meeting brief</div>
+            <p className="text-[12px] text-muted-text leading-snug mt-0.5">
+              Tap to pick someone you're about to see
+            </p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+        </button>
+      )}
 
       {/* Recent People */}
       {recentPeople.length > 0 && (
@@ -142,7 +223,12 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
                 className="flex flex-col items-center gap-1.5 shrink-0 active:scale-[0.97] transition-transform"
               >
                 <div
-                  className={`rounded-full ${isFresh(p.created_at) ? 'ring-[1.5px] ring-primary p-0.5' : ''}`}
+                  className="rounded-full"
+                  style={
+                    isFresh(p.created_at)
+                      ? { boxShadow: '0 0 0 1.5px hsl(var(--primary))', padding: 2 }
+                      : undefined
+                  }
                 >
                   <PersonAvatar name={p.name} photo={p.photos?.[0]} size="md" />
                 </div>
@@ -167,14 +253,14 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
                 <button
                   key={m.id}
                   onClick={() => onSelectPerson(p.id)}
-                  className="w-full flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                  className="w-full flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left overflow-hidden"
                 >
                   <PersonAvatar name={p.name} photo={p.photos?.[0]} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-foreground truncate">{p.name}</div>
                     {m.place && <div className="text-[12px] text-muted-text truncate">{m.place}</div>}
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning px-2 py-0.5 rounded-sm bg-warning/10 border border-warning/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning px-2 py-0.5 rounded-sm bg-warning/10 border border-warning/20 shrink-0">
                     <CalendarPlus className="w-3 h-3" strokeWidth={1.75} /> Encountered
                   </span>
                 </button>
@@ -184,21 +270,26 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
         </section>
       )}
 
-      {/* Your Circles 2x2 grid */}
+      {/* Your Circles — round colour discs with text below */}
       {activeCircles.length > 0 && (
         <section>
           <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-3">Your Circles</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {activeCircles.map((c) => (
               <button
                 key={c.id}
                 onClick={() => onSelectCircle(c.id)}
-                className={`rounded-xl p-4 aspect-[3/2] flex flex-col justify-end text-left transition-transform active:scale-[0.98] tile-${circleTone(c)}`}
+                className="flex flex-col items-center gap-1.5 active:scale-[0.97] transition-transform"
               >
-                <div className="text-[15px] font-semibold text-white truncate">{c.emoji ? `${c.emoji} ` : ''}{c.name}</div>
-                <div className="text-[12px] text-white/70">
-                  {c.members} {c.members === 1 ? 'member' : 'members'}
-                </div>
+                <span
+                  aria-hidden="true"
+                  className={`w-14 h-14 rounded-full flex items-center justify-center text-xl text-white/95 tile-${circleTone(c)}`}
+                >
+                  {c.emoji || ''}
+                </span>
+                <span className="text-[11px] font-medium text-foreground text-center max-w-full truncate w-full">
+                  {c.name}
+                </span>
               </button>
             ))}
           </div>
@@ -216,6 +307,29 @@ export function HomePage({ onSelectPerson, onSelectCircle, onNavigateToRecall }:
             Tap the red + button to add someone you've met.
           </p>
         </div>
+      )}
+
+      {/* Brief picker + modal */}
+      <AnimatePresence>
+        {briefPickerOpen && (
+          <PersonPickerSheet
+            title="Pick someone for a brief"
+            subtitle="AI will pull a 30-second refresher on them."
+            closeOnPick
+            onPick={(id, name) => {
+              setBriefPickerOpen(false);
+              setBriefTarget({ id, name });
+            }}
+            onClose={() => setBriefPickerOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+      {briefTarget && (
+        <MeetingBriefModal
+          personId={briefTarget.id}
+          personName={briefTarget.name}
+          onClose={() => setBriefTarget(null)}
+        />
       )}
     </div>
   );

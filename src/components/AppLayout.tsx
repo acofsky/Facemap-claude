@@ -28,6 +28,13 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background relative">
+      {/* Notch cover — solid background overlay that always sits above the
+          safe-area-inset-top region. Anything that scrolls passes underneath
+          this, so content never peeks above the camera notch. */}
+      <div
+        aria-hidden="true"
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+      />
       <main className="flex-1 overflow-y-auto pb-24 safe-top">
         {children}
       </main>

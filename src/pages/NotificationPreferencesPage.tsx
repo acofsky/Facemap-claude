@@ -9,6 +9,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
+import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface NotificationPreferencesPageProps {
   onBack: () => void;
@@ -25,6 +26,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
   const { prefs, update } = useNotificationPrefs();
   const [permission, setPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const [showFreq, setShowFreq] = useState(false);
+  const swipe = useSwipeBack(onBack, { disabled: showFreq });
 
   useEffect(() => {
     notificationPermissionStatus().then(setPermission);
@@ -53,9 +55,17 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 36, stiffness: 380 }}
       className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
+      style={{
+        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+        transition: swipe.dragging ? 'none' : undefined,
+      }}
+      {...swipe.bind}
     >
       {/* Nav bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button
           onClick={onBack}
           aria-label="Back"
@@ -252,10 +262,11 @@ function Switch({
       )}
     >
       <span
-        className={cn(
-          'absolute top-[3px] w-[20px] h-[20px] rounded-full bg-white transition-transform',
-          checked ? 'translate-x-[21px]' : 'translate-x-[3px]',
-        )}
+        className="absolute top-[3px] w-[20px] h-[20px] rounded-full bg-white"
+        style={{
+          left: checked ? 22 : 2,
+          transition: 'left 0.18s ease-out',
+        }}
       />
     </button>
   );

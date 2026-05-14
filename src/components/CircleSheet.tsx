@@ -97,7 +97,7 @@ export function CircleSheet({ circle, onClose }: CircleSheetProps) {
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-4">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-5 pb-5 space-y-4">
           <div className="flex gap-2">
             <input
               value={emoji}
@@ -116,15 +116,8 @@ export function CircleSheet({ circle, onClose }: CircleSheetProps) {
           </div>
 
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Colour</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Color</span>
             <ColorPicker value={tone} onChange={setTone} />
-          </div>
-
-          <div className={cn('rounded-xl px-4 pb-4 pt-12 flex flex-col justify-end', `tile-${tone}`)}>
-            <div className="text-[15px] font-semibold text-white truncate">
-              {emoji} {name.trim() || 'Circle name'}
-            </div>
-            <div className="text-[11px] text-white/70">Live preview</div>
           </div>
 
           {isEdit && (

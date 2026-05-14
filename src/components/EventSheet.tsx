@@ -156,7 +156,7 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-4">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-5 pb-5 space-y-4">
           {/* Name */}
           <div>
             <input
@@ -194,7 +194,7 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
 
           {/* Color picker */}
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Colour</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Color</span>
             <ColorPicker value={tone} onChange={setTone} />
           </div>
 

@@ -78,7 +78,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
   return (
     <div className="pb-8 animate-fade-in">
       {/* Nav bar */}
-      <div className="flex items-center justify-between px-5 pt-3 mb-4">
+      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
         <span className="w-9" />
         <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
         <div className="relative">
@@ -329,6 +329,8 @@ function CircleTile({
   const longPress = useLongPress(() => {
     if (ref.current) onLongPress(ref.current);
   });
+  // Founder override of spec §CIRCLES-01: Circles render as colour discs
+  // with name + count below, not 3:2 rectangles. Reads more like "circles".
   return (
     <button
       ref={ref}
@@ -338,18 +340,23 @@ function CircleTile({
         if (ref.current) onLongPress(ref.current);
       }}
       {...longPress}
-      className={cn(
-        'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
-        `tile-${circleTone(circle)}`,
-      )}
+      className="flex flex-col items-center gap-2 py-2 transition-transform active:scale-[0.97]"
     >
-      <div className="text-[15px] font-semibold text-white truncate flex items-center gap-1">
-        {circle.emoji && <span>{circle.emoji}</span>}
-        <span className="truncate">{circle.name}</span>
-      </div>
-      <div className="text-[12px] text-white/70">
+      <span
+        aria-hidden="true"
+        className={cn(
+          'w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white/95',
+          `tile-${circleTone(circle)}`,
+        )}
+      >
+        {circle.emoji || ''}
+      </span>
+      <span className="text-[14px] font-semibold text-foreground text-center max-w-full px-2 truncate">
+        {circle.name}
+      </span>
+      <span className="text-[11px] text-muted-text -mt-1">
         {memberCount} {memberCount === 1 ? 'member' : 'members'}
-      </div>
+      </span>
     </button>
   );
 }

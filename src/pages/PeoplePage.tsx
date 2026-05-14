@@ -97,7 +97,7 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   return (
     <div className="pb-8 animate-fade-in">
       {/* Nav bar */}
-      <div className="flex items-center justify-between px-5 pt-3 mb-4">
+      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
         <span className="w-9" />
         <h1 className="text-[17px] font-semibold text-foreground">People</h1>
         <div className="relative">

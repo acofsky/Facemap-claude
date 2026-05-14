@@ -26,7 +26,10 @@ const LABELS: Record<Tone, string> = {
  */
 export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   return (
-    <div className={cn('overflow-x-auto scrollbar-hide -mx-5 px-5', className)}>
+    // overflow-x-auto would clip the selection ring vertically on iOS,
+    // so we use overflow-x-scroll + overflow-y-visible explicitly + vertical
+    // padding to give the box-shadow room to bleed out.
+    <div className={cn('overflow-x-scroll overflow-y-visible scrollbar-hide -mx-5 px-5 py-1', className)}>
       <div className="flex gap-3">
         {TONES.map((tone) => {
           const active = tone === value;
@@ -40,8 +43,11 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
               className={cn(
                 'shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-95',
                 `tile-${tone}`,
-                active && 'ring-2 ring-foreground/95',
               )}
+              // box-shadow follows the circular border-radius perfectly,
+              // whereas Tailwind's ring utility gets clipped on round buttons
+              // inside a horizontally-scrolling container.
+              style={active ? { boxShadow: '0 0 0 2px hsl(var(--foreground))' } : undefined}
             >
               {active && <Check className="w-5 h-5 text-white" strokeWidth={2} />}
             </button>
