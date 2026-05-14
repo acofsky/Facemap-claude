@@ -98,7 +98,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: claude/ios-simulator-setup-*
+        - pattern: claude/pwa-to-ios-conversion-F3VuG
           include: true
     scripts:
       - *install_deps

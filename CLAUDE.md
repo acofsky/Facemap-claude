@@ -23,12 +23,18 @@ Three machines, the user only ever touches the iPad. Claude (you) does the editi
 
 ## Branches
 
-There are **two branches** with `codemagic.yaml`:
+**One branch only: `claude/pwa-to-ios-conversion-F3VuG`** (the GitHub default). This is where ALL work happens — app code, Supabase migrations, GitHub workflows, codemagic.yaml, everything. No dev/default split anymore.
 
-- **The dev branch — `claude/ios-simulator-setup-XXXXX`** (the suffix is a random per-session ID assigned by Claude Code on the web; **don't hardcode it in docs or YAML**). All real work happens on whichever branch the current session is assigned to. Codemagic's `branch_patterns` uses a wildcard (`claude/ios-simulator-setup-*`) so auto-triggers fire from any session's branch.
-- **`claude/pwa-to-ios-conversion-F3VuG`** — the GitHub default branch. Codemagic discovers `codemagic.yaml` here. Keep this branch in sync with the dev branch's `codemagic.yaml` and `CLAUDE.md` whenever they change. Otherwise no other code lives here that we modify.
+Claude Code on the web auto-assigns a fresh per-session branch (e.g. `claude/whatever-XXXXX`) at session start. **Immediately ignore it** and check out the default branch instead:
 
-**Workflow when changing `codemagic.yaml`:** edit on the dev branch → commit + push → checkout default branch → `git checkout <dev-branch> -- codemagic.yaml CLAUDE.md` → commit + push → checkout dev branch. Replace `<dev-branch>` with the current session's branch name (find it via `git branch --show-current`).
+```bash
+git checkout claude/pwa-to-ios-conversion-F3VuG
+git pull --ff-only origin claude/pwa-to-ios-conversion-F3VuG
+```
+
+Then commit/push everything here. The session-assigned branch is junk — don't develop on it, don't push to it.
+
+If a session-assigned branch ever has commits we'd want, cherry-pick or merge them onto the default branch and abandon the assigned one.
 
 ## Codemagic workflows
 
@@ -37,7 +43,7 @@ Two workflows live in `codemagic.yaml`:
 ### `ios-livereload` (the one you'll use 99% of the time)
 
 - **Workflow ID is `ios-livereload`. Display name is "iOS Internal (TestFlight, every push)".** Don't rename the ID — it's intentionally kept to preserve the Codemagic cache keying that holds the distribution cert + private key. Renaming the ID orphans the cache, forcing a re-mint that Apple will reject (409: cert already exists).
-- **Trigger:** auto on push to any branch matching `claude/ios-simulator-setup-*` *if the user has the auto-build toggle on in Codemagic settings*. The user typically prefers **manual triggers** ("Start new build" in Codemagic UI) because they batch changes.
+- **Trigger:** auto on push to `claude/pwa-to-ios-conversion-F3VuG` *if the user has the auto-build toggle on in Codemagic settings*. The user typically prefers **manual triggers** ("Start new build" in Codemagic UI) because they batch changes.
 - **What it does:** builds the iOS IPA with vanilla config (no `server.url`, no live-reload), uploads to TestFlight internal group `LiveReload`.
 - **Build time:** ~10 min.
 - **Bundle versions:** offset by `+99000` so internal builds sort visibly above production in App Store Connect.
@@ -79,7 +85,7 @@ User asks Claude to make changes (typically in **batches** — they prefer to ac
 
 1. Make the change(s) in `src/`.
 2. `git add -A && git commit -m "..." && git push origin $(git branch --show-current)`. Multiple commits are fine — only one build will be triggered when the user manually clicks Start.
-3. **The user manually triggers the Codemagic build** when they're ready: Codemagic UI → Start new build → branch (the session's current `claude/ios-simulator-setup-XXXXX`) → workflow `iOS Internal (TestFlight, every push)` (ID `ios-livereload`) → Start. ~10 min.
+3. **The user manually triggers the Codemagic build** when they're ready: Codemagic UI → Start new build → branch `claude/pwa-to-ios-conversion-F3VuG` → workflow `iOS Internal (TestFlight, every push)` (ID `ios-livereload`) → Start. ~10 min.
 4. TestFlight notifies the user's iPhone. They install and test.
 5. If broken: iterate. Don't squash-rebase mid-iteration unless asked.
 
@@ -126,10 +132,9 @@ Triggers `ios-production` workflow. Goes to `External Testers` TestFlight group.
 ### "Ship to App Store production"
 
 1. Edit `codemagic.yaml` → in `ios-production.publishing.app_store_connect`, set `submit_to_app_store: true` and add `release_type: AFTER_APPROVAL`.
-2. Mirror change to default branch (see Branches section).
-3. Tag a version, push the tag.
-4. Apple reviews (~24–48h).
-5. User clicks "Release" in App Store Connect when notified.
+2. Tag a version, push the tag.
+3. Apple reviews (~24–48h).
+4. User clicks "Release" in App Store Connect when notified.
 
 ### "Investigate a Codemagic build failure"
 
@@ -150,7 +155,7 @@ To add/edit a migration or edge function: edit locally, commit, push, then trigg
 
 - **No Mac access ever.** The user does not have one and will not get one. Don't suggest "open Xcode" or "run on a Mac." Codemagic does Mac things.
 - **No App Store screenshots / store listing edits via code.** Those live in App Store Connect's web UI.
-- **Don't push directly to the default branch** unless it's just to sync `codemagic.yaml` for Codemagic discovery. The dev branch is where work happens.
+- **All work goes on the default branch (`claude/pwa-to-ios-conversion-F3VuG`).** Ignore the session-assigned branch Claude Code on the web hands you.
 - **Don't experiment in `codemagic.yaml` without a reason.** Each test push burns 10 min of CI budget. Read the file carefully and reason from there before pushing speculative changes.
 - **Don't try to run the Supabase CLI from this Linux VM.** Outbound to `api.supabase.com` is blocked. Use the GitHub Actions workflows above.
 
@@ -181,7 +186,7 @@ npm test
 
 If the user says something vague like "make this faster" or "fix the layout," start by skimming `src/` for the relevant component. The actual app code is React. The Capacitor/iOS layer is configured once and rarely changes.
 
-If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the conversation that produced this setup is in git history under earlier `claude/ios-simulator-setup-*` branches (search for commits modifying `codemagic.yaml`).
+If the user mentions builds, TestFlight, signing, or App Store: this file has the answers. If something's still ambiguous, the relevant history is on the default branch (`git log` against `codemagic.yaml` or whichever file).
 
 ## v2 design overhaul — locked decisions
 
