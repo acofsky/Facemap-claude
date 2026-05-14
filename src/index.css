@@ -217,6 +217,23 @@ html.kb-open .corner-fabs {
     max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* When the keyboard is up, paint a 16-px strip of the sheet's bg-surface-2
+   color below the sheet's bottom edge. The iOS keyboard's top has slightly
+   rounded corners; without this strip the body's bg-background bleeds
+   through those corners, looking like a visible seam between the sheet
+   and the keyboard. The strip lives behind the keyboard so it's only
+   visible where the keyboard's rounded corners reveal it. */
+html.kb-open .kb-aware-sheet::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -16px;
+  height: 16px;
+  background: hsl(var(--surface-2));
+  pointer-events: none;
+}
+
 /*
  * Spec §12 — when the OS reports prefers-reduced-motion: reduce, kill
  * every translateY / scale / pulse animation. Plain opacity fades are
