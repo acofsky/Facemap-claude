@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Calendar, MapPin, Users } from 'lucide-react';
 import { Wordmark } from '@/components/Wordmark';
+import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 interface OnboardingFlowProps {
@@ -48,8 +49,14 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
   const isLast = index === SCREENS.length - 1;
 
   const advance = () => {
+    haptics.light();
     if (isLast) onDone();
     else setIndex((i) => i + 1);
+  };
+
+  const skip = () => {
+    haptics.light();
+    onDone();
   };
 
   return (
@@ -68,12 +75,17 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
             />
           ))}
         </div>
-        <button
-          onClick={onDone}
-          className="text-[13px] font-medium text-muted-text w-12 text-right"
-        >
-          {isLast ? '' : 'Skip'}
-        </button>
+        {isLast ? (
+          <span className="w-12" aria-hidden="true" />
+        ) : (
+          <button
+            type="button"
+            onClick={skip}
+            className="text-[14px] font-medium text-muted-text px-2 py-2 -mr-2 active:opacity-60 transition-opacity"
+          >
+            Skip
+          </button>
+        )}
       </div>
 
       {/* Slide content */}

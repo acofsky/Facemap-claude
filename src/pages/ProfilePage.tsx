@@ -135,10 +135,7 @@ export function ProfilePage() {
         <SettingRow
           icon={Sparkles}
           label="Reintroduce me to Membr"
-          onClick={() => {
-            resetOnboarding();
-            toast.success('Onboarding will replay momentarily.');
-          }}
+          onClick={resetOnboarding}
         />
         <SettingRow
           icon={Bell}
