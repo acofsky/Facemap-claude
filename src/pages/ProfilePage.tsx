@@ -15,14 +15,19 @@ const APP_VERSION = '1.0.0';
 export function ProfilePage() {
   const { user, signOut } = useAuth();
   const { resetOnboarding } = useOnboarded();
-  const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password'>(null);
+  const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password' | 'name'>(null);
   const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+  const [nameLoading, setNameLoading] = useState(false);
+
+  const currentFirstName =
+    ((user?.user_metadata as { first_name?: string } | undefined)?.first_name ?? '').trim();
 
   const handleEmailUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +46,24 @@ export function ProfilePage() {
       toast.error(err.message);
     } finally {
       setEmailLoading(false);
+    }
+  };
+
+  const handleNameUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newFirstName.trim();
+    if (!trimmed) return;
+    setNameLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { first_name: trimmed } });
+      if (error) throw error;
+      toast.success('Name updated.');
+      setNewFirstName('');
+      setSettingsOpen(null);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setNameLoading(false);
     }
   };
 
@@ -77,8 +100,11 @@ export function ProfilePage() {
     toast.message('Account deletion coming soon. Email support@membr.app meanwhile.');
   };
 
-  const initials = (user?.email?.[0] || '?').toUpperCase();
-  const displayName = (user?.user_metadata as any)?.full_name as string | undefined;
+  const displayName =
+    currentFirstName ||
+    ((user?.user_metadata as any)?.full_name as string | undefined) ||
+    '';
+  const initials = (displayName[0] || user?.email?.[0] || '?').toUpperCase();
 
   return (
     <div className="pb-10 animate-fade-in">
@@ -108,7 +134,11 @@ export function ProfilePage() {
         <SettingRow
           icon={Pencil}
           label="Edit name"
-          onClick={() => toast.message('Name editing arrives in a future update.')}
+          rightLabel={currentFirstName || 'Add'}
+          onClick={() => {
+            setNewFirstName(currentFirstName);
+            setSettingsOpen('name');
+          }}
         />
         <SettingRow
           icon={AtSign}
@@ -203,7 +233,11 @@ export function ProfilePage() {
           >
             <div className="sticky top-0 bg-surface-2 flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]">
               <h2 className="text-xl font-display text-foreground tracking-[-0.02em]">
-                {settingsOpen === 'email' ? 'Change email' : 'Change password'}
+                {settingsOpen === 'email'
+                  ? 'Change email'
+                  : settingsOpen === 'name'
+                  ? 'Your name'
+                  : 'Change password'}
               </h2>
               <button onClick={() => setSettingsOpen(null)} aria-label="Close" className="w-8 h-8 rounded-md hover:bg-[hsl(0_0%_100%/0.06)] flex items-center justify-center">
                 <X className="w-4 h-4 text-muted-text" strokeWidth={1.75} />
@@ -211,7 +245,33 @@ export function ProfilePage() {
             </div>
 
             <div className="p-5">
-              {settingsOpen === 'email' ? (
+              {settingsOpen === 'name' ? (
+                <form onSubmit={handleNameUpdate} className="space-y-3">
+                  <p className="text-[12px] text-muted-text">
+                    Used in your home greeting. First name only.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="First name"
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    autoCapitalize="words"
+                    autoCorrect="off"
+                    autoComplete="given-name"
+                    maxLength={40}
+                    autoFocus
+                    className="w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                  />
+                  <button
+                    type="submit"
+                    disabled={nameLoading || !newFirstName.trim() || newFirstName.trim() === currentFirstName}
+                    className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                  >
+                    {nameLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Save name
+                  </button>
+                </form>
+              ) : settingsOpen === 'email' ? (
                 <form onSubmit={handleEmailUpdate} className="space-y-3">
                   <p className="text-[12px] text-muted-text">
                     Current: <span className="text-foreground">{user?.email}</span>. You'll get a confirmation link at both addresses.

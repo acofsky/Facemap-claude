@@ -7,6 +7,8 @@ import {
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { EventSheet } from '@/components/EventSheet';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PersonRowSkeleton } from '@/components/skeletons';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 import { suggestEventMembers } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
@@ -31,7 +33,7 @@ function dismissSurface3(eventId: string) {
 }
 
 export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetailPageProps) {
-  const { data: events = [] } = useEvents({ includeArchived: true });
+  const { data: events = [], isLoading: eventsLoading } = useEvents({ includeArchived: true });
   const { data: people = [] } = usePersons();
   const { data: personEvents = [] } = usePersonEvents();
   const setPersonEventsMut = useSetPersonEvents();
@@ -48,6 +50,14 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
 
   const event = events.find((e) => e.id === eventId);
   const tone = event && isValidTone(event.tone) ? event.tone : 'red';
+
+  // If the event vanishes after we've loaded once (deleted from this page or
+  // elsewhere), bounce back to Circles rather than render the not-found
+  // page. Index.tsx always lands here with a real id, so missing-after-load
+  // is necessarily "it was just deleted".
+  useEffect(() => {
+    if (!eventsLoading && !event) onBack();
+  }, [eventsLoading, event, onBack]);
 
   const memberIds = useMemo(
     () => personEvents.filter((pe) => pe.event_id === eventId).map((pe) => pe.person_id),
@@ -96,15 +106,14 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
     setSuggestionsDismissed(true);
   };
 
+  if (eventsLoading) {
+    return <EventDetailSkeleton />;
+  }
+
   if (!event) {
-    return (
-      <div className="px-5 pt-20 text-center safe-top">
-        <p className="text-sm text-muted-text">Event not found.</p>
-        <button onClick={onBack} className="mt-4 text-primary text-sm font-semibold">
-          Go back
-        </button>
-      </div>
-    );
+    // The useEffect above is navigating back; render nothing rather than
+    // flash the legacy "Event not found" page in the meantime.
+    return null;
   }
 
   return (
@@ -250,6 +259,7 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           <EventSheet
             event={event}
             onClose={() => setEditOpen(false)}
+            onDeleted={onBack}
           />
         )}
         {pickerOpen && (
@@ -273,4 +283,30 @@ function formatRange(start: string | null, end: string | null): string {
   if (!start && end) return fmt(end);
   if (start === end) return fmt(start!);
   return `${fmt(start!)} – ${fmt(end!)}`;
+}
+
+function EventDetailSkeleton() {
+  return (
+    <div className="pb-10 safe-top animate-fade-in">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
+        <div className="w-10 h-10" />
+        <Skeleton className="h-4 w-32 bg-[hsl(0_0%_100%/0.06)]" />
+        <div className="w-10 h-10" />
+      </div>
+      <div className="px-5 mt-2 mb-6">
+        <Skeleton className="aspect-[3/2] rounded-xl bg-[hsl(0_0%_100%/0.06)]" />
+      </div>
+      <div className="flex items-center justify-between px-5 mb-3">
+        <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
+      </div>
+      <div className="px-5 space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <PersonRowSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
 }

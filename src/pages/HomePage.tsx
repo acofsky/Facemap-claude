@@ -11,6 +11,8 @@ import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { AnimatePresence } from 'framer-motion';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PersonAvatarSkeleton, PersonRowSkeleton, CircleSmallSkeleton } from '@/components/skeletons';
 
 interface HomePageProps {
   onSelectPerson: (id: string) => void;
@@ -124,8 +126,33 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center pt-32">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="px-5 pt-5 pb-8 animate-fade-in space-y-7">
+        <header className="space-y-2">
+          <Skeleton className="h-7 w-60 bg-[hsl(0_0%_100%/0.06)]" />
+          <Skeleton className="h-3 w-72 bg-[hsl(0_0%_100%/0.04)]" />
+        </header>
+        <Skeleton className="h-11 w-full rounded-md bg-[hsl(0_0%_100%/0.05)]" />
+        <section>
+          <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)] mb-3" />
+          <div className="flex gap-4 -mx-5 px-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <PersonAvatarSkeleton key={i} />
+            ))}
+          </div>
+        </section>
+        <section>
+          <Skeleton className="h-3 w-24 bg-[hsl(0_0%_100%/0.04)] mb-3" />
+          <div className="grid grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <CircleSmallSkeleton key={i} />
+            ))}
+          </div>
+        </section>
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <PersonRowSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }

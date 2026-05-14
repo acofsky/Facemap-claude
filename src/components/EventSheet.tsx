@@ -6,6 +6,7 @@ import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { ColorPicker } from '@/components/ColorPicker';
 import { PersonAvatar } from '@/components/PersonAvatar';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   useCreateEvent, useUpdateEvent, useArchiveEvent, useDeleteEvent,
   useSetPersonEvents, usePersons,
@@ -28,9 +29,15 @@ interface EventSheetProps {
     personIds: string[];
   };
   onClose: () => void;
+  /**
+   * Called after the Event was deleted (in addition to onClose). Lets the
+   * parent unmount the surrounding detail page so we don't flash an
+   * "Event not found" state while the cache invalidates.
+   */
+  onDeleted?: () => void;
 }
 
-export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
+export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheetProps) {
   const isEdit = !!event;
   const [name, setName] = useState(event?.name ?? suggestion?.name ?? '');
   const [tone, setTone] = useState<Tone>(isValidTone(event?.tone) ? event!.tone : 'red');
@@ -39,6 +46,8 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
   const [suggestedMemberIds, setSuggestedMemberIds] = useState<string[]>(
     suggestion?.personIds ?? [],
   );
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { data: people = [] } = usePersons();
   const createEvt = useCreateEvent();
@@ -111,11 +120,24 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
     onClose();
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirmed = async () => {
     if (!event) return;
-    if (!confirm('Delete this Event? Members stay in your Membr.')) return;
-    await deleteEvt.mutateAsync(event.id);
-    onClose();
+    setDeleting(true);
+    try {
+      // Tell the parent first so the surrounding EventDetailPage unmounts
+      // before the cache invalidation hits — kills the "Event not found"
+      // flash. We still await the mutation so we surface errors.
+      onDeleted?.();
+      await deleteEvt.mutateAsync(event.id);
+      setDeleteConfirmOpen(false);
+      onClose();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not delete this event';
+      toast.error(msg);
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const inputClass =
@@ -246,11 +268,12 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
                 Archive
               </button>
               <button
-                onClick={handleDelete}
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleting}
                 aria-label="Delete event"
-                className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors"
+                className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors disabled:opacity-50"
               >
-                <Trash2 className="w-4 h-4" strokeWidth={1.75} />
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" strokeWidth={1.75} />}
               </button>
             </div>
           )}
@@ -267,6 +290,17 @@ export function EventSheet({ event, suggestion, onClose }: EventSheetProps) {
           </button>
         </div>
       </motion.div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete this Event?"
+        description={`${event?.name ?? 'This Event'} will be removed. Members stay in your Membr — only the Event itself goes away.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
     </>
   );
 }

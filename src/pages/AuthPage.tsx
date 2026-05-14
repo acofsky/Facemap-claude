@@ -21,6 +21,7 @@ function detectRecoveryFromHash(): boolean {
 
 export function AuthPage() {
   const [mode, setMode] = useState<Mode>(() => (detectRecoveryFromHash() ? 'reset' : 'sign-in'));
+  const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,10 +46,14 @@ export function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else if (mode === 'sign-up') {
+        const trimmedName = firstName.trim();
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            ...(trimmedName ? { data: { first_name: trimmedName } } : {}),
+          },
         });
         if (error) throw error;
         if (!data.session) {
@@ -266,6 +271,19 @@ export function AuthPage() {
         ) : (
           <>
             <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === 'sign-up' && (
+                <input
+                  type="text"
+                  placeholder="First name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className={inputClass}
+                  autoCapitalize="words"
+                  autoCorrect="off"
+                  autoComplete="given-name"
+                  maxLength={40}
+                />
+              )}
               <input
                 type="email"
                 placeholder="Email"

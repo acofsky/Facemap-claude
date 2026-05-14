@@ -105,6 +105,16 @@ export async function updatePerson(id: string, updates: TablesUpdate<'persons'>)
 }
 
 export async function deletePerson(id: string): Promise<void> {
+  // Cascade by hand. Not all FKs are declared ON DELETE CASCADE in the
+  // historical migrations, so a bare delete on `persons` can fail when the
+  // person is in any circle, event, meeting, or connection. Match the
+  // pattern already used in deleteCircle().
+  await Promise.all([
+    supabase.from('person_circles').delete().eq('person_id', id),
+    supabase.from('person_events').delete().eq('person_id', id),
+    supabase.from('meetings').delete().eq('person_id', id),
+    supabase.from('connections').delete().or(`person_a_id.eq.${id},person_b_id.eq.${id}`),
+  ]);
   const { error } = await supabase.from('persons').delete().eq('id', id);
   if (error) throw error;
 }

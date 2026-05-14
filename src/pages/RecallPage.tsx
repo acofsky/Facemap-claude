@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePersons } from "@/hooks/use-data";
 import { PersonAvatar } from "@/components/PersonAvatar";
 import { AIBadge } from "@/components/AIBadge";
+import { PersonRowSkeleton } from "@/components/skeletons";
 
 interface RecallPageProps {
   onSelectPerson: (id: string) => void;
@@ -19,7 +20,7 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
   const [results, setResults] = useState<{ id: string; reason: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const { data: persons = [] } = usePersons();
+  const { data: persons = [], isLoading: personsLoading } = usePersons();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSearch = async () => {
@@ -76,7 +77,15 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
 
       <AIBadge feature="search" />
 
-      {!searched && (
+      {!searched && personsLoading && (
+        <div className="mt-6 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <PersonRowSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
+      {!searched && !personsLoading && (
         <p className="text-sm text-muted-text leading-relaxed mt-8">
           Describe anyone you've added — by appearance, where you met, notes, or anything you remember.
         </p>

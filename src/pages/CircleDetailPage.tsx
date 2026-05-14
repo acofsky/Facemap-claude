@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight } from 'lucide-react';
 import {
@@ -7,6 +7,8 @@ import {
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { CircleSheet } from '@/components/CircleSheet';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PersonRowSkeleton } from '@/components/skeletons';
 import { isValidTone, TONES, type Tone } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
@@ -24,7 +26,7 @@ function fallbackTone(id: string): Tone {
 }
 
 export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDetailPageProps) {
-  const { data: circles = [] } = useCircles();
+  const { data: circles = [], isLoading: circlesLoading } = useCircles();
   const { data: people = [] } = usePersons();
   const { data: personCircles = [] } = usePersonCircles();
   const addToCircle = useAddPersonToCircle();
@@ -43,15 +45,18 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
   );
   const members = useMemo(() => people.filter((p) => memberIds.includes(p.id)), [people, memberIds]);
 
+  // If the circle is missing AFTER load completes, it was just deleted —
+  // bounce back to Circles instead of flashing the not-found page.
+  useEffect(() => {
+    if (!circlesLoading && !circle) onBack();
+  }, [circlesLoading, circle, onBack]);
+
+  if (circlesLoading) {
+    return <CircleDetailSkeleton />;
+  }
+
   if (!circle) {
-    return (
-      <div className="px-5 pt-20 text-center safe-top">
-        <p className="text-sm text-muted-text">Circle not found.</p>
-        <button onClick={onBack} className="mt-4 text-primary text-sm font-semibold">
-          Go back
-        </button>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -158,6 +163,32 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function CircleDetailSkeleton() {
+  return (
+    <div className="pb-10 safe-top animate-fade-in">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
+        <div className="w-10 h-10" />
+        <Skeleton className="h-4 w-32 bg-[hsl(0_0%_100%/0.06)]" />
+        <div className="w-10 h-10" />
+      </div>
+      <div className="px-5 mt-2 mb-6">
+        <Skeleton className="aspect-[3/2] rounded-xl bg-[hsl(0_0%_100%/0.06)]" />
+      </div>
+      <div className="flex items-center justify-between px-5 mb-3">
+        <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
+      </div>
+      <div className="px-5 space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <PersonRowSkeleton key={i} />
+        ))}
+      </div>
     </div>
   );
 }

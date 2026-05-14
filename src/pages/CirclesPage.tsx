@@ -7,6 +7,8 @@ import {
 } from '@/hooks/use-data';
 import { CircleSheet } from '@/components/CircleSheet';
 import { EventSheet } from '@/components/EventSheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CircleTileSkeleton, EventTileSkeleton } from '@/components/skeletons';
 import { useLongPress } from '@/hooks/use-long-press';
 import { isValidTone, TONES, type Event as MembrEvent, type Tone, type Circle } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -68,8 +70,29 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center pt-32">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="pb-8 animate-fade-in">
+        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <span className="w-9" />
+          <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
+          <span className="w-9" />
+        </div>
+        <div className="px-5 mb-3">
+          <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
+        </div>
+        <div className="px-5 grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CircleTileSkeleton key={i} />
+          ))}
+        </div>
+        <div className="mx-5 my-6 h-px bg-[hsl(0_0%_100%/0.08)]" />
+        <div className="px-5 mb-3">
+          <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
+        </div>
+        <div className="px-5 grid grid-cols-2 gap-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <EventTileSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }

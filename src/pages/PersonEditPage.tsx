@@ -12,6 +12,8 @@ import { BulletTextarea } from '@/components/BulletTextarea';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { AIBadge } from '@/components/AIBadge';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { isValidTone } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -75,6 +77,8 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const dirty = useMemo(() => {
     return (
@@ -173,18 +177,23 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Remove this person from your Membr?')) return;
-    await deletePersonMut.mutateAsync(personId);
-    onClose({ deleted: true });
+  const handleDeleteConfirmed = async () => {
+    setDeleting(true);
+    try {
+      await deletePersonMut.mutateAsync(personId);
+      setDeleteConfirmOpen(false);
+      onClose({ deleted: true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not remove this person';
+      toast.error(msg);
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (isLoading || !person) {
-    return (
-      <div className="flex items-center justify-center pt-32 safe-top">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
+    return <PersonEditSkeleton />;
   }
 
   return (
@@ -421,14 +430,26 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
 
           {/* Delete person */}
           <button
-            onClick={handleDelete}
-            className="w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium"
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={deleting}
+            className="w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50"
           >
-            <Trash2 className="w-4 h-4" strokeWidth={1.75} />
-            Remove from Membr
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" strokeWidth={1.75} />}
+            {deleting ? 'Removing…' : 'Remove from Membr'}
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Remove from Membr?"
+        description={`This deletes ${person.name || 'this person'} along with their encounters, circle memberships, and connections. This cannot be undone.`}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
 
       {/* Save bar pinned at bottom */}
       <div className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pt-3 pb-5 bg-background border-t border-[hsl(0_0%_100%/0.08)] safe-bottom">
@@ -440,6 +461,32 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           {dirty ? 'Save changes' : 'No changes'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function PersonEditSkeleton() {
+  return (
+    <div className="flex flex-col min-h-screen safe-top animate-fade-in">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
+        <Skeleton className="h-4 w-14 bg-[hsl(0_0%_100%/0.04)]" />
+        <Skeleton className="h-4 w-10 bg-[hsl(0_0%_100%/0.06)]" />
+        <Skeleton className="h-4 w-10 bg-[hsl(0_0%_100%/0.04)]" />
+      </div>
+      <div className="flex justify-center pt-4 pb-2">
+        <Skeleton className="w-24 h-24 rounded-full bg-[hsl(0_0%_100%/0.06)]" />
+      </div>
+      <div className="px-5 mt-5 space-y-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-3 w-20 bg-[hsl(0_0%_100%/0.04)]" />
+            <Skeleton className="h-11 w-full rounded-md bg-[hsl(0_0%_100%/0.05)]" />
+          </div>
+        ))}
       </div>
     </div>
   );

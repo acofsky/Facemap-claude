@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import {
   usePerson, usePersons, useCircles, useEvents, useConnections,
@@ -9,6 +9,8 @@ import { MeetingsSection } from '@/components/MeetingsSection';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { AIBadge } from '@/components/AIBadge';
 import { BulletDisplay } from '@/components/BulletTextarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PersonHeaderSkeleton, PersonRowSkeleton } from '@/components/skeletons';
 import { PersonEditPage } from '@/pages/PersonEditPage';
 import {
   ArrowLeft, CalendarPlus, ChevronDown, ChevronUp, MapPin, Pencil, Phone, Sparkles,
@@ -48,12 +50,18 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
   // Swipe gesture is mounted before any early returns so hook order is stable.
   const swipe = useSwipeBack(onBack, { disabled: editOpen });
 
-  if (isLoading || !person) {
-    return (
-      <div className="flex items-center justify-center pt-32 safe-top">
-        <div className="text-sm text-muted-text">Loading…</div>
-      </div>
-    );
+  // If the person vanishes after load (just deleted), bounce out instead
+  // of flashing a "not found" state.
+  useEffect(() => {
+    if (!isLoading && !person) onBack();
+  }, [isLoading, person, onBack]);
+
+  if (isLoading) {
+    return <PersonProfileSkeleton />;
+  }
+
+  if (!person) {
+    return null;
   }
 
   const personCircleObjects = circles.filter((c) => (person.circleIds || []).includes(c.id));
@@ -309,6 +317,42 @@ function DetailCard({
         {right}
       </div>
       {children}
+    </div>
+  );
+}
+
+function PersonProfileSkeleton() {
+  return (
+    <div className="pb-10 safe-top animate-fade-in">
+      <div
+        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
+        <div className="w-10 h-10" />
+        <Skeleton className="h-4 w-24 bg-[hsl(0_0%_100%/0.06)]" />
+        <div className="w-10 h-10" />
+      </div>
+      <PersonHeaderSkeleton />
+      <div className="px-5 mb-6">
+        <div className="grid grid-cols-3 gap-2">
+          <Skeleton className="h-[64px] rounded-md bg-[hsl(0_0%_100%/0.06)]" />
+          <Skeleton className="h-[64px] rounded-md bg-[hsl(0_0%_100%/0.06)]" />
+          <Skeleton className="h-[64px] rounded-md bg-[hsl(0_0%_100%/0.06)]" />
+        </div>
+      </div>
+      <div className="px-5 mb-3">
+        <Skeleton className="h-3 w-12 bg-[hsl(0_0%_100%/0.04)]" />
+      </div>
+      <div className="px-5 mb-6">
+        <Skeleton className="h-24 rounded-lg bg-[hsl(0_0%_100%/0.06)]" />
+      </div>
+      <div className="px-5 mb-3">
+        <Skeleton className="h-3 w-20 bg-[hsl(0_0%_100%/0.04)]" />
+      </div>
+      <div className="px-5 space-y-2">
+        <PersonRowSkeleton />
+        <PersonRowSkeleton />
+      </div>
     </div>
   );
 }

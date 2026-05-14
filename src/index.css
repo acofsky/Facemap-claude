@@ -180,12 +180,24 @@
   .tile-rose    { background: linear-gradient(135deg, hsl(var(--tile-rose-from))    0%, hsl(var(--tile-rose-to))    100%); }
   .tile-slate   { background: linear-gradient(135deg, hsl(var(--tile-slate-from))   0%, hsl(var(--tile-slate-to))   100%); }
 
-  /* Hidden scrollbar utility (preserved from v1) */
+  /* Hidden scrollbar utility — preserved from v1, extended in M2 polish
+     pass to also suppress iOS WebView's momentum-scroll overlay scrollbar,
+     which `display: none` alone doesn't kill. `overscroll-behavior: contain`
+     stops bounce-scroll that triggers the overlay; the zero-size + transparent
+     thumb/track rules cover any browser that ignores `display: none`. */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+    overscroll-behavior: contain;
   }
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+  .scrollbar-hide::-webkit-scrollbar-thumb { background: transparent; }
+  .scrollbar-hide::-webkit-scrollbar-track { background: transparent; }
 
   /* iOS safe-area helpers */
   .safe-top    { padding-top:    env(safe-area-inset-top); }

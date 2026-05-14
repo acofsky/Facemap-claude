@@ -4,6 +4,8 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { SwipeRow } from '@/components/SwipeRow';
 import { LogEncounterModal } from '@/components/LogEncounterModal';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PersonRowSkeleton } from '@/components/skeletons';
 import { Search, Loader2, ListFilter, ChevronRight, ChevronDown, CalendarPlus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
@@ -88,8 +90,20 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center pt-32">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="pb-8 animate-fade-in">
+        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <span className="w-9" />
+          <h1 className="text-[17px] font-semibold text-foreground">People</h1>
+          <span className="w-9" />
+        </div>
+        <div className="px-5 mb-3">
+          <Skeleton className="h-11 w-full rounded-md bg-[hsl(0_0%_100%/0.05)]" />
+        </div>
+        <div className="px-5 space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <PersonRowSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
