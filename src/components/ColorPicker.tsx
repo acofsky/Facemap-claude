@@ -10,13 +10,17 @@ interface ColorPickerProps {
 
 const LABELS: Record<Tone, string> = {
   red: 'Red',
-  blue: 'Blue',
-  purple: 'Purple',
-  green: 'Green',
+  orange: 'Orange',
   amber: 'Amber',
-  slate: 'Slate',
-  rose: 'Rose',
+  green: 'Green',
+  mint: 'Mint',
   teal: 'Teal',
+  blue: 'Blue',
+  indigo: 'Indigo',
+  purple: 'Purple',
+  fuchsia: 'Fuchsia',
+  rose: 'Rose',
+  slate: 'Slate',
 };
 
 /**
@@ -44,10 +48,16 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
                 'shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-95',
                 `tile-${tone}`,
               )}
-              // box-shadow follows the circular border-radius perfectly,
-              // whereas Tailwind's ring utility gets clipped on round buttons
-              // inside a horizontally-scrolling container.
-              style={active ? { boxShadow: '0 0 0 2px hsl(var(--foreground))' } : undefined}
+              // Selected ring uses box-shadow (Tailwind's ring clips on round
+              // buttons in horizontal scrollers). Inactive swatches get a
+              // hairline inset outline so the most muted tones (slate, deep
+              // purple) stay visibly distinct from the #000 background and
+              // never read as "gaps" between siblings.
+              style={
+                active
+                  ? { boxShadow: '0 0 0 2px hsl(var(--foreground))' }
+                  : { boxShadow: 'inset 0 0 0 1px hsl(0 0% 100% / 0.18)' }
+              }
             >
               {active && <Check className="w-5 h-5 text-white" strokeWidth={2} />}
             </button>

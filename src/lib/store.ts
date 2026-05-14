@@ -9,8 +9,15 @@ export type Meeting = Tables<'meetings'>;
 export type Event = Tables<'events'>;
 export type PersonEvent = Tables<'person_events'>;
 
-/** The eight named tones from the Visual Brief. Source of truth for tile gradients. */
-export const TONES = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
+/**
+ * Twelve named tones, ordered around the colour wheel so the picker reads
+ * as a spectrum (red → orange → … → rose → slate). Source of truth for
+ * tile gradients; the matching `.tile-{name}` classes live in index.css.
+ */
+export const TONES = [
+  'red', 'orange', 'amber', 'green', 'mint', 'teal',
+  'blue', 'indigo', 'purple', 'fuchsia', 'rose', 'slate',
+] as const;
 export type Tone = (typeof TONES)[number];
 export function isValidTone(t: string | null | undefined): t is Tone {
   return !!t && (TONES as readonly string[]).includes(t);

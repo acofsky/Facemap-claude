@@ -7,7 +7,7 @@ import {
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { CircleSheet } from '@/components/CircleSheet';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
-import { isValidTone, type Tone } from '@/lib/store';
+import { isValidTone, TONES, type Tone } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 
@@ -18,7 +18,6 @@ interface CircleDetailPageProps {
 }
 
 function fallbackTone(id: string): Tone {
-  const TONES = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return TONES[hash % TONES.length];

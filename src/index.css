@@ -56,23 +56,31 @@
     --radius-card-elevated: 0.75rem;  /* 12px */
     --radius-sheet: 1rem;             /* 16px (top corners only on bottom sheets) */
 
-    /* Circle / Event tile gradients — 8 options, all at 135°. Red is the only full-saturation tile. */
+    /* Circle / Event tile gradients — 12 options, all at 135°. Red is the only full-saturation tile. */
     --tile-red-from:    0 75% 42%;    /* #B52020 */
     --tile-red-to:     10 80% 45%;    /* #BE3A15 */
-    --tile-blue-from:  210 40% 40%;   /* #3D5C7A */
-    --tile-blue-to:    195 45% 38%;   /* #326675 */
-    --tile-purple-from:265 30% 42%;   /* #5A4870 */
-    --tile-purple-to:  285 28% 42%;   /* #5C426B */
-    --tile-green-from: 150 30% 35%;   /* #3B6650 */
-    --tile-green-to:   165 32% 35%;   /* #367060 */
+    --tile-orange-from: 18 55% 42%;   /* #A65A30 */
+    --tile-orange-to:   30 50% 40%;   /* #99693A */
     --tile-amber-from:  35 45% 40%;   /* #7A5E2B */
     --tile-amber-to:    22 42% 38%;   /* #73472A */
-    --tile-slate-from: 215 20% 30%;   /* #3A4455 */
-    --tile-slate-to:   215 22% 24%;   /* #2E3A4A */
-    --tile-rose-from:  345 30% 32%;   /* #6B3A4A */
-    --tile-rose-to:    355 45% 33%;   /* #7A3040 */
-    --tile-teal-from:  180 35% 26%;   /* #2A5A5A */
-    --tile-teal-to:    190 45% 26%;   /* #245060 */
+    --tile-green-from: 150 30% 35%;   /* #3B6650 */
+    --tile-green-to:   165 32% 35%;   /* #367060 */
+    --tile-mint-from:  155 35% 42%;   /* #468D6E */
+    --tile-mint-to:    170 38% 40%;   /* #3F8D7E */
+    --tile-teal-from:  180 35% 30%;   /* #316C6C */
+    --tile-teal-to:    190 45% 30%;   /* #2C6477 */
+    --tile-blue-from:  210 40% 42%;   /* #406184 */
+    --tile-blue-to:    195 45% 40%;   /* #366D7B */
+    --tile-indigo-from:230 35% 40%;   /* #455882 */
+    --tile-indigo-to:  245 32% 40%;   /* #4F4D85 */
+    --tile-purple-from:265 30% 42%;   /* #5A4870 */
+    --tile-purple-to:  285 28% 42%;   /* #5C426B */
+    --tile-fuchsia-from:310 35% 40%;  /* #864A6F */
+    --tile-fuchsia-to: 325 38% 40%;   /* #8C3F65 */
+    --tile-rose-from:  345 30% 36%;   /* #77425A */
+    --tile-rose-to:    355 45% 38%;   /* #8E3848 */
+    --tile-slate-from: 215 18% 35%;   /* #475266 */
+    --tile-slate-to:   215 20% 28%;   /* #3A4456 */
 
     /* Sidebar — aliases to the same tokens (kept for shadcn sidebar component) */
     --sidebar-background: var(--background);
@@ -159,14 +167,18 @@
   .border-hairline-stronger { border-color: hsl(0 0% 100% / 0.12); }
 
   /* Circle tile gradients (135°) */
-  .tile-red    { background: linear-gradient(135deg, hsl(var(--tile-red-from))    0%, hsl(var(--tile-red-to))    100%); }
-  .tile-blue   { background: linear-gradient(135deg, hsl(var(--tile-blue-from))   0%, hsl(var(--tile-blue-to))   100%); }
-  .tile-purple { background: linear-gradient(135deg, hsl(var(--tile-purple-from)) 0%, hsl(var(--tile-purple-to)) 100%); }
-  .tile-green  { background: linear-gradient(135deg, hsl(var(--tile-green-from))  0%, hsl(var(--tile-green-to))  100%); }
-  .tile-amber  { background: linear-gradient(135deg, hsl(var(--tile-amber-from))  0%, hsl(var(--tile-amber-to))  100%); }
-  .tile-slate  { background: linear-gradient(135deg, hsl(var(--tile-slate-from))  0%, hsl(var(--tile-slate-to))  100%); }
-  .tile-rose   { background: linear-gradient(135deg, hsl(var(--tile-rose-from))   0%, hsl(var(--tile-rose-to))   100%); }
-  .tile-teal   { background: linear-gradient(135deg, hsl(var(--tile-teal-from))   0%, hsl(var(--tile-teal-to))   100%); }
+  .tile-red     { background: linear-gradient(135deg, hsl(var(--tile-red-from))     0%, hsl(var(--tile-red-to))     100%); }
+  .tile-orange  { background: linear-gradient(135deg, hsl(var(--tile-orange-from))  0%, hsl(var(--tile-orange-to))  100%); }
+  .tile-amber   { background: linear-gradient(135deg, hsl(var(--tile-amber-from))   0%, hsl(var(--tile-amber-to))   100%); }
+  .tile-green   { background: linear-gradient(135deg, hsl(var(--tile-green-from))   0%, hsl(var(--tile-green-to))   100%); }
+  .tile-mint    { background: linear-gradient(135deg, hsl(var(--tile-mint-from))    0%, hsl(var(--tile-mint-to))    100%); }
+  .tile-teal    { background: linear-gradient(135deg, hsl(var(--tile-teal-from))    0%, hsl(var(--tile-teal-to))    100%); }
+  .tile-blue    { background: linear-gradient(135deg, hsl(var(--tile-blue-from))    0%, hsl(var(--tile-blue-to))    100%); }
+  .tile-indigo  { background: linear-gradient(135deg, hsl(var(--tile-indigo-from))  0%, hsl(var(--tile-indigo-to))  100%); }
+  .tile-purple  { background: linear-gradient(135deg, hsl(var(--tile-purple-from))  0%, hsl(var(--tile-purple-to))  100%); }
+  .tile-fuchsia { background: linear-gradient(135deg, hsl(var(--tile-fuchsia-from)) 0%, hsl(var(--tile-fuchsia-to)) 100%); }
+  .tile-rose    { background: linear-gradient(135deg, hsl(var(--tile-rose-from))    0%, hsl(var(--tile-rose-to))    100%); }
+  .tile-slate   { background: linear-gradient(135deg, hsl(var(--tile-slate-from))   0%, hsl(var(--tile-slate-to))   100%); }
 
   /* Hidden scrollbar utility (preserved from v1) */
   .scrollbar-hide {

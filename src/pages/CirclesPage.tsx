@@ -8,7 +8,7 @@ import {
 import { CircleSheet } from '@/components/CircleSheet';
 import { EventSheet } from '@/components/EventSheet';
 import { useLongPress } from '@/hooks/use-long-press';
-import { isValidTone, type Event as MembrEvent, type Tone, type Circle } from '@/lib/store';
+import { isValidTone, TONES, type Event as MembrEvent, type Tone, type Circle } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 interface CirclesPageProps {
@@ -18,7 +18,6 @@ interface CirclesPageProps {
 
 function circleTone(c: { id: string; tone?: string | null }): Tone {
   if (isValidTone(c.tone)) return c.tone;
-  const TONES = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
   let hash = 0;
   for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
   return TONES[hash % TONES.length];
