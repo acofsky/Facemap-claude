@@ -62,12 +62,13 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
     'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-start sm:justify-center bg-black/60 animate-fade-in sm:pt-20"
-      onClick={handleClose}
-    >
+    <>
       <div
-        className="w-full max-w-md bg-surface-2 rounded-t-2xl sm:rounded-xl border border-[hsl(0_0%_100%/0.12)] p-5 animate-scale-in safe-bottom"
+        className="fixed inset-0 z-50 bg-black/60 animate-fade-in"
+        onClick={handleClose}
+      />
+      <div
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] p-5 z-50 safe-bottom animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {!selected ? (
@@ -189,6 +190,6 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }
