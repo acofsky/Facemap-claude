@@ -115,20 +115,16 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   const activeCircles = useMemo(() => {
     const memberCount = new Map<string, number>();
     for (const pc of personCircles) memberCount.set(pc.circle_id, (memberCount.get(pc.circle_id) || 0) + 1);
-    // Sort newest-first so a freshly-created circle always shows on Home.
-    // The previous "most-members-first, recency as tiebreaker" sort hid
-    // a new 0-member circle behind any 4+ existing circles that already
-    // had members — Adam saw the bug when adding his second batch of
-    // circles. Home is the quick-glance surface; the Network tab is the
-    // exhaustive list.
+    // Show every circle, newest-first. The grid wraps to additional rows
+    // once the user has more than 4 circles. Capping previously dropped
+    // circles silently — the user expects to see all of them on Home.
     return circles
       .map((c) => ({ ...c, members: memberCount.get(c.id) || 0 }))
       .slice()
       .sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
-      .slice(0, 4);
+      );
   }, [circles, personCircles]);
 
   const countLabel = people.length === 1 ? '1 person' : `${people.length} people`;
