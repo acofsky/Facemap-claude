@@ -11,6 +11,29 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+const ANTHROPIC_MODEL = "claude-haiku-4-5";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+
+// Cap the number of photos per person we send to the AI so very large
+// People libraries don't blow past Anthropic's request size or burn tokens.
+// Two photos give enough visual context to match physical-description queries.
+const PHOTOS_PER_PERSON = 2;
+
+interface PersonProfile {
+  id: string;
+  name: string;
+  profile: string;
+  photos: string[];
+}
+
+interface AnthropicContentBlock {
+  type: string;
+  text?: string;
+  name?: string;
+  input?: { matches?: Array<{ id: string; reason: string }> };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -49,7 +72,7 @@ serve(async (req) => {
       .eq("user_id", user.id);
     if (pErr) throw pErr;
 
-    const personIds = (persons || []).map((p: any) => p.id);
+    const personIds = (persons || []).map((p: { id: string }) => p.id);
     const { data: personCircles } = await admin
       .from("person_circles")
       .select("person_id, circle_id")
@@ -60,58 +83,75 @@ serve(async (req) => {
       .select("id, name, emoji")
       .eq("user_id", user.id);
 
-    const circleMap = new Map((circles || []).map((c: any) => [c.id, c]));
+    const circleMap = new Map(
+      (circles || []).map((c: { id: string; name: string; emoji: string | null }) => [c.id, c])
+    );
+
+    type PersonRow = {
+      id: string;
+      name: string;
+      how_we_met: string | null;
+      where_when: string | null;
+      physical_description: string | null;
+      important_info: string | null;
+      misc_notes: string | null;
+      photos: string[] | null;
+    };
 
     // Build a text profile for each person and sign their photo paths
-    const personProfiles = await Promise.all((persons || []).map(async (p: any) => {
-      const pCircles = (personCircles || [])
-        .filter((pc: any) => pc.person_id === p.id)
-        .map((pc: any) => circleMap.get(pc.circle_id))
-        .filter(Boolean)
-        .map((c: any) => `${c.emoji} ${c.name}`);
+    const personProfiles: PersonProfile[] = await Promise.all(
+      ((persons || []) as PersonRow[]).map(async (p) => {
+        const pCircles = (personCircles || [])
+          .filter((pc: { person_id: string; circle_id: string }) => pc.person_id === p.id)
+          .map((pc: { circle_id: string }) => circleMap.get(pc.circle_id))
+          .filter(Boolean)
+          .map((c) => {
+            const circle = c as { name: string; emoji: string | null };
+            return `${circle.emoji ?? ""} ${circle.name}`.trim();
+          });
 
-      const fields = [
-        `Name: ${p.name}`,
-        p.how_we_met && `How we met: ${p.how_we_met}`,
-        p.where_when && `Where: ${p.where_when}`,
-        p.physical_description && `Physical: ${p.physical_description}`,
-        p.important_info && `Important: ${p.important_info}`,
-        p.misc_notes && `Notes: ${p.misc_notes}`,
-        pCircles.length && `Circles: ${pCircles.join(", ")}`,
-      ].filter(Boolean);
+        const fields = [
+          `Name: ${p.name}`,
+          p.how_we_met && `How we met: ${p.how_we_met}`,
+          p.where_when && `Where: ${p.where_when}`,
+          p.physical_description && `Physical: ${p.physical_description}`,
+          p.important_info && `Important: ${p.important_info}`,
+          p.misc_notes && `Notes: ${p.misc_notes}`,
+          pCircles.length && `Circles: ${pCircles.join(", ")}`,
+        ].filter(Boolean) as string[];
 
-      // Sign photo paths so the AI gateway can fetch them.
-      // Photos may be stored as raw paths OR as full Supabase storage URLs
-      // (public/sign URLs). Since the bucket is private, we always re-sign.
-      const signedPhotos: string[] = [];
-      for (const photo of (p.photos || []).slice(0, 2)) {
-        if (typeof photo !== "string") continue;
+        // Sign photo paths so the AI can fetch them. Photos may be stored
+        // as raw paths OR as full Supabase storage URLs; the bucket is
+        // private so we always re-sign with a short TTL.
+        const signedPhotos: string[] = [];
+        for (const photo of (p.photos || []).slice(0, PHOTOS_PER_PERSON)) {
+          if (typeof photo !== "string") continue;
 
-        let path = photo;
-        // Extract storage path from a full Supabase storage URL if needed
-        const m = photo.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/person-photos\/([^?]+)/);
-        if (m) {
-          path = decodeURIComponent(m[1]);
-        } else if (photo.startsWith("http://") || photo.startsWith("https://")) {
-          // Non-Supabase URL — pass through
-          signedPhotos.push(photo);
-          continue;
+          let path = photo;
+          const m = photo.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/person-photos\/([^?]+)/);
+          if (m) {
+            path = decodeURIComponent(m[1]);
+          } else if (photo.startsWith("http://") || photo.startsWith("https://")) {
+            // Non-Supabase URL — pass through
+            signedPhotos.push(photo);
+            continue;
+          }
+
+          const { data: signed, error: signErr } = await admin.storage
+            .from("person-photos")
+            .createSignedUrl(path, 60 * 10);
+          if (signErr) console.error("sign error for", path, signErr);
+          if (signed?.signedUrl) signedPhotos.push(signed.signedUrl);
         }
 
-        const { data: signed, error: signErr } = await admin.storage
-          .from("person-photos")
-          .createSignedUrl(path, 60 * 10);
-        if (signErr) console.error("sign error for", path, signErr);
-        if (signed?.signedUrl) signedPhotos.push(signed.signedUrl);
-      }
+        return { id: p.id, name: p.name, profile: fields.join("\n"), photos: signedPhotos };
+      })
+    );
 
-      return { id: p.id, name: p.name, profile: fields.join("\n"), photos: signedPhotos };
-    }));
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-    const systemPrompt = `You are a person-matching assistant for a personal CRM called Facemap.
+    const systemPrompt = `You are a person-matching assistant for a personal CRM called Membr.
 The user will describe someone they're trying to find. You have a list of people profiles below, some with photos.
 Analyze BOTH the text profiles AND any attached photos to find matches.
 For photo-based queries (e.g. "blonde hair", "tall guy", "wears glasses"), carefully examine the photos.
@@ -119,59 +159,59 @@ Return the IDs of people that match the description, ranked by relevance (best m
 Only return people that are plausible matches. If nobody matches, return an empty array.
 
 People:
-${personProfiles.map((p: any) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
+${personProfiles.map((p) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
 
-    const userContent: any[] = [{ type: "text", text: query }];
+    // Build the user message: the query text, then any photos grouped by
+    // person so the model can correlate the right face with the right ID.
+    const userContent: Array<
+      | { type: "text"; text: string }
+      | { type: "image"; source: { type: "url"; url: string } }
+    > = [{ type: "text", text: query }];
     for (const p of personProfiles) {
-      if (p.photos && p.photos.length > 0) {
+      if (p.photos.length > 0) {
         userContent.push({ type: "text", text: `[Photos for ID: ${p.id}, Name: ${p.name}]` });
         for (const photoUrl of p.photos) {
-          userContent.push({ type: "image_url", image_url: { url: photoUrl } });
+          userContent.push({ type: "image", source: { type: "url", url: photoUrl } });
         }
       }
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": ANTHROPIC_VERSION,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
         tools: [
           {
-            type: "function",
-            function: {
-              name: "return_matches",
-              description: "Return matching person IDs ranked by relevance",
-              parameters: {
-                type: "object",
-                properties: {
-                  matches: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string", description: "Person UUID" },
-                        reason: { type: "string", description: "Why this person matches" },
-                      },
-                      required: ["id", "reason"],
-                      additionalProperties: false,
+            name: "return_matches",
+            description: "Return matching person IDs ranked by relevance",
+            input_schema: {
+              type: "object",
+              properties: {
+                matches: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", description: "Person UUID" },
+                      reason: { type: "string", description: "Why this person matches" },
                     },
+                    required: ["id", "reason"],
                   },
                 },
-                required: ["matches"],
-                additionalProperties: false,
               },
+              required: ["matches"],
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "return_matches" } },
+        tool_choice: { type: "tool", name: "return_matches" },
       }),
     });
 
@@ -182,26 +222,21 @@ ${personProfiles.map((p: any) => `[ID: ${p.id}]\n${p.profile}`).join("\n\n")}`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, t);
+      console.error("Anthropic error:", aiResponse.status, t);
       throw new Error("AI gateway error");
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    const toolUseBlock = ((aiData.content || []) as AnthropicContentBlock[]).find(
+      (b) => b.type === "tool_use" && b.name === "return_matches"
+    );
     let matches: { id: string; reason: string }[] = [];
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      matches = parsed.matches || [];
+    if (toolUseBlock?.input?.matches) {
+      matches = toolUseBlock.input.matches;
     }
 
-    const validIds = new Set(personProfiles.map((p: any) => p.id));
+    const validIds = new Set(personProfiles.map((p) => p.id));
     matches = matches.filter((m) => validIds.has(m.id));
 
     return new Response(JSON.stringify({ results: matches }), {
