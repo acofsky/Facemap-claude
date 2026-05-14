@@ -117,7 +117,15 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
     for (const pc of personCircles) memberCount.set(pc.circle_id, (memberCount.get(pc.circle_id) || 0) + 1);
     return circles
       .map((c) => ({ ...c, members: memberCount.get(c.id) || 0 }))
-      .sort((a, b) => b.members - a.members)
+      // Most members first, newest-created wins ties — without the
+      // secondary sort, a freshly-created (0-member) circle stays at the
+      // bottom of the 0-member tie group and falls off the slice(0, 4),
+      // so the user didn't see it appear after creating one.
+      .sort(
+        (a, b) =>
+          b.members - a.members ||
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
       .slice(0, 4);
   }, [circles, personCircles]);
 

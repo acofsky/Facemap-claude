@@ -43,11 +43,16 @@ export function ConfirmDialog({
           <motion.div
             role="alertdialog"
             aria-modal="true"
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
+            // Centering is folded into framer-motion's animate values
+            // because the `scale` keyframe sets `transform` inline and
+            // would otherwise wipe Tailwind's `-translate-x-1/2
+            // -translate-y-1/2` — the dialog ended up with its top-left
+            // corner at viewport centre and clipped off the right edge.
+            initial={{ opacity: 0, scale: 0.94, x: '-50%', y: '-50%' }}
+            animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
+            exit={{ opacity: 0, scale: 0.94, x: '-50%', y: '-50%' }}
             transition={{ type: 'spring', damping: 24, stiffness: 360 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-[min(86vw,360px)] rounded-xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-5"
+            className="fixed left-1/2 top-1/2 z-[61] w-[min(86vw,360px)] rounded-xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-xl text-foreground tracking-[-0.02em]">
