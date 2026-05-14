@@ -25,6 +25,22 @@ jobs:
       - name: Push migrations
         run: supabase db push --include-all
 
+      # NOTIFY pgrst doesn't always force the hosted PostgREST instance to
+      # actually reload — it's a hint that the listener can ignore if the
+      # process is busy. The Management API restart hard-bounces the
+      # PostgREST + GoTrue + Realtime services, which guarantees the
+      # schema cache is rebuilt from current Postgres state. Run this
+      # whenever a migration touches table or column shape.
+      - name: Restart project services (force PostgREST schema reload)
+        run: |
+          curl -fsS -X POST \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/restart" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            && echo "Restart triggered" || echo "Restart endpoint failed (non-fatal)"
+          # Give the services ~30s to come back before we hit them again.
+          sleep 30
+
       - name: Set ANTHROPIC_API_KEY function secret
         run: supabase secrets set ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
 

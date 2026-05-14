@@ -19,8 +19,12 @@ import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonEditPageProps {
   personId: string;
-  /** Called on cancel (with discard if needed) or save. */
-  onClose: () => void;
+  /**
+   * Called on cancel (with discard if needed), save, or delete. When the
+   * person was just deleted, `result.deleted` is true so the caller can
+   * route past the now-stale Person Profile screen.
+   */
+  onClose: (result?: { deleted?: boolean }) => void;
 }
 
 /**
@@ -172,7 +176,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   const handleDelete = async () => {
     if (!confirm('Remove this person from your Membr?')) return;
     await deletePersonMut.mutateAsync(personId);
-    onClose();
+    onClose({ deleted: true });
   };
 
   if (isLoading || !person) {

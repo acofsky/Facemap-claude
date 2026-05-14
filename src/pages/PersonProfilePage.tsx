@@ -67,7 +67,15 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
   );
 
   if (editOpen) {
-    return <PersonEditPage personId={personId} onClose={() => setEditOpen(false)} />;
+    return (
+      <PersonEditPage
+        personId={personId}
+        onClose={(result) => {
+          setEditOpen(false);
+          if (result?.deleted) onBack();
+        }}
+      />
+    );
   }
 
   return (
