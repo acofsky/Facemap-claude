@@ -16,6 +16,13 @@ import { cn } from '@/lib/utils';
 interface CirclesPageProps {
   onSelectCircle: (id: string) => void;
   onSelectEvent: (id: string) => void;
+  /**
+   * When true, the page is rendered inside NetworkPage. Skip the top
+   * nav (NetworkPage owns the title + segment toggle) and surface the
+   * "+ Add Circle / Event" menu as a small inline button at the top
+   * of the body.
+   */
+  embedded?: boolean;
 }
 
 function circleTone(c: { id: string; tone?: string | null }): Tone {
@@ -33,7 +40,7 @@ const CIRCLE_SUGGESTIONS = [
   { emoji: '🎲', name: 'Randoms' },
 ];
 
-export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps) {
+export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }: CirclesPageProps) {
   const { data: circles = [], isLoading } = useCircles();
   const { data: personCircles = [] } = usePersonCircles();
   const { data: events = [] } = useEvents({ includeArchived: false });
@@ -68,14 +75,51 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
   const circleMemberCount = (id: string) => personCircles.filter((pc) => pc.circle_id === id).length;
   const eventMemberCount = (id: string) => personEvents.filter((pe) => pe.event_id === id).length;
 
+  const addMenu = (
+    <div className="relative">
+      <button
+        onClick={() => setAddMenuOpen((v) => !v)}
+        onBlur={() => setTimeout(() => setAddMenuOpen(false), 150)}
+        aria-label="Create"
+        className="w-9 h-9 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+      >
+        <Plus className="w-5 h-5" strokeWidth={1.75} />
+      </button>
+      {addMenuOpen && (
+        <div className="absolute right-0 top-full mt-1 w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+          <button
+            onClick={() => {
+              setCircleSheetOpen(true);
+              setAddMenuOpen(false);
+            }}
+            className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+          >
+            New Circle
+          </button>
+          <button
+            onClick={() => {
+              setEventSheetOpen({});
+              setAddMenuOpen(false);
+            }}
+            className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+          >
+            New Event
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="pb-8 animate-fade-in">
-        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-          <span className="w-9" />
-          <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
-          <span className="w-9" />
-        </div>
+        {!embedded && (
+          <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+            <span className="w-9" />
+            <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
+            <span className="w-9" />
+          </div>
+        )}
         <div className="px-5 mb-3">
           <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
         </div>
@@ -99,43 +143,20 @@ export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps)
 
   return (
     <div className="pb-8 animate-fade-in">
-      {/* Nav bar */}
-      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-        <span className="w-9" />
-        <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
-        <div className="relative">
-          <button
-            onClick={() => setAddMenuOpen((v) => !v)}
-            onBlur={() => setTimeout(() => setAddMenuOpen(false), 150)}
-            aria-label="Create"
-            className="w-9 h-9 -mr-2 flex items-center justify-center text-foreground active:scale-95 transition-transform"
-          >
-            <Plus className="w-5 h-5" strokeWidth={1.75} />
-          </button>
-          {addMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
-              <button
-                onClick={() => {
-                  setCircleSheetOpen(true);
-                  setAddMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
-              >
-                New Circle
-              </button>
-              <button
-                onClick={() => {
-                  setEventSheetOpen({});
-                  setAddMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
-              >
-                New Event
-              </button>
-            </div>
-          )}
+      {/* Nav bar — only when standalone. NetworkPage owns title + segments
+          when embedded, and the + menu surfaces inline at the top of body. */}
+      {!embedded && (
+        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <span className="w-9" />
+          <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
+          <div className="-mr-2">{addMenu}</div>
         </div>
-      </div>
+      )}
+
+      {/* Inline + menu shown only when embedded */}
+      {embedded && (
+        <div className="px-5 pt-1 -mb-1 flex justify-end">{addMenu}</div>
+      )}
 
       {/* Suggestions in empty state */}
       {circles.length === 0 && (

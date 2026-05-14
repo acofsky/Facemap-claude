@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { AppLayout, type Tab } from '@/components/AppLayout';
 import { HomePage } from './HomePage';
-import { PeoplePage } from './PeoplePage';
-import { CirclesPage } from './CirclesPage';
+import { NetworkPage } from './NetworkPage';
 import { RecallPage } from './RecallPage';
 import { ProfilePage } from './ProfilePage';
 import { PersonProfilePage } from './PersonProfilePage';
@@ -97,9 +96,12 @@ const Index = () => {
             onSelectCircle={setSelectedCircleId}
           />
         )}
-        {activeTab === 'people' && <PeoplePage onSelectPerson={setSelectedPersonId} />}
-        {activeTab === 'circles' && (
-          <CirclesPage onSelectCircle={setSelectedCircleId} onSelectEvent={setSelectedEventId} />
+        {activeTab === 'network' && (
+          <NetworkPage
+            onSelectPerson={setSelectedPersonId}
+            onSelectCircle={setSelectedCircleId}
+            onSelectEvent={setSelectedEventId}
+          />
         )}
         {activeTab === 'recall' && <RecallPage onSelectPerson={setSelectedPersonId} />}
         {activeTab === 'profile' && <ProfilePage />}

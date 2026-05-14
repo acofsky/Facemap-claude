@@ -12,6 +12,12 @@ import { isValidTone } from '@/lib/store';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
+  /**
+   * When true, the page is rendered inside NetworkPage. Skip the top
+   * nav (NetworkPage owns the title + segment toggle) and inline the
+   * sort menu alongside the search bar.
+   */
+  embedded?: boolean;
 }
 
 type SortKey = 'recent' | 'az' | 'circle';
@@ -25,7 +31,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 // Active filter is one chip at a time: 'all' or `${'circle'|'event'}:${id}`.
 type FilterKey = string | null;
 
-export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
+export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>(null);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
@@ -88,14 +94,49 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
     return result;
   }, [people, search, filter, sortBy, personCircleMap, personEventMap]);
 
+  const sortMenu = (
+    <div className="relative">
+      <button
+        onClick={() => setSortOpen((v) => !v)}
+        onBlur={() => setTimeout(() => setSortOpen(false), 150)}
+        aria-label="Sort"
+        className="w-9 h-9 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+      >
+        <ListFilter className="w-5 h-5" strokeWidth={1.75} />
+      </button>
+      {sortOpen && (
+        <div className="absolute right-0 top-full mt-1 w-48 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => {
+                setSortBy(key);
+                setSortOpen(false);
+              }}
+              className={cn(
+                'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center justify-between',
+                sortBy === key ? 'text-foreground' : 'text-muted-text',
+              )}
+            >
+              {SORT_LABELS[key]}
+              {sortBy === key && <ChevronDown className="w-3 h-3 text-primary" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="pb-8 animate-fade-in">
-        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-          <span className="w-9" />
-          <h1 className="text-[17px] font-semibold text-foreground">People</h1>
-          <span className="w-9" />
-        </div>
+        {!embedded && (
+          <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+            <span className="w-9" />
+            <h1 className="text-[17px] font-semibold text-foreground">People</h1>
+            <span className="w-9" />
+          </div>
+        )}
         <div className="px-5 mb-3">
           <Skeleton className="h-11 w-full rounded-md bg-[hsl(0_0%_100%/0.05)]" />
         </div>
@@ -110,52 +151,29 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
 
   return (
     <div className="pb-8 animate-fade-in">
-      {/* Nav bar */}
-      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-        <span className="w-9" />
-        <h1 className="text-[17px] font-semibold text-foreground">People</h1>
-        <div className="relative">
-          <button
-            onClick={() => setSortOpen((v) => !v)}
-            onBlur={() => setTimeout(() => setSortOpen(false), 150)}
-            aria-label="Sort"
-            className="w-9 h-9 -mr-2 flex items-center justify-center text-foreground active:scale-95 transition-transform"
-          >
-            <ListFilter className="w-5 h-5" strokeWidth={1.75} />
-          </button>
-          {sortOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
-              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setSortBy(key);
-                    setSortOpen(false);
-                  }}
-                  className={cn(
-                    'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center justify-between',
-                    sortBy === key ? 'text-foreground' : 'text-muted-text',
-                  )}
-                >
-                  {SORT_LABELS[key]}
-                  {sortBy === key && <ChevronDown className="w-3 h-3 text-primary" />}
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Nav bar — only when standalone. NetworkPage owns the title + segment
+          toggle when embedded, and the sort menu moves inline below. */}
+      {!embedded && (
+        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <span className="w-9" />
+          <h1 className="text-[17px] font-semibold text-foreground">People</h1>
+          <div className="-mr-2">{sortMenu}</div>
         </div>
-      </div>
+      )}
 
-      {/* Inline search */}
+      {/* Inline search + sort (sort only when embedded — otherwise it lives in the nav) */}
       <div className="px-5 mb-3">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search names and notes…"
-            className="w-full h-11 pl-10 pr-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search names and notes…"
+              className="w-full h-11 pl-10 pr-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
+            />
+          </div>
+          {embedded && sortMenu}
         </div>
       </div>
 
