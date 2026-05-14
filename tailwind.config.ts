@@ -3,6 +3,16 @@ import type { Config } from "tailwindcss";
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  // The .tile-{tone} classes live in src/index.css under @layer utilities
+  // and are referenced through dynamic template strings (`tile-${tone}`),
+  // which Tailwind's content scanner can't see. Without this safelist,
+  // every tone except the four with static usages (red/blue/green/rose)
+  // would be purged at build time — leaving Circle/Event tiles
+  // background-less.
+  safelist: [
+    'tile-red', 'tile-orange', 'tile-amber', 'tile-green', 'tile-mint', 'tile-teal',
+    'tile-blue', 'tile-indigo', 'tile-purple', 'tile-fuchsia', 'tile-rose', 'tile-slate',
+  ],
   prefix: "",
   theme: {
     container: {

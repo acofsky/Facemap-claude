@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePersons, useCircles, usePersonCircles, useRecentMeetings } from '@/hooks/use-data';
+import { TONES, isValidTone, type Tone } from '@/lib/store';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { SmartCircleBanner } from '@/components/SmartCircleBanner';
 import { AIBadge } from '@/components/AIBadge';
@@ -16,12 +17,11 @@ interface HomePageProps {
   onSelectCircle: (id: string) => void;
 }
 
-const TILE_PALETTE = ['red', 'blue', 'purple', 'green', 'amber', 'slate', 'rose', 'teal'] as const;
-function circleTone(c: { id: string; tone?: string | null }): typeof TILE_PALETTE[number] {
-  if (c.tone && (TILE_PALETTE as readonly string[]).includes(c.tone)) return c.tone as typeof TILE_PALETTE[number];
+function circleTone(c: { id: string; tone?: string | null }): Tone {
+  if (isValidTone(c.tone)) return c.tone;
   let hash = 0;
   for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
-  return TILE_PALETTE[hash % TILE_PALETTE.length];
+  return TONES[hash % TONES.length];
 }
 
 function getFirstName(
