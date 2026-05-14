@@ -14,12 +14,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PersonHeaderSkeleton, PersonRowSkeleton } from '@/components/skeletons';
 import { PersonEditPage } from '@/pages/PersonEditPage';
 import {
-  ArrowLeft, CalendarPlus, MapPin, Pencil, Phone, Sparkles,
+  ArrowLeft, CalendarPlus, MapPin, Pencil, Sparkles,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
-import { isNativeIOS, openIOSContact } from '@/lib/ios-contacts';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonProfilePageProps {
@@ -68,7 +67,6 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
   const personEventObjects = events.filter((e) => (person.eventIds || []).includes(e.id));
   const firstName = (person.name || '').split(' ')[0] || 'Person';
   const iosContactId = person.ios_contact_id ?? null;
-  const native = isNativeIOS();
 
   if (editOpen) {
     return (
@@ -157,21 +155,18 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         )}
       </div>
 
-      {/* Action buttons row */}
+      {/* Action buttons row. The third tile used to be "Contact" but iOS
+          doesn't expose a public URL scheme that opens Contacts.app to a
+          specific contact — the link did nothing. The iPhone Contact
+          section below already surfaces the linked state. */}
       <div className="px-5 mb-6">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <ActionTile
             icon={CalendarPlus}
             label="Log"
             onClick={() => document.getElementById('encounters-anchor')?.scrollIntoView({ behavior: 'smooth' })}
           />
           <ActionTile icon={Sparkles} label="Brief" onClick={() => setBriefOpen(true)} />
-          <ActionTile
-            icon={Phone}
-            label="Contact"
-            onClick={() => iosContactId && openIOSContact(iosContactId)}
-            disabled={!iosContactId || !native}
-          />
         </div>
       </div>
 

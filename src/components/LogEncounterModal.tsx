@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { usePersons, useCreateMeeting } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
-import { Search, ArrowLeft, Loader2, Check, CalendarDays, MapPin, NotebookPen } from 'lucide-react';
+import { Search, ArrowLeft, Loader2, Check, CalendarDays, MapPin, NotebookPen, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -64,11 +64,11 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/60 animate-fade-in"
+        className="fixed inset-0 z-[60] bg-black/60 animate-fade-in"
         onClick={handleClose}
       />
       <div
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] p-5 z-50 safe-bottom animate-scale-in"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] p-5 z-[60] safe-bottom animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {!selected ? (
@@ -77,10 +77,17 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
               <div className="w-10 h-10 rounded-md tile-red flex items-center justify-center">
                 <CalendarDays className="w-4 h-4 text-white" strokeWidth={1.75} />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <h3 className="font-display text-xl text-foreground leading-tight tracking-[-0.02em]">Log encounter</h3>
                 <p className="text-[12px] text-muted-text">Pick someone you ran into</p>
               </div>
+              <button
+                onClick={handleClose}
+                aria-label="Close"
+                className="w-9 h-9 -mr-1 rounded-md flex items-center justify-center hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text"
+              >
+                <X className="w-5 h-5" strokeWidth={1.75} />
+              </button>
             </div>
             <div className="relative mb-3">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
@@ -139,7 +146,11 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
                   value={meetingDate}
                   onChange={(e) => setMeetingDate(e.target.value)}
                   max={format(new Date(), 'yyyy-MM-dd')}
-                  className={inputClass}
+                  /* min-w-0 + appearance-none lets iOS Safari shrink the
+                     date input to fit the container; without them it sticks
+                     at the intrinsic content width of "MM/DD/YYYY" and
+                     overflows. */
+                  className={cn(inputClass, 'min-w-0 appearance-none')}
                 />
               </label>
 

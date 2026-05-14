@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	    Sign in with Apple capability. Required for Apple's App Store
+	    review of any app that offers third-party social login (Google,
+	    etc.) per App Store Review Guideline 4.8. The "Default" value
+	    binds Sign in with Apple to this app's bundle identifier
+	    (com.acofsky.facemap) — Apple uses that as the AppID-bound key
+	    for the credential. The bundle also has to have the "Sign in
+	    with Apple" capability enabled in Apple Developer for this
+	    entitlement to actually grant access at runtime.
+	-->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

@@ -67,7 +67,7 @@ export function PersonPickerSheet({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 z-50"
+        className="fixed inset-0 bg-black/60 z-[60]"
         onClick={onClose}
       />
       <motion.div
@@ -84,7 +84,7 @@ export function PersonPickerSheet({
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-50 flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-start justify-between px-5 pt-2 pb-3">

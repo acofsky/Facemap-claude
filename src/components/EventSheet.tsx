@@ -149,7 +149,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 z-50"
+        className="fixed inset-0 bg-black/60 z-[60]"
         onClick={onClose}
       />
       <motion.div
@@ -166,7 +166,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-50 flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-center justify-between px-5 pt-2 pb-3">
@@ -191,24 +191,26 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
             />
           </div>
 
-          {/* Date range */}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
+          {/* Date range — min-w-0 lets the grid cells shrink the iOS date
+              inputs below their intrinsic content width so they sit inside
+              their cell instead of touching / overflowing. */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block min-w-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-1.5 block">Start</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={inputClass}
+                className={cn(inputClass, 'min-w-0 appearance-none')}
               />
             </label>
-            <label className="block">
+            <label className="block min-w-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-1.5 block">End</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={inputClass}
+                className={cn(inputClass, 'min-w-0 appearance-none')}
                 min={startDate || undefined}
               />
             </label>
@@ -218,17 +220,6 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-2 block">Color</span>
             <ColorPicker value={tone} onChange={setTone} />
-          </div>
-
-          {/* Live preview */}
-          <div className={cn('rounded-xl px-4 pb-4 pt-12 flex flex-col justify-end', `tile-${tone}`)}>
-            <div className="text-[15px] font-semibold text-white truncate">
-              {name.trim() || 'Event name'}
-            </div>
-            <div className="text-[11px] text-white/70">
-              {formatDateRange(startDate, endDate) ||
-                `${suggestedMemberIds.length} ${suggestedMemberIds.length === 1 ? 'member' : 'members'}`}
-            </div>
           </div>
 
           {/* Smart Circle suggested members */}
@@ -303,16 +294,4 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
       />
     </>
   );
-}
-
-function formatDateRange(start: string | null | undefined, end: string | null | undefined): string {
-  if (!start && !end) return '';
-  const fmt = (s: string) => {
-    const d = new Date(s);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-  if (start && !end) return fmt(start);
-  if (!start && end) return fmt(end);
-  if (start === end) return fmt(start!);
-  return `${fmt(start!)} – ${fmt(end!)}`;
 }

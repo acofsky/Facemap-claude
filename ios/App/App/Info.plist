@@ -53,5 +53,24 @@
 	<string>Membr uses your photo library to let you add a photo to a person's record.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Membr uses your contacts to let you link a Membr person record to an existing iPhone contact.</string>
+	<!--
+	    Custom URL scheme used as the OAuth redirect target for Sign in
+	    with Apple / Google. Supabase redirects to
+	    `com.acofsky.facemap://login-callback#access_token=...` after
+	    the user authenticates; iOS hands the URL off to the app, the
+	    Capacitor App plugin fires `appUrlOpen`, and the listener in
+	    src/App.tsx calls `supabase.auth.setSession`.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.acofsky.facemap</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.acofsky.facemap</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -26,7 +26,11 @@ export function NetworkPage({ onSelectPerson, onSelectCircle, onSelectEvent }: N
 
   return (
     <div className="pb-8 animate-fade-in">
-      <div className="sticky top-0 z-30 bg-background pt-3 pb-2 mb-1 px-5 space-y-2.5">
+      {/* z-20 sits below the AppLayout notch cover (z-30) so the cover
+          always paints over the sliver of header that scrolls into the
+          safe-top region — without this the header drifts up "behind"
+          the camera inlet. */}
+      <div className="sticky top-0 z-20 bg-background pt-3 pb-2 mb-1 px-5 space-y-2.5">
         <div className="flex items-center justify-center">
           <h1 className="text-[17px] font-semibold text-foreground">Network</h1>
         </div>

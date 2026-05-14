@@ -3,11 +3,14 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Keyboard, KeyboardResize } from "@capacitor/keyboard";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { AuthPage } from "@/pages/AuthPage";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
@@ -54,10 +57,41 @@ function useKeyboardSetup() {
   }, []);
 }
 
+function useOAuthDeepLink() {
+  // Apple / Google sign-in opens Safari via Capacitor's Browser plugin and
+  // Supabase redirects back to `com.acofsky.facemap://login-callback`. iOS
+  // routes that URL to the app and the App plugin fires `appUrlOpen`. Pull
+  // the access + refresh tokens out of the URL hash and hand them to
+  // Supabase, which sets the session and unblocks AuthContent.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const handle = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+      try {
+        const parsed = new URL(url);
+        const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+        const params = new URLSearchParams(hash || parsed.search);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+          // Close the in-app Safari so the user lands back on the app.
+          await Browser.close().catch(() => {});
+        }
+      } catch {
+        // Ignore non-auth deep links (we only own one URL scheme anyway).
+      }
+    });
+    return () => {
+      handle.then((h) => h.remove());
+    };
+  }, []);
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
   const { onboarded, markOnboarded } = useOnboarded();
   useKeyboardSetup();
+  useOAuthDeepLink();
 
   if (loading) {
     return (

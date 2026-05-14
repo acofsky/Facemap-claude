@@ -46,11 +46,14 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
 
   return (
     <>
+      {/* z-[60] keeps the modal above the centre FAB cluster (z-50).
+          MeetingBriefModal is rendered inside <main>, which is earlier
+          in DOM than the FAB, so equal z-index loses the tie. */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 z-50"
+        className="fixed inset-0 bg-black/60 z-[60]"
         onClick={onClose}
       />
       <motion.div
@@ -67,7 +70,7 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-50 flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-center justify-between px-5 pt-2 pb-3">

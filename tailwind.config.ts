@@ -108,8 +108,12 @@ export default {
           to: { height: "0" },
         },
         "fade-in": {
-          from: { opacity: "0", transform: "translateY(6px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          // Opacity-only on purpose. A transform on an ancestor breaks
+          // `position: sticky` for descendants while the animation
+          // runs — which made the NetworkPage header drift behind the
+          // notch cover for the first ~300 ms of the page.
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
         "scale-in": {
           from: { opacity: "0", transform: "scale(0.97)" },

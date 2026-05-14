@@ -1,9 +1,36 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { toast } from 'sonner';
-import { Loader2, Check, X, ArrowLeft } from 'lucide-react';
+import { Loader2, Check, X, ArrowLeft, Apple } from 'lucide-react';
 import { Wordmark } from '@/components/Wordmark';
+
+// Custom URL scheme registered in ios/App/App/Info.plist (CFBundleURLTypes).
+// Supabase redirects here after the user authenticates with Apple/Google.
+// The deep-link handler in src/App.tsx parses the hash params and calls
+// supabase.auth.setSession.
+const OAUTH_REDIRECT = 'com.acofsky.facemap://login-callback';
+
+async function startOAuth(provider: 'google' | 'apple'): Promise<{ error?: Error }> {
+  const native = Capacitor.isNativePlatform();
+  // Native: ask Supabase for the OAuth URL but DON'T let it auto-navigate
+  // (we open it in the Capacitor Browser instead so the redirect lands on
+  // the deep link, not on the in-app webview). Web: let Supabase navigate
+  // normally — the redirect comes back through the same window.
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: native ? OAUTH_REDIRECT : `${window.location.origin}/`,
+      skipBrowserRedirect: native,
+    },
+  });
+  if (error) return { error };
+  if (native && data?.url) {
+    await Browser.open({ url: data.url, presentationStyle: 'popover' });
+  }
+  return {};
+}
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot' | 'reset';
 
@@ -132,10 +159,13 @@ export function AuthPage() {
   };
 
   const handleGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) toast.error(result.error.message);
+    const { error } = await startOAuth('google');
+    if (error) toast.error(error.message);
+  };
+
+  const handleApple = async () => {
+    const { error } = await startOAuth('apple');
+    if (error) toast.error(error.message);
   };
 
   const inputClass =
@@ -364,6 +394,17 @@ export function AuthPage() {
                 <span className="bg-background px-2 text-muted-text">or</span>
               </div>
             </div>
+
+            {/* Apple first per HIG: when an app offers any third-party
+                social login (Google here), Sign in with Apple must be
+                presented as a peer option, typically on top. */}
+            <button
+              onClick={handleApple}
+              className="w-full h-[52px] rounded-md bg-foreground text-background font-medium transition-colors flex items-center justify-center gap-2 active:opacity-90"
+            >
+              <Apple className="w-5 h-5" strokeWidth={1.75} />
+              Continue with Apple
+            </button>
 
             <button
               onClick={handleGoogle}
