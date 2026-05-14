@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
 const APP_VERSION = '1.0.0';
-// TODO when the policy is hosted, replace with the live URL.
-const PRIVACY_POLICY_URL: string | null = null;
+const PRIVACY_POLICY_URL: string | null =
+  'https://www.termsfeed.com/live/00f81b1d-cab0-4059-93ed-1103b7603d30';
 
 export function ProfilePage() {
   const { user, signOut } = useAuth();
