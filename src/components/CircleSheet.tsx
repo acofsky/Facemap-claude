@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Loader2, Trash2 } from 'lucide-react';
 import { DragHandle } from '@/components/DragHandle';
 import { haptics } from '@/lib/haptics';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { toast } from 'sonner';
 import { ColorPicker } from '@/components/ColorPicker';
 import { useCreateCircle, useUpdateCircle, useDeleteCircle } from '@/hooks/use-data';
@@ -17,6 +18,7 @@ interface CircleSheetProps {
 }
 
 export function CircleSheet({ circle, onClose }: CircleSheetProps) {
+  useScrollLock();
   const isEdit = !!circle;
   const [name, setName] = useState(circle?.name ?? '');
   const [emoji, setEmoji] = useState(circle?.emoji ?? '📌');

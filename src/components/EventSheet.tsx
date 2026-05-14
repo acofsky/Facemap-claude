@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ColorPicker } from '@/components/ColorPicker';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 import {
   useCreateEvent, useUpdateEvent, useArchiveEvent, useDeleteEvent,
   useSetPersonEvents, usePersons,
@@ -38,6 +39,9 @@ interface EventSheetProps {
 }
 
 export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheetProps) {
+  // Freeze the page underneath while the sheet is open — see comment in
+  // useScrollLock for the underlying iOS WebView behavior.
+  useScrollLock();
   const isEdit = !!event;
   const [name, setName] = useState(event?.name ?? suggestion?.name ?? '');
   const [tone, setTone] = useState<Tone>(isValidTone(event?.tone) ? event!.tone : 'red');

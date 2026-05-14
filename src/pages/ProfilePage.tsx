@@ -224,11 +224,11 @@ export function ProfilePage() {
       {settingsOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/60 animate-fade-in"
+            className="fixed inset-0 z-[60] bg-black/60 animate-fade-in"
             onClick={() => setSettingsOpen(null)}
           />
           <div
-            className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 border-t border-[hsl(0_0%_100%/0.12)] rounded-t-2xl overflow-y-auto safe-bottom z-50 animate-scale-in"
+            className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 border-t border-[hsl(0_0%_100%/0.12)] rounded-t-2xl overflow-y-auto safe-bottom z-[60] animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-surface-2 flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]">

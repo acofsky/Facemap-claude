@@ -11,6 +11,7 @@ import {
   useCreateEvent, useSetPersonEvents, usePersons, useEvents,
 } from '@/hooks/use-data';
 import { useSmartClusters } from '@/hooks/use-smart-clusters';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { matchSheetInputToCluster } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,10 @@ interface QuickAddSheetProps {
 }
 
 export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetProps) {
+  // Freeze the page underneath so iOS doesn't scroll <main> to keep the
+  // autofocused name input "in view" — the input is in a fixed sheet, but
+  // WebView doesn't know that and bumps the underlying page.
+  useScrollLock();
   const [name, setName] = useState('');
   const [whereWhen, setWhereWhen] = useState('');
   const [dateMet, setDateMet] = useState('');

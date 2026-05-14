@@ -6,6 +6,7 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { usePersons } from '@/hooks/use-data';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface PersonPickerSheetProps {
   /** Sheet header text. */
@@ -36,6 +37,7 @@ export function PersonPickerSheet({
   onPick,
   onClose,
 }: PersonPickerSheetProps) {
+  useScrollLock();
   const { data: people = [] } = usePersons();
   const [query, setQuery] = useState('');
 

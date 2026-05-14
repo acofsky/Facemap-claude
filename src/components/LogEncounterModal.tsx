@@ -5,6 +5,7 @@ import { Search, ArrowLeft, Loader2, Check, CalendarDays, MapPin, NotebookPen, X
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface LogEncounterModalProps {
   open: boolean;
@@ -12,6 +13,8 @@ interface LogEncounterModalProps {
 }
 
 export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
+  // Lock background scroll while the modal is mounted (see useScrollLock).
+  useScrollLock(open);
   const { data: people = [] } = usePersons();
   const createMeeting = useCreateMeeting();
 

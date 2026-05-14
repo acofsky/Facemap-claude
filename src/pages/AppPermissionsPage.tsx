@@ -83,7 +83,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 36, stiffness: 380 }}
-      className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
+      className="fixed inset-0 z-[60] bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : undefined,

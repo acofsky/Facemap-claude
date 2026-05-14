@@ -45,7 +45,6 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       }
     }
     update({ eod: { ...prefs.eod, enabled: next } });
-    toast.success(next ? 'End-of-day reminder scheduled.' : 'End-of-day reminder off.');
   };
 
   return (
@@ -54,7 +53,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 36, stiffness: 380 }}
-      className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
+      className="fixed inset-0 z-[60] bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : undefined,
@@ -128,10 +127,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
             label="Weekly summary"
             sub="Friday evening reminder to look back at who you added and saw this week"
             value={prefs.weeklySummary}
-            onChange={(v) => {
-              update({ weeklySummary: v });
-              toast.success(v ? 'Weekly summary scheduled for Friday 7 PM.' : 'Weekly summary off.');
-            }}
+            onChange={(v) => update({ weeklySummary: v })}
           />
         </SectionCard>
 

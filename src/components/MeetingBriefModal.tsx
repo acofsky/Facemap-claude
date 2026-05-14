@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { AIBadge } from '@/components/AIBadge';
 import { DragHandle } from '@/components/DragHandle';
 import { haptics } from '@/lib/haptics';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface MeetingBriefModalProps {
   personId: string;
@@ -14,6 +15,7 @@ interface MeetingBriefModalProps {
 }
 
 export function MeetingBriefModal({ personId, personName, onClose }: MeetingBriefModalProps) {
+  useScrollLock();
   const [loading, setLoading] = useState(true);
   const [brief, setBrief] = useState('');
   const [copied, setCopied] = useState(false);
