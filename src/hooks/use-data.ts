@@ -6,7 +6,9 @@ import {
   addPersonToCircle, removePersonFromCircle,
   uploadPhoto,
   fetchConnections, createConnection, deleteConnection,
-  fetchMeetingsForPerson, createMeeting, updateMeeting, deleteMeeting,
+  fetchMeetingsForPerson, fetchRecentMeetings, createMeeting, updateMeeting, deleteMeeting,
+  fetchEvents, createEvent, updateEvent, archiveEvent, deleteEvent,
+  fetchPersonEvents, setPersonEvents,
 } from '@/lib/store';
 import type { TablesUpdate } from '@/integrations/supabase/types';
 
@@ -69,7 +71,7 @@ export function useCreateCircle() {
 export function useUpdateCircle() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: { name?: string; emoji?: string; color?: string } }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof updateCircle>[1] }) =>
       updateCircle(id, updates),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['circles'] }),
   });
@@ -154,6 +156,71 @@ export function useMeetings(personId: string | null) {
     queryKey: ['meetings', personId],
     queryFn: () => fetchMeetingsForPerson(personId!),
     enabled: !!personId,
+  });
+}
+
+export function useRecentMeetings(sinceISODate: string) {
+  return useQuery({
+    queryKey: ['meetings', 'recent', sinceISODate],
+    queryFn: () => fetchRecentMeetings(sinceISODate),
+  });
+}
+
+// ---- Events ----
+
+export function useEvents(opts: { includeArchived?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['events', !!opts.includeArchived],
+    queryFn: () => fetchEvents(opts),
+  });
+}
+
+export function useCreateEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: createEvent,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  });
+}
+
+export function useUpdateEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof updateEvent>[1] }) =>
+      updateEvent(id, updates),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  });
+}
+
+export function useArchiveEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => archiveEvent(id, archived),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  });
+}
+
+export function useDeleteEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteEvent,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['events'] });
+      qc.invalidateQueries({ queryKey: ['person_events'] });
+    },
+  });
+}
+
+export function usePersonEvents() {
+  return useQuery({ queryKey: ['person_events'], queryFn: fetchPersonEvents });
+}
+
+export function useSetPersonEvents() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ personId, eventIds }: { personId: string; eventIds: string[] }) =>
+      setPersonEvents(personId, eventIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['person_events'] }),
   });
 }
 

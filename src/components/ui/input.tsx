@@ -2,13 +2,19 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// Visual Brief §4.4 — Surface 2 fill, 8px radius. Focus ring is the one red moment on a form screen:
+// 1px Primary Red border + 3px rgba(224,48,48,0.15) glow.
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
     return (
       <input
         type={type}
         className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "flex h-11 w-full rounded-md bg-surface-2 px-3.5 text-base text-foreground placeholder:text-muted-text",
+          "border border-[hsl(0_0%_100%/0.08)] transition-colors",
+          "focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15",
+          "disabled:cursor-not-allowed disabled:opacity-60",
+          "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
           className,
         )}
         ref={ref}

@@ -1,82 +1,86 @@
 import { ReactNode, useState } from 'react';
-import { Home, Users, CircleDot, Plus, Search, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Users, LayoutGrid, Search, User } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { QuickAddSheet } from './QuickAddSheet';
-import { RecallSearch } from './RecallSearch';
+import { LogEncounterModal } from './LogEncounterModal';
+import { CornerFabs } from './CornerFabs';
 
-type Tab = 'home' | 'people' | 'circles' | 'profile';
+export type Tab = 'home' | 'people' | 'circles' | 'recall' | 'profile';
 
 interface AppLayoutProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
-  onSelectPerson?: (id: string) => void;
   children: ReactNode;
 }
 
+// M2 — 5-tab IA per spec. Recall earns its own tab; FABs live in the corner.
 const tabs = [
-  { id: 'home' as Tab, icon: Home, label: 'Home' },
-  { id: 'people' as Tab, icon: Users, label: 'People' },
-  { id: 'circles' as Tab, icon: CircleDot, label: 'Circles' },
-  { id: 'profile' as Tab, icon: User, label: 'Profile' },
+  { id: 'home' as Tab,    icon: Home,        label: 'Home' },
+  { id: 'people' as Tab,  icon: Users,       label: 'People' },
+  { id: 'circles' as Tab, icon: LayoutGrid,  label: 'Circles' },
+  { id: 'recall' as Tab,  icon: Search,      label: 'Recall' },
+  { id: 'profile' as Tab, icon: User,        label: 'Profile' },
 ];
 
-export function AppLayout({ activeTab, onTabChange, onSelectPerson, children }: AppLayoutProps) {
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
+  const [logEncounterOpen, setLogEncounterOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background relative">
-      {/* Search FAB */}
-      <button
-        onClick={() => setSearchOpen(true)}
-        className="fixed top-4 right-4 z-30 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center hover:bg-accent transition-colors"
-      >
-        <Search className="w-4 h-4 text-muted-foreground" />
-      </button>
-
-      <main className="flex-1 overflow-y-auto pb-24">
+      {/* Notch cover — solid background overlay that always sits above the
+          safe-area-inset-top region. Anything that scrolls passes underneath
+          this, so content never peeks above the camera notch. */}
+      <div
+        aria-hidden="true"
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+      />
+      <main className="flex-1 overflow-y-auto pb-24 safe-top">
         {children}
       </main>
 
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-card/80 backdrop-blur-xl border-t border-border z-40">
-        <div className="flex items-center justify-around h-16 px-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors ${
-                activeTab === tab.id
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <tab.icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{tab.label}</span>
-            </button>
-          ))}
-        </div>
+      {/* Corner-anchored FABs (Visual Brief §4.2). Hidden when Recall tab is
+          active so the search field has breathing room. */}
+      {activeTab !== 'recall' && (
+        <CornerFabs
+          onAddPerson={() => setAddPersonOpen(true)}
+          onLogEncounter={() => setLogEncounterOpen(true)}
+        />
+      )}
 
-        {/* FAB */}
-        <button
-          onClick={() => setQuickAddOpen(true)}
-          className="absolute -top-7 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center warm-shadow-lg hover:scale-105 active:scale-95 transition-transform"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
+      {/* Bottom Nav — Surface 1, hairline top border, no blur. Hidden via CSS
+          when the keyboard is open (see html.kb-open .bottom-tabs in index.css). */}
+      <nav
+        className="bottom-tabs fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 safe-bottom"
+        style={{ backgroundColor: 'hsl(var(--surface-1))', borderTop: '1px solid hsl(0 0% 100% / 0.08)' }}
+      >
+        <div className="flex items-stretch justify-around h-16 px-1">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                aria-label={tab.label}
+                aria-current={active ? 'page' : undefined}
+                className="flex flex-col items-center justify-center gap-0.5 flex-1 transition-colors min-w-[44px]"
+                style={{ color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-text))' }}
+              >
+                <tab.icon className="w-5 h-5" strokeWidth={1.75} />
+                <span className="text-[10px] font-medium tracking-wide">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       <AnimatePresence>
-        {quickAddOpen && (
-          <QuickAddSheet onClose={() => setQuickAddOpen(false)} />
-        )}
-        {searchOpen && onSelectPerson && (
-          <RecallSearch
-            onClose={() => setSearchOpen(false)}
-            onSelectPerson={(id) => { setSearchOpen(false); onSelectPerson(id); }}
-          />
+        {addPersonOpen && (
+          <QuickAddSheet onClose={() => setAddPersonOpen(false)} />
         )}
       </AnimatePresence>
+
+      <LogEncounterModal open={logEncounterOpen} onClose={() => setLogEncounterOpen(false)} />
     </div>
   );
 }

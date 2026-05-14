@@ -1,72 +1,70 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { Plus, Loader2, ChevronDown, Archive, Pencil, Trash2 } from 'lucide-react';
 import {
-  useCircles, usePersons, usePersonCircles,
-  useCreateCircle, useUpdateCircle, useDeleteCircle,
-  useAddPersonToCircle, useRemovePersonFromCircle,
+  useCircles, useCreateCircle, usePersonCircles, useEvents, usePersonEvents,
+  useArchiveEvent, useDeleteCircle, useDeleteEvent,
 } from '@/hooks/use-data';
-import { PersonAvatar } from '@/components/PersonAvatar';
-import { Plus, X, Loader2, Trash2, Pencil, Check, UserPlus, UserMinus } from 'lucide-react';
+import { CircleSheet } from '@/components/CircleSheet';
+import { EventSheet } from '@/components/EventSheet';
+import { useLongPress } from '@/hooks/use-long-press';
+import { isValidTone, TONES, type Event as MembrEvent, type Tone, type Circle } from '@/lib/store';
+import { cn } from '@/lib/utils';
 
 interface CirclesPageProps {
-  onSelectPerson: (id: string) => void;
+  onSelectCircle: (id: string) => void;
+  onSelectEvent: (id: string) => void;
 }
 
-export function CirclesPage({ onSelectPerson }: CirclesPageProps) {
+function circleTone(c: { id: string; tone?: string | null }): Tone {
+  if (isValidTone(c.tone)) return c.tone;
+  let hash = 0;
+  for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
+  return TONES[hash % TONES.length];
+}
+
+const CIRCLE_SUGGESTIONS = [
+  { emoji: '🎓', name: 'School' },
+  { emoji: '🏫', name: 'Childhood' },
+  { emoji: '💼', name: 'Work' },
+  { emoji: '🏋️', name: 'Gym' },
+  { emoji: '🎲', name: 'Randoms' },
+];
+
+export function CirclesPage({ onSelectCircle, onSelectEvent }: CirclesPageProps) {
   const { data: circles = [], isLoading } = useCircles();
-  const { data: people = [] } = usePersons();
   const { data: personCircles = [] } = usePersonCircles();
-  const createCircle = useCreateCircle();
-  const updateCircle = useUpdateCircle();
+  const { data: events = [] } = useEvents({ includeArchived: false });
+  const { data: archivedEvents = [] } = useEvents({ includeArchived: true });
+  const { data: personEvents = [] } = usePersonEvents();
+  const archiveEvt = useArchiveEvent();
   const deleteCircle = useDeleteCircle();
-  const addToCircle = useAddPersonToCircle();
-  const removeFromCircle = useRemovePersonFromCircle();
+  const deleteEvent = useDeleteEvent();
+  const createCircle = useCreateCircle();
 
-  const [expandedCircle, setExpandedCircle] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmoji, setNewEmoji] = useState('📌');
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [circleSheetOpen, setCircleSheetOpen] = useState(false);
+  const [eventSheetOpen, setEventSheetOpen] = useState<{ event?: MembrEvent } | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  // Long-press context menu for circle/event tiles.
+  const [tileMenu, setTileMenu] = useState<
+    | { kind: 'circle'; id: string; x: number; y: number }
+    | { kind: 'event'; id: string; x: number; y: number }
+    | null
+  >(null);
 
-  // Editing state
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editEmoji, setEditEmoji] = useState('');
-
-  // Add people mode
-  const [addingPeopleCircle, setAddingPeopleCircle] = useState<string | null>(null);
-
-  const handleAdd = async () => {
-    if (!newName.trim()) return;
-    await createCircle.mutateAsync({ name: newName, emoji: newEmoji, color: 'hsl(16, 65%, 55%)' });
-    setNewName('');
-    setNewEmoji('📌');
-    setShowAdd(false);
+  const openContextMenu = (kind: 'circle' | 'event', id: string, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    setTileMenu({ kind, id, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } as typeof tileMenu);
   };
 
-  const startEdit = (circle: { id: string; name: string; emoji: string }) => {
-    setEditingId(circle.id);
-    setEditName(circle.name);
-    setEditEmoji(circle.emoji);
-  };
+  const archivedOnly = useMemo(
+    () => archivedEvents.filter((e) => e.archived_at !== null),
+    [archivedEvents],
+  );
 
-  const saveEdit = async () => {
-    if (!editingId || !editName.trim()) return;
-    await updateCircle.mutateAsync({ id: editingId, updates: { name: editName, emoji: editEmoji } });
-    setEditingId(null);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this circle? People will not be removed.')) return;
-    await deleteCircle.mutateAsync(id);
-    if (expandedCircle === id) setExpandedCircle(null);
-  };
-
-  const togglePersonInCircle = async (personId: string, circleId: string, isInCircle: boolean) => {
-    if (isInCircle) {
-      await removeFromCircle.mutateAsync({ personId, circleId });
-    } else {
-      await addToCircle.mutateAsync({ personId, circleId });
-    }
-  };
+  const circleMemberCount = (id: string) => personCircles.filter((pc) => pc.circle_id === id).length;
+  const eventMemberCount = (id: string) => personEvents.filter((pe) => pe.event_id === id).length;
 
   if (isLoading) {
     return (
@@ -77,48 +75,57 @@ export function CirclesPage({ onSelectPerson }: CirclesPageProps) {
   }
 
   return (
-    <div className="px-5 pt-12 animate-fade-in">
-      <div className="mb-6 pr-14">
-        <h1 className="text-3xl font-display text-foreground">Circles</h1>
+    <div className="pb-8 animate-fade-in">
+      {/* Nav bar */}
+      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+        <span className="w-9" />
+        <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
+        <div className="relative">
+          <button
+            onClick={() => setAddMenuOpen((v) => !v)}
+            onBlur={() => setTimeout(() => setAddMenuOpen(false), 150)}
+            aria-label="Create"
+            className="w-9 h-9 -mr-2 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+          >
+            <Plus className="w-5 h-5" strokeWidth={1.75} />
+          </button>
+          {addMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+              <button
+                onClick={() => {
+                  setCircleSheetOpen(true);
+                  setAddMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+              >
+                New Circle
+              </button>
+              <button
+                onClick={() => {
+                  setEventSheetOpen({});
+                  setAddMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+              >
+                New Event
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {showAdd && (
-        <div className="flex gap-2 mb-6 animate-scale-in">
-          <input
-            value={newEmoji}
-            onChange={e => setNewEmoji(e.target.value)}
-            className="w-12 px-2 py-2.5 rounded-xl bg-muted text-center text-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
-            maxLength={2}
-          />
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Circle name..."
-            className="flex-1 px-4 py-2.5 rounded-xl bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
-            autoFocus
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-          <button onClick={handleAdd} className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium">
-            Add
-          </button>
-        </div>
-      )}
-
-      {circles.length === 0 && !showAdd && (
-        <div className="mb-6 space-y-3">
-          <p className="text-sm text-muted-foreground">Quick start with a suggestion:</p>
+      {/* Suggestions in empty state */}
+      {circles.length === 0 && (
+        <div className="px-5 mb-6">
+          <p className="text-[13px] text-muted-text mb-2.5">Quick start with a suggestion:</p>
           <div className="flex flex-wrap gap-2">
-            {[
-              { emoji: '🎓', name: 'School' },
-              { emoji: '💒', name: 'Childhood' },
-              { emoji: '💼', name: 'Work' },
-              { emoji: '🏋️', name: 'Gym' },
-              { emoji: '🎲', name: 'Randoms' },
-            ].map(s => (
+            {CIRCLE_SUGGESTIONS.map((s) => (
               <button
                 key={s.name}
-                onClick={() => createCircle.mutateAsync({ name: s.name, emoji: s.emoji, color: 'hsl(16, 65%, 55%)' })}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-sm text-foreground hover:bg-accent/30 transition-colors"
+                onClick={() =>
+                  createCircle.mutateAsync({ name: s.name, emoji: s.emoji, color: 'hsl(0, 75%, 53%)', tone: 'red' })
+                }
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground hover:border-[hsl(0_0%_100%/0.14)] transition-colors"
               >
                 <span>{s.emoji}</span>
                 <span>{s.name}</span>
@@ -128,147 +135,311 @@ export function CirclesPage({ onSelectPerson }: CirclesPageProps) {
         </div>
       )}
 
-      <div className="space-y-3">
-        {circles.map(circle => {
-          const circlePeopleIds = personCircles
-            .filter(pc => pc.circle_id === circle.id)
-            .map(pc => pc.person_id);
-          const circlePeople = people.filter(p => circlePeopleIds.includes(p.id));
-          const nonCirclePeople = people.filter(p => !circlePeopleIds.includes(p.id));
-          const isExpanded = expandedCircle === circle.id;
-          const isEditing = editingId === circle.id;
-          const isAddingPeople = addingPeopleCircle === circle.id;
+      {/* Circles tier */}
+      <SectionLabel>Circles</SectionLabel>
+      {circles.length > 0 ? (
+        <div className="px-5 grid grid-cols-2 gap-3">
+          {circles.map((circle) => (
+            <CircleTile
+              key={circle.id}
+              circle={circle}
+              memberCount={circleMemberCount(circle.id)}
+              onTap={() => onSelectCircle(circle.id)}
+              onLongPress={(target) => openContextMenu('circle', circle.id, target)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="px-5">
+          <p className="text-[13px] text-muted-text italic">No Circles yet. Tap + above to create one.</p>
+        </div>
+      )}
 
-          return (
-            <div key={circle.id} className="rounded-xl bg-card warm-shadow overflow-hidden">
-              {/* Circle header */}
-              {isEditing ? (
-                <div className="flex items-center gap-2 p-3">
-                  <input
-                    value={editEmoji}
-                    onChange={e => setEditEmoji(e.target.value)}
-                    className="w-10 px-1 py-1.5 rounded-lg bg-muted text-center text-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    maxLength={2}
-                  />
-                  <input
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-muted text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                  />
-                  <button onClick={saveEdit} className="p-1.5 rounded-lg bg-primary text-primary-foreground">
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <button
-                    onClick={() => setExpandedCircle(isExpanded ? null : circle.id)}
-                    className="flex-1 flex items-center gap-3 p-4 hover:bg-secondary/40 transition-colors"
-                  >
-                    <span className="text-2xl">{circle.emoji}</span>
-                    <div className="flex-1 text-left">
-                      <div className="font-display text-base text-foreground">{circle.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {circlePeople.length} {circlePeople.length === 1 ? 'person' : 'people'}
-                      </div>
+      {/* Section divider */}
+      <div className="mx-5 my-6 h-px bg-[hsl(0_0%_100%/0.08)]" />
+
+      {/* Events tier */}
+      <SectionLabel>Events</SectionLabel>
+      {events.length > 0 ? (
+        <div className="px-5 grid grid-cols-2 gap-3">
+          {events.map((evt) => (
+            <EventTile
+              key={evt.id}
+              event={evt}
+              memberCount={eventMemberCount(evt.id)}
+              onTap={() => onSelectEvent(evt.id)}
+              onLongPress={(target) => openContextMenu('event', evt.id, target)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="px-5">
+          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-5 text-center">
+            <button
+              onClick={() => setEventSheetOpen({})}
+              className="text-[13px] text-primary font-semibold"
+            >
+              + Log a trip, dinner, or event
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Archived link */}
+      {archivedOnly.length > 0 && (
+        <div className="px-5 mt-4">
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-text hover:text-foreground transition-colors"
+          >
+            <Archive className="w-3.5 h-3.5" strokeWidth={1.75} />
+            Archived ({archivedOnly.length})
+            <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showArchived && 'rotate-180')} strokeWidth={1.75} />
+          </button>
+          {showArchived && (
+            <div className="mt-3 space-y-2">
+              {archivedOnly.map((evt) => (
+                <div
+                  key={evt.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)]"
+                >
+                  <button onClick={() => onSelectEvent(evt.id)} className="min-w-0 flex-1 text-left">
+                    <div className="text-[14px] font-medium text-foreground truncate">{evt.name}</div>
+                    <div className="text-[12px] text-muted-text">
+                      {eventMemberCount(evt.id)} {eventMemberCount(evt.id) === 1 ? 'member' : 'members'}
+                      {(evt.start_date || evt.end_date) && ` · ${formatRange(evt.start_date, evt.end_date)}`}
                     </div>
                   </button>
-                  <div className="flex items-center gap-1 pr-3">
-                    <button
-                      onClick={() => startEdit(circle)}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(circle.id)}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => archiveEvt.mutate({ id: evt.id, archived: false })}
+                    className="text-[12px] font-semibold text-primary"
+                  >
+                    Unarchive
+                  </button>
                 </div>
-              )}
-
-              {/* Expanded content */}
-              {isExpanded && (
-                <div className="border-t border-border">
-                  {/* People in circle */}
-                  <div className="px-4 pt-3 pb-2">
-                    {circlePeople.length > 0 ? (
-                      <div className="space-y-1">
-                        {circlePeople.map(p => (
-                          <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg group">
-                            <button
-                              onClick={() => onSelectPerson(p.id)}
-                              className="flex-1 flex items-center gap-3 hover:bg-muted rounded-lg transition-colors"
-                            >
-                              <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                              <span className="text-sm font-medium text-foreground">{p.name}</span>
-                            </button>
-                            <button
-                              onClick={() => togglePersonInCircle(p.id, circle.id, true)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                              title="Remove from circle"
-                            >
-                              <UserMinus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground py-1">No people in this circle yet.</p>
-                    )}
-                  </div>
-
-                  {/* Add people toggle */}
-                  <div className="px-4 pb-3">
-                    <button
-                      onClick={() => setAddingPeopleCircle(isAddingPeople ? null : circle.id)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-primary hover:opacity-80 transition-opacity"
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      {isAddingPeople ? 'Done adding' : 'Add people'}
-                    </button>
-
-                    {isAddingPeople && nonCirclePeople.length > 0 && (
-                      <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
-                        {nonCirclePeople.map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => togglePersonInCircle(p.id, circle.id, false)}
-                            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors"
-                          >
-                            <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                            <span className="text-sm text-foreground">{p.name}</span>
-                            <Plus className="w-3.5 h-3.5 text-primary ml-auto" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {isAddingPeople && nonCirclePeople.length === 0 && (
-                      <p className="text-xs text-muted-foreground mt-2">Everyone is already in this circle.</p>
-                    )}
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
-          );
-        })}
+          )}
+        </div>
+      )}
 
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-card border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-secondary/40 transition-colors w-fit"
+      <AnimatePresence>
+        {circleSheetOpen && (
+          <CircleSheet
+            onClose={(result) => {
+              setCircleSheetOpen(false);
+              if (result && 'id' in result) onSelectCircle(result.id);
+            }}
+          />
+        )}
+        {eventSheetOpen && (
+          <EventSheet event={eventSheetOpen.event} onClose={() => setEventSheetOpen(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Long-press context menu */}
+      {tileMenu && (
+        <div
+          className="fixed inset-0 z-[55]"
+          onPointerDown={() => setTileMenu(null)}
         >
-          {showAdd ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {showAdd ? 'Cancel' : 'New circle'}
-        </button>
-      </div>
+          <div
+            className="absolute w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 shadow-xl"
+            style={{
+              left: Math.max(12, Math.min(window.innerWidth - 188, tileMenu.x - 88)),
+              top: Math.max(12, tileMenu.y),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {tileMenu.kind === 'circle' ? (
+              <>
+                <MenuItem
+                  icon={Pencil}
+                  label="Edit"
+                  onClick={() => {
+                    const c = circles.find((x) => x.id === tileMenu.id);
+                    setTileMenu(null);
+                    if (c) onSelectCircle(c.id);
+                  }}
+                />
+                <MenuItem
+                  icon={Trash2}
+                  destructive
+                  label="Delete"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    if (confirm('Delete this Circle? People will not be removed from Membr.')) {
+                      await deleteCircle.mutateAsync(tileMenu.id);
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <MenuItem
+                  icon={Pencil}
+                  label="Edit"
+                  onClick={() => {
+                    const evt = events.find((x) => x.id === tileMenu.id) || archivedEvents.find((x) => x.id === tileMenu.id);
+                    setTileMenu(null);
+                    if (evt) setEventSheetOpen({ event: evt });
+                  }}
+                />
+                <MenuItem
+                  icon={Archive}
+                  label="Archive"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    await archiveEvt.mutateAsync({ id: tileMenu.id, archived: true });
+                  }}
+                />
+                <MenuItem
+                  icon={Trash2}
+                  destructive
+                  label="Delete"
+                  onClick={async () => {
+                    setTileMenu(null);
+                    if (confirm('Delete this Event? Members stay in your Membr.')) {
+                      await deleteEvent.mutateAsync(tileMenu.id);
+                    }
+                  }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function CircleTile({
+  circle,
+  memberCount,
+  onTap,
+  onLongPress,
+}: {
+  circle: Circle;
+  memberCount: number;
+  onTap: () => void;
+  onLongPress: (target: HTMLElement) => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const longPress = useLongPress(() => {
+    if (ref.current) onLongPress(ref.current);
+  });
+  // Founder override of spec §CIRCLES-01: Circles render as colour discs
+  // with name + count below, not 3:2 rectangles. Reads more like "circles".
+  return (
+    <button
+      ref={ref}
+      onClick={onTap}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (ref.current) onLongPress(ref.current);
+      }}
+      {...longPress}
+      className="flex flex-col items-center gap-2 py-2 transition-transform active:scale-[0.97]"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white/95',
+          `tile-${circleTone(circle)}`,
+        )}
+      >
+        {circle.emoji || ''}
+      </span>
+      <span className="text-[14px] font-semibold text-foreground text-center max-w-full px-2 truncate">
+        {circle.name}
+      </span>
+      <span className="text-[11px] text-muted-text -mt-1">
+        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+      </span>
+    </button>
+  );
+}
+
+function EventTile({
+  event,
+  memberCount,
+  onTap,
+  onLongPress,
+}: {
+  event: MembrEvent;
+  memberCount: number;
+  onTap: () => void;
+  onLongPress: (target: HTMLElement) => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const longPress = useLongPress(() => {
+    if (ref.current) onLongPress(ref.current);
+  });
+  return (
+    <button
+      ref={ref}
+      onClick={onTap}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (ref.current) onLongPress(ref.current);
+      }}
+      {...longPress}
+      className={cn(
+        'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
+        `tile-${isValidTone(event.tone) ? event.tone : 'red'}`,
+      )}
+    >
+      <div className="text-[15px] font-semibold text-white truncate">{event.name}</div>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[12px] text-white/70">
+          {memberCount} {memberCount === 1 ? 'member' : 'members'}
+        </span>
+        {(event.start_date || event.end_date) && (
+          <span className="text-[11px] text-white/60">{formatRange(event.start_date, event.end_date)}</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  destructive,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center gap-2',
+        destructive ? 'text-destructive' : 'text-foreground',
+      )}
+    >
+      <Icon className="w-4 h-4" strokeWidth={1.75} />
+      {label}
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-5 mb-3">
+      <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">{children}</h2>
+    </div>
+  );
+}
+
+function formatRange(start: string | null, end: string | null): string {
+  if (!start && !end) return '';
+  const fmt = (s: string) => new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (start && !end) return fmt(start);
+  if (!start && end) return fmt(end);
+  if (start === end) return fmt(start!);
+  return `${fmt(start!)} – ${fmt(end!)}`;
 }

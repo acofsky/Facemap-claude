@@ -21,6 +21,7 @@ export type Database = {
           emoji: string
           id: string
           name: string
+          tone: string
           user_id: string | null
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           emoji?: string
           id?: string
           name: string
+          tone?: string
           user_id?: string | null
         }
         Update: {
@@ -37,9 +39,85 @@ export type Database = {
           emoji?: string
           id?: string
           name?: string
+          tone?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      events: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          tone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      person_events: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          person_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          person_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          person_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_events_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       connections: {
         Row: {

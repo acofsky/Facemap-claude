@@ -6,6 +6,22 @@ export type Circle = Tables<'circles'>;
 export type PersonCircle = Tables<'person_circles'>;
 export type Connection = Tables<'connections'>;
 export type Meeting = Tables<'meetings'>;
+export type Event = Tables<'events'>;
+export type PersonEvent = Tables<'person_events'>;
+
+/**
+ * Twelve named tones, ordered around the colour wheel so the picker reads
+ * as a spectrum (red → orange → … → rose → slate). Source of truth for
+ * tile gradients; the matching `.tile-{name}` classes live in index.css.
+ */
+export const TONES = [
+  'red', 'orange', 'amber', 'green', 'mint', 'teal',
+  'blue', 'indigo', 'purple', 'fuchsia', 'rose', 'slate',
+] as const;
+export type Tone = (typeof TONES)[number];
+export function isValidTone(t: string | null | undefined): t is Tone {
+  return !!t && (TONES as readonly string[]).includes(t);
+}
 
 // ---- Persons ----
 
@@ -18,7 +34,9 @@ export async function fetchPersons(): Promise<Person[]> {
   return data;
 }
 
-export async function fetchPerson(id: string): Promise<Person & { circleIds: string[] }> {
+export async function fetchPerson(
+  id: string,
+): Promise<Person & { circleIds: string[]; eventIds: string[] }> {
   const { data, error } = await supabase
     .from('persons')
     .select('*')
@@ -26,12 +44,16 @@ export async function fetchPerson(id: string): Promise<Person & { circleIds: str
     .single();
   if (error) throw error;
 
-  const { data: pc } = await supabase
-    .from('person_circles')
-    .select('circle_id')
-    .eq('person_id', id);
+  const [{ data: pc }, { data: pe }] = await Promise.all([
+    supabase.from('person_circles').select('circle_id').eq('person_id', id),
+    supabase.from('person_events').select('event_id').eq('person_id', id),
+  ]);
 
-  return { ...data, circleIds: (pc || []).map(r => r.circle_id) };
+  return {
+    ...data,
+    circleIds: (pc || []).map((r) => r.circle_id),
+    eventIds: (pe || []).map((r) => r.event_id),
+  };
 }
 
 export async function createPerson(input: Partial<{
@@ -98,7 +120,7 @@ export async function fetchCircles(): Promise<Circle[]> {
   return data;
 }
 
-export async function createCircle(input: { name: string; emoji: string; color: string }): Promise<Circle> {
+export async function createCircle(input: { name: string; emoji: string; color: string; tone?: string }): Promise<Circle> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { data, error } = await supabase
@@ -110,7 +132,7 @@ export async function createCircle(input: { name: string; emoji: string; color: 
   return data;
 }
 
-export async function updateCircle(id: string, updates: { name?: string; emoji?: string; color?: string }): Promise<Circle> {
+export async function updateCircle(id: string, updates: { name?: string; emoji?: string; color?: string; tone?: string }): Promise<Circle> {
   const { data, error } = await supabase
     .from('circles')
     .update(updates)
@@ -201,6 +223,16 @@ export async function fetchMeetingsForPerson(personId: string): Promise<Meeting[
   return data;
 }
 
+export async function fetchRecentMeetings(sinceISODate: string): Promise<Meeting[]> {
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('*')
+    .gte('meeting_date', sinceISODate)
+    .order('meeting_date', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function createMeeting(input: { person_id: string; meeting_date: string; place?: string; notes?: string }): Promise<Meeting> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -271,5 +303,102 @@ export async function getPhotoUrl(pathOrUrl: string): Promise<string> {
     expiresAt: Date.now() + 55 * 60 * 1000,
   });
   return data.signedUrl;
+}
+
+// ---- Events ----
+
+export async function fetchEvents(opts: { includeArchived?: boolean } = {}): Promise<Event[]> {
+  let q = supabase
+    .from('events')
+    .select('*')
+    .order('start_date', { ascending: false, nullsFirst: false });
+  if (!opts.includeArchived) q = q.is('archived_at', null);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+
+export async function createEvent(input: {
+  name: string;
+  tone?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+}): Promise<Event> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { data, error } = await supabase
+    .from('events')
+    .insert({
+      user_id: user.id,
+      name: input.name,
+      tone: input.tone || 'red',
+      start_date: input.start_date || null,
+      end_date: input.end_date || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateEvent(
+  id: string,
+  updates: Partial<{ name: string; tone: string; start_date: string | null; end_date: string | null }>,
+): Promise<Event> {
+  const { data, error } = await supabase
+    .from('events')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function archiveEvent(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('events')
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const { error } = await supabase.from('events').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---- person_events join ----
+
+export async function fetchPersonEvents(): Promise<PersonEvent[]> {
+  const { data, error } = await supabase.from('person_events').select('*');
+  if (error) throw error;
+  return data;
+}
+
+export async function setPersonEvents(personId: string, eventIds: string[]): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { data: existing } = await supabase
+    .from('person_events')
+    .select('id, event_id')
+    .eq('person_id', personId);
+  const currentIds = new Set((existing || []).map((r) => r.event_id));
+  const nextIds = new Set(eventIds);
+  const toAdd = [...nextIds].filter((id) => !currentIds.has(id));
+  const toRemove = (existing || []).filter((r) => !nextIds.has(r.event_id));
+  if (toAdd.length > 0) {
+    const { error } = await supabase
+      .from('person_events')
+      .insert(toAdd.map((event_id) => ({ user_id: user.id, person_id: personId, event_id })));
+    if (error) throw error;
+  }
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from('person_events')
+      .delete()
+      .in('id', toRemove.map((r) => r.id));
+    if (error) throw error;
+  }
 }
 

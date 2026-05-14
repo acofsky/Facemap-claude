@@ -28,7 +28,7 @@ export async function pickIOSContact(): Promise<{ id: string; name: string } | n
   return { id: c.contactId, name };
 }
 
-// ---------- Smart extraction from free-text FaceMap fields ----------
+// ---------- Smart extraction from free-text Membr fields ----------
 
 const PHONE_RE = /(\+?\d[\d\s().-]{7,}\d)/;
 const EMAIL_RE = /([\w.+-]+@[\w-]+\.[\w.-]+)/;
@@ -91,8 +91,8 @@ function buildNote(p: PersonForExport): string | undefined {
   if (p.important_info) lines.push(`Important: ${p.important_info}`);
   if (p.misc_notes) lines.push(`Notes: ${p.misc_notes}`);
   if (p.known_people_notes) lines.push(`Knows: ${p.known_people_notes}`);
-  if (lines.length === 0) return 'Linked from FaceMap';
-  return ['— From FaceMap —', ...lines].join('\n');
+  if (lines.length === 0) return 'Linked from Membr';
+  return ['— From Membr —', ...lines].join('\n');
 }
 
 async function fetchPhotoBase64(photoPath: string): Promise<string | null> {
@@ -128,7 +128,7 @@ export interface PersonForExport {
 }
 
 /**
- * Create an iOS contact from a full FaceMap person, porting over anything
+ * Create an iOS contact from a full Membr person, porting over anything
  * that maps cleanly to a Contacts field.
  */
 export async function createIOSContactFromPerson(p: PersonForExport): Promise<string | null> {

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>FaceMap</string>
+	<string>Membr</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,8 +33,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
@@ -43,13 +41,17 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<true/>
+	<false/>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
 	<key>NSCameraUsageDescription</key>
-	<string>FaceMap uses the camera to take photos of people you meet so you can remember them.</string>
+	<string>Membr uses your camera to add a photo to a person's record, so you can put a face to the name.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>FaceMap can attach photos from your library to people you meet.</string>
+	<string>Membr uses your photo library to let you add a photo to a person's record.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>FaceMap links the people you remember to entries in your iOS Contacts.</string>
+	<string>Membr uses your contacts to let you link a Membr person record to an existing iPhone contact.</string>
 </dict>
 </plist>

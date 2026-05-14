@@ -1,49 +1,90 @@
 import { useState, useMemo } from 'react';
-import { usePersons, useCircles, usePersonCircles } from '@/hooks/use-data';
+import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
-import { Search, LayoutGrid, List, Loader2, ArrowDownAZ, Clock } from 'lucide-react';
+import { SwipeRow } from '@/components/SwipeRow';
+import { LogEncounterModal } from '@/components/LogEncounterModal';
+import { MeetingBriefModal } from '@/components/MeetingBriefModal';
+import { Search, Loader2, ListFilter, ChevronRight, ChevronDown, CalendarPlus, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { isValidTone } from '@/lib/store';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
 }
 
+type SortKey = 'recent' | 'az' | 'circle';
+
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: 'Recently Added',
+  az: 'Alphabetical A–Z',
+  circle: 'By Circle',
+};
+
+// Active filter is one chip at a time: 'all' or `${'circle'|'event'}:${id}`.
+type FilterKey = string | null;
+
 export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'list' | 'grid'>('list');
-  const [filterCircle, setFilterCircle] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'recent' | 'az'>('recent');
+  const [filter, setFilter] = useState<FilterKey>(null);
+  const [sortBy, setSortBy] = useState<SortKey>('recent');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [briefFor, setBriefFor] = useState<{ id: string; name: string } | null>(null);
 
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
   const { data: personCircles = [] } = usePersonCircles();
+  const { data: events = [] } = useEvents({ includeArchived: false });
+  const { data: personEvents = [] } = usePersonEvents();
 
   const personCircleMap = useMemo(() => {
     const map: Record<string, string[]> = {};
-    personCircles.forEach(pc => {
+    personCircles.forEach((pc) => {
       if (!map[pc.person_id]) map[pc.person_id] = [];
       map[pc.person_id].push(pc.circle_id);
     });
     return map;
   }, [personCircles]);
 
+  const personEventMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    personEvents.forEach((pe) => {
+      if (!map[pe.person_id]) map[pe.person_id] = [];
+      map[pe.person_id].push(pe.event_id);
+    });
+    return map;
+  }, [personEvents]);
+
   const filtered = useMemo(() => {
     let result = people;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.misc_notes?.toLowerCase().includes(q) ||
-        p.important_info?.toLowerCase().includes(q)
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.misc_notes?.toLowerCase().includes(q) ||
+          p.important_info?.toLowerCase().includes(q),
       );
     }
-    if (filterCircle) {
-      result = result.filter(p => (personCircleMap[p.id] || []).includes(filterCircle));
+    if (filter) {
+      const [kind, id] = filter.split(':');
+      if (kind === 'circle') {
+        result = result.filter((p) => (personCircleMap[p.id] || []).includes(id));
+      } else if (kind === 'event') {
+        result = result.filter((p) => (personEventMap[p.id] || []).includes(id));
+      }
     }
     if (sortBy === 'az') {
       result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'circle') {
+      result = [...result].sort((a, b) => {
+        const ac = personCircleMap[a.id]?.[0] ?? '~';
+        const bc = personCircleMap[b.id]?.[0] ?? '~';
+        return ac.localeCompare(bc) || a.name.localeCompare(b.name);
+      });
     }
     return result;
-  }, [people, search, filterCircle, sortBy, personCircleMap]);
+  }, [people, search, filter, sortBy, personCircleMap, personEventMap]);
 
   if (isLoading) {
     return (
@@ -54,142 +95,188 @@ export function PeoplePage({ onSelectPerson }: PeoplePageProps) {
   }
 
   return (
-    <div className="px-5 pt-12 pb-8 animate-fade-in">
-      <div className="flex items-end justify-between mb-5 pr-14">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Your network</p>
-          <h1 className="text-4xl font-display text-foreground leading-tight">People</h1>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-display text-foreground leading-none">{filtered.length}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{filtered.length === 1 ? 'shown' : 'shown'}</div>
+    <div className="pb-8 animate-fade-in">
+      {/* Nav bar */}
+      <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+        <span className="w-9" />
+        <h1 className="text-[17px] font-semibold text-foreground">People</h1>
+        <div className="relative">
+          <button
+            onClick={() => setSortOpen((v) => !v)}
+            onBlur={() => setTimeout(() => setSortOpen(false), 150)}
+            aria-label="Sort"
+            className="w-9 h-9 -mr-2 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+          >
+            <ListFilter className="w-5 h-5" strokeWidth={1.75} />
+          </button>
+          {sortOpen && (
+            <div className="absolute right-0 top-full mt-1 w-48 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setSortBy(key);
+                    setSortOpen(false);
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center justify-between',
+                    sortBy === key ? 'text-foreground' : 'text-muted-text',
+                  )}
+                >
+                  {SORT_LABELS[key]}
+                  {sortBy === key && <ChevronDown className="w-3 h-3 text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Search + view toggle */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      {/* Inline search */}
+      <div className="px-5 mb-3">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or notes..."
-            className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search names and notes…"
+            className="w-full h-11 pl-10 pr-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
           />
         </div>
-        <div className="flex rounded-2xl bg-white/5 border border-white/10 p-1">
-          <button
-            onClick={() => setView('list')}
-            className={`p-2 rounded-xl transition-colors ${view === 'list' ? 'bg-white/10 text-foreground' : 'text-muted-foreground'}`}
-            aria-label="List view"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setView('grid')}
-            className={`p-2 rounded-xl transition-colors ${view === 'grid' ? 'bg-white/10 text-foreground' : 'text-muted-foreground'}`}
-            aria-label="Grid view"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
-      {/* Sort */}
-      <div className="flex items-center gap-2 mb-3">
-        <button
-          onClick={() => setSortBy(sortBy === 'recent' ? 'az' : 'recent')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-foreground hover:bg-white/10 transition-colors"
-        >
-          {sortBy === 'recent' ? <Clock className="w-3 h-3" /> : <ArrowDownAZ className="w-3 h-3" />}
-          {sortBy === 'recent' ? 'Recent' : 'A–Z'}
-        </button>
-        <span className="text-[11px] text-muted-foreground">tap to switch</span>
-      </div>
-
-      {/* Circle filter pills */}
-      {circles.length > 0 && (
-        <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-hide">
-          <button
-            onClick={() => setFilterCircle(null)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              !filterCircle
-                ? 'bg-primary text-primary-foreground shadow-glow-primary'
-                : 'bg-white/5 border border-white/10 text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            All
-          </button>
-          {circles.map(c => (
-            <button
-              key={c.id}
-              onClick={() => setFilterCircle(filterCircle === c.id ? null : c.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                filterCircle === c.id
-                  ? 'bg-primary text-primary-foreground shadow-glow-primary'
-                  : 'bg-white/5 border border-white/10 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <span>{c.emoji}</span>
-              <span>{c.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 rounded-3xl warm-shadow">
-          <p className="text-muted-foreground text-sm">
-            {people.length === 0 ? 'No people yet. Tap + to add someone!' : 'No results found.'}
-          </p>
-        </div>
-      ) : view === 'list' ? (
-        <div className="rounded-3xl warm-shadow overflow-hidden divide-y divide-white/5">
-          {filtered.map(p => {
-            const cIds = personCircleMap[p.id] || [];
+      {/* Filter chips */}
+      {(circles.length > 0 || events.length > 0) && (
+        <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 px-5 scrollbar-hide">
+          <FilterChip active={!filter} onClick={() => setFilter(null)} label="All" />
+          {circles.map((c) => {
+            const key = `circle:${c.id}`;
             return (
-              <button
-                key={p.id}
-                onClick={() => onSelectPerson(p.id)}
-                className="w-full flex items-center gap-3 p-3.5 hover:bg-white/[0.04] transition-colors"
-              >
-                <PersonAvatar name={p.name} photo={p.photos[0]} size="sm" />
-                <div className="flex-1 text-left min-w-0">
-                  <div className="font-medium text-foreground truncate">{p.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {p.misc_notes || p.important_info || 'No notes yet'}
-                  </div>
-                </div>
-                {cIds.length > 0 && (
-                  <div className="flex gap-1">
-                    {cIds.slice(0, 3).map(cid => {
-                      const circle = circles.find(c => c.id === cid);
-                      return circle ? (
-                        <span key={cid} className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-xs">
-                          {circle.emoji}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-              </button>
+              <FilterChip
+                key={key}
+                active={filter === key}
+                onClick={() => setFilter(filter === key ? null : key)}
+                label={`${c.emoji ? `${c.emoji} ` : ''}${c.name}`}
+              />
+            );
+          })}
+          {events.map((e) => {
+            const key = `event:${e.id}`;
+            const tone = isValidTone(e.tone) ? e.tone : 'red';
+            return (
+              <FilterChip
+                key={key}
+                active={filter === key}
+                onClick={() => setFilter(filter === key ? null : key)}
+                label={e.name}
+                tone={tone}
+              />
             );
           })}
         </div>
+      )}
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className="px-5">
+          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-8 text-center">
+            <p className="text-sm text-muted-text">
+              {people.length === 0
+                ? 'No people yet. Tap the red + button to add someone.'
+                : 'No results.'}
+            </p>
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
-          {filtered.map(p => (
-            <button
-              key={p.id}
-              onClick={() => onSelectPerson(p.id)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl warm-shadow hover:scale-[1.03] transition-transform"
-            >
-              <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
-              <span className="text-xs font-medium text-foreground truncate w-full text-center">{p.name}</span>
-            </button>
-          ))}
+        <div className="px-5 space-y-2">
+          {filtered.map((p) => {
+            const cIds = personCircleMap[p.id] || [];
+            const cs = cIds.map((id) => circles.find((c) => c.id === id)).filter(Boolean);
+            return (
+              <SwipeRow
+                key={p.id}
+                className="rounded-lg"
+                actions={[
+                  {
+                    key: 'log',
+                    label: 'Log',
+                    background: 'hsl(var(--warning))',
+                    icon: <CalendarPlus className="w-4 h-4" strokeWidth={1.75} />,
+                    onTap: () => setLogOpen(true),
+                  },
+                  {
+                    key: 'brief',
+                    label: 'Brief',
+                    background: 'hsl(var(--primary))',
+                    icon: <Sparkles className="w-4 h-4" strokeWidth={1.75} />,
+                    onTap: () => setBriefFor({ id: p.id, name: p.name }),
+                  },
+                ]}
+              >
+                <button
+                  onClick={() => onSelectPerson(p.id)}
+                  className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                >
+                  <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-semibold text-foreground truncate">{p.name}</div>
+                    {cs.length > 0 ? (
+                      <div className="text-[12px] text-muted-text truncate">
+                        {cs.map((c) => c!.name).join(' · ')}
+                      </div>
+                    ) : (
+                      p.misc_notes && (
+                        <div className="text-[12px] text-muted-text truncate">
+                          {p.misc_notes.replace(/^\s*[•\-*]\s*/gm, '').slice(0, 60)}
+                        </div>
+                      )
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+                </button>
+              </SwipeRow>
+            );
+          })}
         </div>
       )}
+
+      <LogEncounterModal open={logOpen} onClose={() => setLogOpen(false)} />
+      {briefFor && (
+        <MeetingBriefModal
+          personId={briefFor.id}
+          personName={briefFor.name}
+          onClose={() => setBriefFor(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+  tone,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  /** Event chips get a gradient when active; circle/all chips stay Primary Red. */
+  tone?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'shrink-0 px-3 h-8 inline-flex items-center rounded-sm text-[12px] font-medium whitespace-nowrap transition-colors border',
+        active
+          ? tone
+            ? `tile-${tone} text-white border-transparent`
+            : 'bg-primary text-primary-foreground border-primary'
+          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+      )}
+    >
+      {label}
+    </button>
   );
 }
