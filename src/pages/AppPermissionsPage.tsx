@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Camera, Image as ImageIcon, BookUser, Bell, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
 import { Contacts } from '@capacitor-community/contacts';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { cn } from '@/lib/utils';
@@ -62,13 +61,13 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
     })();
   }, [isNative]);
 
-  const openSettings = async () => {
+  const openSettings = () => {
     if (!isNative) return;
-    try {
-      await App.openUrl({ url: 'app-settings:' });
-    } catch {
-      // Older Capacitor versions return a rejected promise on non-iOS — ignore.
-    }
+    // @capacitor/app v7 dropped `openUrl`; the Capacitor iOS WKWebView
+    // delegates unrecognised URL schemes (app-settings:, mailto:, etc.) to
+    // UIApplication, which is exactly what we want here. Navigating the
+    // top window is the simplest cross-version trigger.
+    window.location.href = 'app-settings:';
   };
 
   const rows: Row[] = [
@@ -99,7 +98,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
         <span className="w-10" />
       </div>
 
-      <div className="overflow-y-auto flex-1 px-5 pt-4 pb-10">
+      <div className="overflow-y-auto scrollbar-hide flex-1 px-5 pt-4 pb-10">
         <p className="text-[13px] text-muted-text leading-relaxed mb-5">
           iOS doesn't let apps re-prompt for permissions once you've decided. To change anything below, tap "Change in Settings" — it'll open iOS Settings → Membr.
         </p>
