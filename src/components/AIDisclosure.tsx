@@ -78,7 +78,7 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
                   setOpen(false);
                 }
               }}
-              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-50 bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] max-h-[85dvh] flex flex-col safe-bottom"
+              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-50 bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] flex flex-col safe-bottom"
             >
               <DragHandle />
               <div className="flex items-center justify-between px-5 pt-2 pb-3">

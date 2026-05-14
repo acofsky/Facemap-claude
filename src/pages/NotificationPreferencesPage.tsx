@@ -62,10 +62,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       {...swipe.bind}
     >
       {/* Nav bar */}
-      <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
-      >
+      <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
         <button
           onClick={onBack}
           aria-label="Back"

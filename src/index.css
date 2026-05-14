@@ -207,11 +207,14 @@ html.kb-open .corner-fabs {
 }
 
 /* Sheets that opt-in to keyboard-aware positioning. The Y animation comes
-   from Framer Motion; the bottom offset comes from CSS so it tracks the
-   keyboard fluidly. */
+   from Framer Motion; the bottom offset + max-height come from CSS so they
+   track the keyboard fluidly without ever extending past the safe-area-top. */
 .kb-aware-sheet {
   bottom: var(--keyboard-height, 0px);
-  transition: bottom 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: calc(100dvh - var(--keyboard-height) - env(safe-area-inset-top) - 8px);
+  transition:
+    bottom 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /*

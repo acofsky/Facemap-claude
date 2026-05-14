@@ -91,10 +91,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
       }}
       {...swipe.bind}
     >
-      <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
-      >
+      <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
         </button>
