@@ -54,6 +54,14 @@
 	<key>NSContactsUsageDescription</key>
 	<string>Membr uses your contacts to let you link a Membr person record to an existing iPhone contact.</string>
 	<!--
+	    Membr only uses standard HTTPS/TLS (Supabase, Anthropic). That's
+	    "exempt" encryption under US export rules, so declaring NO here
+	    lets App Store Connect skip the export-compliance questionnaire
+	    on every upload.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!--
 	    Custom URL scheme used as the OAuth redirect target for Sign in
 	    with Apple / Google. Supabase redirects to
 	    `com.acofsky.facemap://login-callback#access_token=...` after
