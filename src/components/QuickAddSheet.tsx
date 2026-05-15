@@ -12,6 +12,7 @@ import {
 } from '@/hooks/use-data';
 import { useSmartClusters } from '@/hooks/use-smart-clusters';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { PhotoCropModal } from '@/components/PhotoCropModal';
 import { matchSheetInputToCluster } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -66,11 +68,25 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    // Send the user to the crop step before we keep the file.
+    setCropSrc(URL.createObjectURL(file));
+  };
+
+  const handleCropped = (file: File) => {
+    const src = cropSrc;
+    setCropSrc(null);
+    if (src) URL.revokeObjectURL(src);
     setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const cancelCrop = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   };
 
   const toggleCircle = (id: string) => {
@@ -447,6 +463,10 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
           </button>
         </div>
       </motion.div>
+
+      {cropSrc && (
+        <PhotoCropModal imageSrc={cropSrc} onCancel={cancelCrop} onCropped={handleCropped} />
+      )}
     </>
   );
 }

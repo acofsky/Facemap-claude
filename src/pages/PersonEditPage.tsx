@@ -13,6 +13,7 @@ import { ContactLinkSection } from '@/components/ContactLinkSection';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { AIBadge } from '@/components/AIBadge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { PhotoCropModal } from '@/components/PhotoCropModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { isValidTone } from '@/lib/store';
@@ -79,6 +80,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
 
   const [showMore, setShowMore] = useState(false);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -150,12 +152,31 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
     }
   };
 
-  const handlePhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset the input so picking the same file again still fires onChange.
+    e.target.value = '';
     if (!file) return;
-    const url = await uploadPhoto.mutateAsync(file);
-    setPhotos((cur) => [...cur, url].slice(0, 5));
+    // Hand off to the crop step instead of uploading the raw file.
+    setCropSrc(URL.createObjectURL(file));
     setPhotoMenuOpen(false);
+  };
+
+  const handleCropped = async (file: File) => {
+    const src = cropSrc;
+    setCropSrc(null);
+    if (src) URL.revokeObjectURL(src);
+    try {
+      const url = await uploadPhoto.mutateAsync(file);
+      setPhotos((cur) => [...cur, url].slice(0, 5));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not upload photo');
+    }
+  };
+
+  const cancelCrop = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   };
 
   const handleRemovePhoto = () => {
@@ -479,6 +500,10 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirmOpen(false)}
       />
+
+      {cropSrc && (
+        <PhotoCropModal imageSrc={cropSrc} onCancel={cancelCrop} onCropped={handleCropped} />
+      )}
 
       {/* Save bar pinned at bottom */}
       <div className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pt-3 pb-5 bg-background border-t border-[hsl(0_0%_100%/0.08)] safe-bottom">
