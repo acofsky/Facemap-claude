@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 // Required for App Store Guideline 5.1.1(v): apps that support account
 // creation must offer in-app account deletion. This function deletes the
