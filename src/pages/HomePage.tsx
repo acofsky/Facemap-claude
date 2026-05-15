@@ -204,7 +204,13 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
             className="w-full h-11 pl-10 pr-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
           />
           {recallLoading ? (
-            <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text animate-spin" />
+            // Centering (-translate-y-1/2) and the spin animation both
+            // write `transform`; on one element the spin keyframe
+            // interpolates the translate away and the icon drifts. Keep
+            // them on separate elements — wrapper centers, icon spins.
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+              <Loader2 className="w-4 h-4 text-muted-text animate-spin" />
+            </div>
           ) : (
             hasQuery && (
               <button
