@@ -6,7 +6,8 @@ import { SmartCircleBanner } from '@/components/SmartCircleBanner';
 import { AIBadge } from '@/components/AIBadge';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
-import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight, X } from 'lucide-react';
+import { UseCasesPage } from '@/pages/UseCasesPage';
+import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight, X, Lightbulb } from 'lucide-react';
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
@@ -87,6 +88,7 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   // Brief CTA: tap → opens person picker → opens MeetingBriefModal
   const [briefPickerOpen, setBriefPickerOpen] = useState(false);
   const [briefTarget, setBriefTarget] = useState<{ id: string; name: string } | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const firstName = getFirstName(user);
   const tod = timeOfDayGreeting();
@@ -377,6 +379,25 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
         </div>
       )}
 
+      {/* Ways to use Membr — scenario-driven feature showcase. Surface-2
+          icon (not a red tile) so it doesn't compete with the red Brief
+          CTA card above for the one-red-per-frame rule. */}
+      <button
+        onClick={() => setGuideOpen(true)}
+        className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] active:scale-[0.99] transition text-left"
+      >
+        <div className="w-10 h-10 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] flex items-center justify-center shrink-0">
+          <Lightbulb className="w-5 h-5 text-muted-text" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-semibold text-foreground">Ways to use Membr</div>
+          <p className="text-[12px] text-muted-text leading-snug mt-0.5">
+            Real scenarios — get the most out of every feature
+          </p>
+        </div>
+        <ArrowRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+      </button>
+
       </div>{/* /content (px-5 space-y-7) */}
 
       {/* Brief picker + modal */}
@@ -403,6 +424,10 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
           onClose={() => setBriefTarget(null)}
         />
       )}
+
+      <AnimatePresence>
+        {guideOpen && <UseCasesPage onBack={() => setGuideOpen(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
