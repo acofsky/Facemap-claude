@@ -241,7 +241,18 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
           <div className="relative">
             <PersonAvatar name={name || 'New'} photo={photos[0]} size="lg" className="!w-24 !h-24 !text-2xl" />
             <button
-              onClick={() => setPhotoMenuOpen((v) => !v)}
+              onClick={() => {
+                // With no photo there's nothing to remove, so the menu
+                // would just be a pointless one-item list — go straight
+                // to the native picker (Photo Library / Take Photo /
+                // Choose File). Only show the menu when there's an
+                // existing photo to offer a Remove option.
+                if (photos.length === 0) {
+                  fileRef.current?.click();
+                } else {
+                  setPhotoMenuOpen((v) => !v);
+                }
+              }}
               aria-label="Change photo"
               className="absolute -bottom-0.5 -right-0.5 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
               style={{ boxShadow: '0 4px 12px hsl(var(--primary) / 0.35)' }}
@@ -249,22 +260,23 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               <Camera className="w-4 h-4" strokeWidth={1.75} />
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
-            {photoMenuOpen && (
+            {photoMenuOpen && photos.length > 0 && (
               <div className="absolute z-10 right-0 top-full mt-1 w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 shadow-xl">
                 <button
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => {
+                    setPhotoMenuOpen(false);
+                    fileRef.current?.click();
+                  }}
                   className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
                 >
-                  Choose from Library
+                  Change photo
                 </button>
-                {photos.length > 0 && (
-                  <button
-                    onClick={handleRemovePhoto}
-                    className="w-full text-left px-3 py-2.5 text-sm text-destructive hover:bg-[hsl(0_0%_100%/0.04)]"
-                  >
-                    Remove Photo
-                  </button>
-                )}
+                <button
+                  onClick={handleRemovePhoto}
+                  className="w-full text-left px-3 py-2.5 text-sm text-destructive hover:bg-[hsl(0_0%_100%/0.04)]"
+                >
+                  Remove Photo
+                </button>
               </div>
             )}
           </div>
