@@ -9,7 +9,6 @@ import {
   useSetPersonCircles, useSetPersonEvents, useEvents, useDeletePerson,
 } from '@/hooks/use-data';
 import { BulletTextarea } from '@/components/BulletTextarea';
-import { ContactLinkSection } from '@/components/ContactLinkSection';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { AIBadge } from '@/components/AIBadge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -333,35 +332,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
             </div>
           </Field>
 
-          <Field label="Circles">
-            {circles.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {circles.map((c) => {
-                  const on = circleIds.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() =>
-                        setCircleIds((cur) => (on ? cur.filter((id) => id !== c.id) : [...cur, c.id]))
-                      }
-                      className={cn(
-                        'inline-flex items-center px-2.5 py-1 rounded-sm text-[12px] font-medium border transition-colors',
-                        on
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
-                      )}
-                    >
-                      {c.emoji ? `${c.emoji} ` : ''}{c.name}
-                      {on && <X className="w-3 h-3 ml-1" strokeWidth={1.75} />}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-[13px] text-muted-text italic">No Circles yet. Create one in the Circles tab.</p>
-            )}
-          </Field>
-
           <Field label="Events">
             {events.length > 0 ? (
               <div className="flex flex-wrap gap-2">
@@ -390,15 +360,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
             ) : (
               <p className="text-[13px] text-muted-text italic">No Events yet. Create one in the Circles tab.</p>
             )}
-          </Field>
-
-          {/* iPhone Contact link */}
-          <Field label="iPhone Contact">
-            <ContactLinkSection
-              personId={personId}
-              person={person}
-              iosContactId={person.ios_contact_id ?? null}
-            />
           </Field>
 
           <Field label="About">
@@ -461,6 +422,35 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               rows={3}
               className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
             />
+          </Field>
+
+          <Field label="Circles">
+            {circles.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {circles.map((c) => {
+                  const on = circleIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() =>
+                        setCircleIds((cur) => (on ? cur.filter((id) => id !== c.id) : [...cur, c.id]))
+                      }
+                      className={cn(
+                        'inline-flex items-center px-2.5 py-1 rounded-sm text-[12px] font-medium border transition-colors',
+                        on
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                      )}
+                    >
+                      {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                      {on && <X className="w-3 h-3 ml-1" strokeWidth={1.75} />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[13px] text-muted-text italic">No Circles yet. Create one in the Circles tab.</p>
+            )}
           </Field>
 
           {/* Delete person */}

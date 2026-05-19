@@ -138,16 +138,8 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
           {person.name || 'Unknown'}
         </div>
 
-        {(personCircleObjects.length > 0 || personEventObjects.length > 0) && (
+        {personEventObjects.length > 0 && (
           <div className="flex flex-wrap justify-center gap-1.5 mt-2.5 px-4">
-            {personCircleObjects.map((c) => (
-              <span
-                key={c.id}
-                className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[hsl(0_0%_100%/0.05)] border border-[hsl(0_0%_100%/0.08)] text-[11px] font-medium text-foreground/80"
-              >
-                {c.emoji ? `${c.emoji} ` : ''}{c.name}
-              </span>
-            ))}
             {personEventObjects.map((e) => {
               const tone = isValidTone(e.tone) ? e.tone : 'red';
               return (
@@ -287,6 +279,26 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
                 </button>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {/* Circles — kept at the bottom (above Encounters) to mirror the
+          edit screen's field order. */}
+      {personCircleObjects.length > 0 && (
+        <>
+          <SectionLabel>Circles</SectionLabel>
+          <div className="px-5 mb-6">
+            <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 flex flex-wrap gap-1.5">
+              {personCircleObjects.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[hsl(0_0%_100%/0.05)] border border-[hsl(0_0%_100%/0.08)] text-[12px] font-medium text-foreground/80"
+                >
+                  {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                </span>
+              ))}
+            </div>
           </div>
         </>
       )}

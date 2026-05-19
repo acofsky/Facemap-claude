@@ -3,12 +3,8 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { haptics } from '@/lib/haptics';
 
 interface UseSwipeBackOptions {
-  /** Max distance from the left edge where the swipe must start (px). */
+  /** Max distance from the page's left edge where the swipe must start (px). */
   edgeWidth?: number;
-  /** Minimum horizontal drag to count as a back gesture (px). */
-  threshold?: number;
-  /** Minimum velocity (px/s) that also counts even without enough distance. */
-  velocityThreshold?: number;
   /** Disable the gesture (e.g. while a sheet covers the page). */
   disabled?: boolean;
 }
@@ -29,18 +25,27 @@ interface UseSwipeBackReturn {
 
 /**
  * Edge-swipe-to-go-back gesture for full-screen pages. Mirrors iOS's
- * built-in nav controller swipe.
+ * built-in nav-controller swipe.
+ *
+ * Commit logic projects the release position ~100ms forward using the
+ * recent swipe velocity (the way iOS does) — so a quick flick closes the
+ * page even from a short drag, and a deliberate drag past ~40% of the
+ * width closes regardless of speed. Anything less snaps back.
  *
  * Usage:
  *   const back = useSwipeBack(onBack);
  *   <div {...back.bind} style={{ transform: `translateX(${back.offsetX}px)` }}>
  */
 export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {}): UseSwipeBackReturn {
-  const { edgeWidth = 24, threshold = 100, velocityThreshold = 500, disabled = false } = opts;
+  const { edgeWidth = 30, disabled = false } = opts;
   const reduced = useReduceMotion();
   const startX = useRef<number | null>(null);
-  const startTime = useRef<number>(0);
-  const baseTime = useRef<number>(0);
+  // Mirror offsetX into a ref so onPointerUp reads the true latest value
+  // rather than a possibly-stale render closure.
+  const offsetRef = useRef(0);
+  const velocity = useRef(0); // smoothed horizontal velocity, px per ms
+  const lastX = useRef(0);
+  const lastT = useRef(0);
   const [offsetX, setOffsetX] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -48,13 +53,15 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
   useEffect(() => {
     if (disabled) {
       startX.current = null;
+      offsetRef.current = 0;
       setOffsetX(0);
       setDragging(false);
     }
   }, [disabled]);
 
-  const reset = () => {
+  const snapBack = () => {
     startX.current = null;
+    offsetRef.current = 0;
     setOffsetX(0);
     setDragging(false);
   };
@@ -64,10 +71,16 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
       onPointerDown: (e) => {
         if (disabled || reduced) return;
         if (e.button !== undefined && e.button !== 0) return;
-        if (e.clientX > edgeWidth) return; // gesture must start near the left edge
+        // Gesture must start near the page's left edge — measured relative
+        // to the element, so it works whether the page fills the screen
+        // (iPhone) or sits in a centered column (wider screens).
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (e.clientX - rect.left > edgeWidth) return;
         startX.current = e.clientX;
-        startTime.current = performance.now();
-        baseTime.current = performance.now();
+        offsetRef.current = 0;
+        velocity.current = 0;
+        lastX.current = e.clientX;
+        lastT.current = performance.now();
         setDragging(true);
         // Capture the pointer so every move/up event keeps coming to this
         // element even once the finger travels off it — without this, iOS
@@ -81,23 +94,42 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
       },
       onPointerMove: (e) => {
         if (startX.current === null) return;
-        const dx = e.clientX - startX.current;
-        if (dx < 0) return; // ignore leftward drags
-        setOffsetX(Math.min(dx, window.innerWidth));
+        const dx = Math.max(0, e.clientX - startX.current);
+        const now = performance.now();
+        const dt = now - lastT.current;
+        if (dt > 0) {
+          // Exponential smoothing so the release reading isn't dominated
+          // by a single jittery final sample.
+          const sample = (e.clientX - lastX.current) / dt;
+          velocity.current = velocity.current * 0.6 + sample * 0.4;
+        }
+        lastX.current = e.clientX;
+        lastT.current = now;
+        offsetRef.current = dx;
+        setOffsetX(dx);
       },
       onPointerUp: () => {
         if (startX.current === null) return;
-        const dx = offsetX;
-        const dt = Math.max(1, performance.now() - startTime.current);
-        const velocity = (dx / dt) * 1000;
-        const triggered = dx > threshold || velocity > velocityThreshold;
+        startX.current = null;
+        const width = Math.min(window.innerWidth, 480);
+        const dx = offsetRef.current;
+        // Project where the page would land ~100ms after release.
+        const projected = dx + velocity.current * 100;
+        const triggered = projected > width * 0.4;
+        setDragging(false);
         if (triggered) {
           haptics.light();
+          // Leave offsetX where it is: the page is about to unmount and
+          // its exit animation slides it the rest of the way off-screen.
+          // Snapping offsetX back to 0 here would yank the content left
+          // for a frame before the exit — that was the visible jank.
           onBack();
+        } else {
+          offsetRef.current = 0;
+          setOffsetX(0);
         }
-        reset();
       },
-      onPointerCancel: () => reset(),
+      onPointerCancel: () => snapBack(),
     },
     offsetX,
     dragging,
