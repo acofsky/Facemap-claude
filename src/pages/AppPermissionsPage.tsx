@@ -92,7 +92,10 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
-          touchAction: 'pan-y',
+          // `none` (not `pan-y`): keeps the swipe's vertical component from
+          // leaking into a scroll on the page underneath. The inner scroll
+          // area re-enables vertical panning for itself.
+          touchAction: 'none',
         }}
         {...swipe.bind}
       >
@@ -104,7 +107,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
         <span className="w-10" />
       </div>
 
-      <div className="overflow-y-auto scrollbar-hide flex-1 px-5 pt-4 pb-10">
+      <div className="overflow-y-auto scrollbar-hide touch-pan-y flex-1 px-5 pt-4 pb-10">
         <p className="text-[13px] text-muted-text leading-relaxed mb-5">
           iOS doesn't let apps re-prompt for permissions once you've decided. To change anything below, tap "Change in Settings" — it'll open iOS Settings → Membr.
         </p>

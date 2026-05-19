@@ -332,36 +332,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
             </div>
           </Field>
 
-          <Field label="Events">
-            {events.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {events.map((e) => {
-                  const on = eventIds.includes(e.id);
-                  const tone = isValidTone(e.tone) ? e.tone : 'red';
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() =>
-                        setEventIds((cur) => (on ? cur.filter((id) => id !== e.id) : [...cur, e.id]))
-                      }
-                      className={cn(
-                        'inline-flex items-center px-2.5 py-1 rounded-sm text-[12px] font-medium border transition-all',
-                        on
-                          ? `tile-${tone} text-white border-transparent`
-                          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
-                      )}
-                    >
-                      {e.name}
-                      {on && <X className="w-3 h-3 ml-1" strokeWidth={1.75} />}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-[13px] text-muted-text italic">No Events yet. Create one in the Circles tab.</p>
-            )}
-          </Field>
-
           <Field label="About">
             <BulletTextarea
               value={miscNotes}
@@ -422,6 +392,36 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               rows={3}
               className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
             />
+          </Field>
+
+          <Field label="Events">
+            {events.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {events.map((e) => {
+                  const on = eventIds.includes(e.id);
+                  const tone = isValidTone(e.tone) ? e.tone : 'red';
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() =>
+                        setEventIds((cur) => (on ? cur.filter((id) => id !== e.id) : [...cur, e.id]))
+                      }
+                      className={cn(
+                        'inline-flex items-center px-2.5 py-1 rounded-sm text-[12px] font-medium border transition-all',
+                        on
+                          ? `tile-${tone} text-white border-transparent`
+                          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+                      )}
+                    >
+                      {e.name}
+                      {on && <X className="w-3 h-3 ml-1" strokeWidth={1.75} />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[13px] text-muted-text italic">No Events yet. Create one in the Circles tab.</p>
+            )}
           </Field>
 
           <Field label="Circles">

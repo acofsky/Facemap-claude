@@ -86,7 +86,10 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
-          touchAction: 'pan-y',
+          // `none` (not `pan-y`): keeps the swipe's vertical component from
+          // leaking into a scroll on the page underneath. The inner scroll
+          // area re-enables vertical panning for itself.
+          touchAction: 'none',
         }}
         {...swipe.bind}
       >
@@ -103,7 +106,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
         <span className="w-10" />
       </div>
 
-      <div className="overflow-y-auto scrollbar-hide flex-1 px-5 pt-5 pb-12">
+      <div className="overflow-y-auto scrollbar-hide touch-pan-y flex-1 px-5 pt-5 pb-12">
         <p className="text-[14px] text-muted-text leading-relaxed mb-6">
           Membr earns its keep in the small moments. Here's how it fits into
           real situations — so every feature is working for you.

@@ -62,7 +62,10 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
-          touchAction: 'pan-y',
+          // `none` (not `pan-y`): keeps the swipe's vertical component from
+          // leaking into a scroll on the page underneath. The inner scroll
+          // area re-enables vertical panning for itself.
+          touchAction: 'none',
         }}
         {...swipe.bind}
       >
@@ -79,7 +82,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
         <span className="w-10" />
       </div>
 
-      <div className="overflow-y-auto scrollbar-hide flex-1 px-5 pt-4 space-y-6 pb-10">
+      <div className="overflow-y-auto scrollbar-hide touch-pan-y flex-1 px-5 pt-4 space-y-6 pb-10">
         {needsPermission && (
           <div className="rounded-lg bg-surface-1 border border-warning/30 p-3 flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" strokeWidth={1.75} />
