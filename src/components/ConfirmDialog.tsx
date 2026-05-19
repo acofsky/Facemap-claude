@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  useScrollLock(open);
   return (
     <AnimatePresence>
       {open && (

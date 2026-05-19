@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
-  usePerson, usePersons, useCircles, useEvents, useConnections,
+  usePerson, usePersons, useCircles, useEvents, useConnections, useDeletePerson,
 } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { PhotoImg } from '@/components/PhotoImg';
@@ -10,15 +11,18 @@ import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { AIBadge } from '@/components/AIBadge';
 import { BulletDisplay } from '@/components/BulletTextarea';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { InfoModal } from '@/components/InfoModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonHeaderSkeleton, PersonRowSkeleton } from '@/components/skeletons';
 import { PersonEditPage } from '@/pages/PersonEditPage';
 import {
-  ArrowLeft, CalendarPlus, MapPin, Pencil, Sparkles,
+  ArrowLeft, CalendarPlus, Info, Loader2, MapPin, Pencil, Sparkles, Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
+import { friendlyError } from '@/lib/errors';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonProfilePageProps {
@@ -40,6 +44,10 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
 
   const [briefOpen, setBriefOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [contactInfoOpen, setContactInfoOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletePersonMut = useDeletePerson();
 
   const personConnections = useMemo(
     () => connections.filter((c) => c.person_a_id === personId || c.person_b_id === personId),
@@ -48,6 +56,19 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
 
   // Swipe gesture is mounted before any early returns so hook order is stable.
   const swipe = useSwipeBack(onBack, { disabled: editOpen });
+
+  const handleDeleteConfirmed = async () => {
+    setDeleting(true);
+    try {
+      await deletePersonMut.mutateAsync(personId);
+      setDeleteConfirmOpen(false);
+      onBack();
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not remove this person. Try again.'));
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
 
   // If the person vanishes after load (just deleted), bounce out instead
   // of flashing a "not found" state.
@@ -86,6 +107,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+        touchAction: 'pan-y',
       }}
       {...swipe.bind}
     >
@@ -170,6 +192,28 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         </div>
       </div>
 
+      {/* iPhone Contact — sits directly below the action buttons so it's
+          visible without scrolling. The (i) opens a quick explainer. */}
+      <div className="px-5 mb-3 flex items-center gap-1.5">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">
+          iPhone Contact
+        </h2>
+        <button
+          onClick={() => setContactInfoOpen(true)}
+          aria-label="How iPhone Contact linking works"
+          className="text-muted-text active:scale-90 transition-transform"
+        >
+          <Info className="w-3.5 h-3.5" strokeWidth={1.75} />
+        </button>
+      </div>
+      <div className="px-5 mb-6">
+        <ContactLinkSection
+          personId={personId}
+          person={person}
+          iosContactId={iosContactId}
+        />
+      </div>
+
       {/* Photos strip */}
       {person.photos.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2 mb-6 px-5 scrollbar-hide">
@@ -220,16 +264,6 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         </div>
       )}
 
-      {/* iPhone Contact — link, create-from-fields, or open in Contacts */}
-      <SectionLabel>iPhone Contact</SectionLabel>
-      <div className="px-5 mb-6">
-        <ContactLinkSection
-          personId={personId}
-          person={person}
-          iosContactId={iosContactId}
-        />
-      </div>
-
       {/* Connections — read-only list of linked people */}
       {personConnections.length > 0 && onSelectPerson && (
         <>
@@ -274,6 +308,48 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
           </div>
         </div>
       </div>
+
+      {/* Remove from Membr — always visible here, no need to enter Edit */}
+      <div className="px-5 mt-6">
+        <button
+          onClick={() => setDeleteConfirmOpen(true)}
+          disabled={deleting}
+          className="w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" strokeWidth={1.75} />}
+          {deleting ? 'Removing…' : 'Remove from Membr'}
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Remove from Membr?"
+        description={`This deletes ${person.name || 'this person'} along with their encounters, circle memberships, and connections. This cannot be undone.`}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      <InfoModal
+        open={contactInfoOpen}
+        title="iPhone Contact"
+        onClose={() => setContactInfoOpen(false)}
+      >
+        <p>
+          Linking ties this person to a card in your iPhone's Contacts app. You can
+          link an existing contact or create a new one.
+        </p>
+        <p>
+          When you create one, Membr fills in their name and photo, and scans your
+          notes for a phone number, email, or birthday to add too.
+        </p>
+        <p>
+          It's a one-time export — editing this profile later won't change the
+          contact, and unlinking never deletes anything from Contacts.
+        </p>
+      </InfoModal>
 
       <AnimatePresence>
         {briefOpen && (

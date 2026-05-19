@@ -16,6 +16,7 @@ import { PhotoCropModal } from '@/components/PhotoCropModal';
 import { matchSheetInputToCluster } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
+import { friendlyError } from '@/lib/errors';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -127,8 +128,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
       const description = data?.description || '';
       if (description) setPhysicalDescription(description);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to generate description';
-      toast.error(msg);
+      toast.error(friendlyError(e, "Couldn't generate a description from this photo. Try again."));
     } finally {
       setGeneratingDesc(false);
     }

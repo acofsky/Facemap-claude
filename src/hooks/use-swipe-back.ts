@@ -69,6 +69,15 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
         startTime.current = performance.now();
         baseTime.current = performance.now();
         setDragging(true);
+        // Capture the pointer so every move/up event keeps coming to this
+        // element even once the finger travels off it — without this, iOS
+        // WebView can hand the gesture to its own scrolling and the swipe
+        // silently dies mid-drag.
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* setPointerCapture can throw if the pointer is already gone */
+        }
       },
       onPointerMove: (e) => {
         if (startX.current === null) return;

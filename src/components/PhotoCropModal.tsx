@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Loader2 } from 'lucide-react';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface PhotoCropModalProps {
   /** Object URL or data URL of the picked image. */
@@ -55,6 +56,7 @@ async function cropToFile(imageSrc: string, area: Area): Promise<File> {
  * user drags and pinch-zooms to frame the shot.
  */
 export function PhotoCropModal({ imageSrc, onCancel, onCropped }: PhotoCropModalProps) {
+  useScrollLock();
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [areaPixels, setAreaPixels] = useState<Area | null>(null);

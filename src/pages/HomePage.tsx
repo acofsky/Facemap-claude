@@ -11,6 +11,8 @@ import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight, X, Lightbulb } fro
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
+import { friendlyError } from '@/lib/errors';
+import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonAvatarSkeleton, PersonRowSkeleton, CircleSmallSkeleton } from '@/components/skeletons';
@@ -75,7 +77,8 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
         const { data, error } = await supabase.functions.invoke('recall-search', { body: { query: trimmed } });
         if (error) throw error;
         setRecallResults(data?.results || []);
-      } catch {
+      } catch (e) {
+        toast.error(friendlyError(e, "Couldn't run that search. Try again."));
         setRecallResults([]);
       } finally {
         setRecallLoading(false);

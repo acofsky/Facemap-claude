@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Camera, Check, ChevronDown, ChevronUp, Loader2, MapPin, Plus, Sparkles, Trash2, Wand2, X,
+  ArrowLeft, Camera, Check, Loader2, MapPin, Plus, Sparkles, Trash2, Wand2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { isValidTone } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { friendlyError } from '@/lib/errors';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface PersonEditPageProps {
@@ -78,7 +79,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   const [circleIds, setCircleIds] = useState<string[]>(initial.circleIds);
   const [eventIds, setEventIds] = useState<string[]>(initial.eventIds);
 
-  const [showMore, setShowMore] = useState(false);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [generatingDesc, setGeneratingDesc] = useState(false);
@@ -145,8 +145,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       }
       onClose();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not save';
-      toast.error(msg);
+      toast.error(friendlyError(e, 'Could not save your changes. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -170,7 +169,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       const url = await uploadPhoto.mutateAsync(file);
       setPhotos((cur) => [...cur, url].slice(0, 5));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not upload photo');
+      toast.error(friendlyError(e, 'Could not upload that photo. Try again.'));
     }
   };
 
@@ -203,8 +202,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
         setPhysicalAi(true);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to generate description';
-      toast.error(msg);
+      toast.error(friendlyError(e, "Couldn't generate a description from this photo. Try again."));
     } finally {
       setGeneratingDesc(false);
     }
@@ -217,8 +215,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       setDeleteConfirmOpen(false);
       onClose({ deleted: true });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not remove this person';
-      toast.error(msg);
+      toast.error(friendlyError(e, 'Could not remove this person. Try again.'));
       setDeleteConfirmOpen(false);
     } finally {
       setDeleting(false);
@@ -235,6 +232,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+        touchAction: 'pan-y',
       }}
       {...swipe.bind}
     >
@@ -310,7 +308,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError(null); }}
               placeholder="Their name"
               className={fieldInputClass}
-              autoFocus
             />
           </Field>
 
@@ -334,15 +331,6 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                 className={cn(fieldInputClass, 'pl-9')}
               />
             </div>
-          </Field>
-
-          <Field label="About">
-            <BulletTextarea
-              value={miscNotes}
-              onChange={setMiscNotes}
-              placeholder="What should you remember about them?"
-              rows={4}
-            />
           </Field>
 
           <Field label="Circles">
@@ -404,77 +392,74 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
             )}
           </Field>
 
-          {/* More details collapsible — preserved fields outside the spec's PEOPLE-02 minimal set */}
-          <div>
-            <button
-              onClick={() => setShowMore((v) => !v)}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text"
-            >
-              More details
-              {showMore ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-            {showMore && (
-              <div className="mt-3 space-y-6 animate-fade-in">
-                <Field
-                  label="Physical description"
-                  right={
-                    photos[0] && (
-                      <div className="flex items-center gap-2">
-                        {physicalAi && <AIBadge feature="description" />}
-                        <button
-                          onClick={handleGenerateDescription}
-                          disabled={generatingDesc}
-                          className="flex items-center gap-1 px-2 py-1 rounded-sm bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
-                        >
-                          {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                          {generatingDesc ? 'Generating…' : 'From photo'}
-                        </button>
-                      </div>
-                    )
-                  }
-                >
-                  <textarea
-                    value={physical}
-                    onChange={(e) => {
-                      setPhysical(e.target.value);
-                      // Manual edit overrides AI authorship — drop the flag
-                      // so the profile page won't claim Membr wrote this.
-                      if (physicalAi) setPhysicalAi(false);
-                    }}
-                    placeholder="Tall, dark beard, wears glasses…"
-                    rows={3}
-                    className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
-                  />
-                </Field>
-
-                <Field label="Background">
-                  <BulletTextarea
-                    value={important}
-                    onChange={setImportant}
-                    placeholder="Work, school, or anything you should know about them…"
-                    rows={3}
-                  />
-                </Field>
-
-                <Field label="Who they know">
-                  <textarea
-                    value={known}
-                    onChange={(e) => setKnown(e.target.value)}
-                    placeholder="They know Sarah from yoga, Mike's cousin…"
-                    rows={3}
-                    className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
-                  />
-                </Field>
-              </div>
-            )}
-          </div>
-
           {/* iPhone Contact link */}
           <Field label="iPhone Contact">
             <ContactLinkSection
               personId={personId}
               person={person}
               iosContactId={person.ios_contact_id ?? null}
+            />
+          </Field>
+
+          <Field label="About">
+            <BulletTextarea
+              value={miscNotes}
+              onChange={setMiscNotes}
+              placeholder="What should you remember about them?"
+              rows={4}
+            />
+          </Field>
+
+          {/* Detail fields render inline — the edit form mirrors the
+              read-only profile, with no collapsed section to dig into. */}
+          <Field
+            label="Physical description"
+            right={
+              photos[0] && (
+                <div className="flex items-center gap-2">
+                  {physicalAi && <AIBadge feature="description" />}
+                  <button
+                    onClick={handleGenerateDescription}
+                    disabled={generatingDesc}
+                    className="flex items-center gap-1 px-2 py-1 rounded-sm bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                  >
+                    {generatingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    {generatingDesc ? 'Generating…' : 'From photo'}
+                  </button>
+                </div>
+              )
+            }
+          >
+            <textarea
+              value={physical}
+              onChange={(e) => {
+                setPhysical(e.target.value);
+                // Manual edit overrides AI authorship — drop the flag
+                // so the profile page won't claim Membr wrote this.
+                if (physicalAi) setPhysicalAi(false);
+              }}
+              placeholder="Tall, dark beard, wears glasses…"
+              rows={3}
+              className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
+            />
+          </Field>
+
+          <Field label="Background">
+            <BulletTextarea
+              value={important}
+              onChange={setImportant}
+              placeholder="Work, school, or anything you should know about them…"
+              rows={3}
+            />
+          </Field>
+
+          <Field label="Who they know">
+            <textarea
+              value={known}
+              onChange={(e) => setKnown(e.target.value)}
+              placeholder="They know Sarah from yoga, Mike's cousin…"
+              rows={3}
+              className={cn(fieldInputClass, 'h-auto py-2.5 resize-none')}
             />
           </Field>
 

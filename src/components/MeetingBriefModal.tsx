@@ -7,6 +7,7 @@ import { AIBadge } from '@/components/AIBadge';
 import { DragHandle } from '@/components/DragHandle';
 import { haptics } from '@/lib/haptics';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { friendlyError } from '@/lib/errors';
 
 interface MeetingBriefModalProps {
   personId: string;
@@ -30,8 +31,8 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         setBrief(data?.brief || '');
-      } catch (e: any) {
-        toast.error(e.message || 'Failed to generate brief');
+      } catch (e) {
+        toast.error(friendlyError(e, "Couldn't generate a brief right now. Try again."));
         setBrief('');
       } finally {
         setLoading(false);

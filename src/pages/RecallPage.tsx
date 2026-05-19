@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { Search, Loader2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { friendlyError } from "@/lib/errors";
 import { usePersons } from "@/hooks/use-data";
 import { PersonAvatar } from "@/components/PersonAvatar";
 import { AIBadge } from "@/components/AIBadge";
@@ -35,7 +37,7 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
       if (error) throw error;
       setResults(data?.results || []);
     } catch (e) {
-      console.error("Recall search error:", e);
+      toast.error(friendlyError(e, "Couldn't run that search. Try again."));
       setResults([]);
     } finally {
       setLoading(false);

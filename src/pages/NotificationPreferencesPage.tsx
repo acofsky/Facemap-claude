@@ -53,13 +53,19 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 36, stiffness: 380 }}
-      className="fixed inset-0 z-[60] bg-background flex flex-col safe-top safe-bottom max-w-md mx-auto"
-      style={{
-        transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
-        transition: swipe.dragging ? 'none' : undefined,
-      }}
-      {...swipe.bind}
+      className="fixed inset-0 z-[60] max-w-md mx-auto"
     >
+      {/* Inner layer carries the swipe-back transform so it never fights
+          Framer Motion's entry/exit animation on the wrapper above. */}
+      <div
+        className="absolute inset-0 bg-background flex flex-col safe-top safe-bottom"
+        style={{
+          transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
+          transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+          touchAction: 'pan-y',
+        }}
+        {...swipe.bind}
+      >
       {/* Nav bar */}
       <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
         <button
@@ -180,6 +186,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
           </div>
         </div>
       )}
+      </div>
     </motion.div>
   );
 }

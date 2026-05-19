@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AI_MODEL_LABEL, AI_PROVIDER_LABEL } from "./AIBadge";
 import { DragHandle } from "@/components/DragHandle";
 import { haptics } from "@/lib/haptics";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 const FEATURES = [
   {
@@ -34,6 +35,7 @@ interface AIDisclosureProps {
  */
 export function AIDisclosure({ className }: AIDisclosureProps) {
   const [open, setOpen] = useState(false);
+  useScrollLock(open);
   return (
     <>
       <button
@@ -61,7 +63,7 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50"
+              className="fixed inset-0 bg-black/60 z-[60]"
               onClick={() => setOpen(false)}
             />
             <motion.div
@@ -78,7 +80,7 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
                   setOpen(false);
                 }
               }}
-              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-50 bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] flex flex-col safe-bottom"
+              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-[60] bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] flex flex-col safe-bottom"
             >
               <DragHandle />
               <div className="flex items-center justify-between px-5 pt-2 pb-3">

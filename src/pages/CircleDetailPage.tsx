@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import {
   useCircles, usePersons, usePersonCircles, useAddPersonToCircle, useRemovePersonFromCircle,
+  useDeleteCircle,
 } from '@/hooks/use-data';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { CircleSheet } from '@/components/CircleSheet';
 import { PersonPickerSheet } from '@/components/PersonPickerSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonRowSkeleton } from '@/components/skeletons';
 import { isValidTone, TONES, type Tone } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { friendlyError } from '@/lib/errors';
 import { useSwipeBack } from '@/hooks/use-swipe-back';
 
 interface CircleDetailPageProps {
@@ -31,10 +35,28 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
   const { data: personCircles = [] } = usePersonCircles();
   const addToCircle = useAddPersonToCircle();
   const removeFromCircle = useRemovePersonFromCircle();
+  const deleteCircleMut = useDeleteCircle();
 
   const [editOpen, setEditOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const swipe = useSwipeBack(onBack, { disabled: editOpen || pickerOpen });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const swipe = useSwipeBack(onBack, {
+    disabled: editOpen || pickerOpen || deleteConfirmOpen,
+  });
+
+  const handleDeleteConfirmed = async () => {
+    setDeleting(true);
+    try {
+      await deleteCircleMut.mutateAsync(circleId);
+      setDeleteConfirmOpen(false);
+      onBack();
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not delete this Circle. Try again.'));
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
 
   const circle = circles.find((c) => c.id === circleId);
   const tone = circle ? (isValidTone(circle.tone) ? circle.tone : fallbackTone(circle.id)) : 'red';
@@ -65,6 +87,7 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
+        touchAction: 'pan-y',
       }}
       {...swipe.bind}
     >
@@ -142,6 +165,29 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
           ))
         )}
       </div>
+
+      {/* Delete Circle — visible without entering edit */}
+      <div className="px-5 mt-8">
+        <button
+          onClick={() => setDeleteConfirmOpen(true)}
+          disabled={deleting}
+          className="w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-destructive hover:border-destructive/40 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" strokeWidth={1.75} />}
+          {deleting ? 'Deleting…' : 'Delete Circle'}
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete this Circle?"
+        description="People stay in Membr — only the Circle itself is removed."
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
 
       <AnimatePresence>
         {editOpen && (

@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { friendlyError } from '@/lib/errors';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -113,8 +114,8 @@ export function ProfilePage() {
       // to AuthPage now that the JWT is invalid.
       await signOut();
       toast.success('Account deleted.');
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not delete account. Try again.');
+    } catch (err) {
+      toast.error(friendlyError(err, 'Could not delete your account. Try again.'));
       setDeleting(false);
       setDeleteConfirmOpen(false);
     }
