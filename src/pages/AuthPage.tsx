@@ -12,6 +12,16 @@ import { Wordmark } from '@/components/Wordmark';
 // supabase.auth.setSession.
 const OAUTH_REDIRECT = 'com.acofsky.facemap://login-callback';
 
+// Email links (signup confirmation, password reset) have to come back
+// into the app. In the native build `window.location.origin` is
+// `capacitor://localhost` — Safari can't open that, so a tapped email
+// link dead-ends with "address is not valid". Point the links at the
+// app's custom URL scheme instead; the deep-link handler in App.tsx
+// exchanges the returned tokens for a session.
+const EMAIL_REDIRECT = Capacitor.isNativePlatform()
+  ? OAUTH_REDIRECT
+  : `${window.location.origin}/`;
+
 async function startOAuth(provider: 'google' | 'apple'): Promise<{ error?: Error }> {
   const native = Capacitor.isNativePlatform();
   // Native: ask Supabase for the OAuth URL but DON'T let it auto-navigate
@@ -34,6 +44,14 @@ async function startOAuth(provider: 'google' | 'apple'): Promise<{ error?: Error
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot' | 'reset';
 
+interface AuthPageProps {
+  /** Force the starting mode — used when a recovery deep link opens the app. */
+  initialMode?: Mode;
+  /** Called after a successful password reset so the host can dismiss the
+      recovery screen. */
+  onResetComplete?: () => void;
+}
+
 /**
  * Reads a Supabase recovery token from the URL hash. After the user taps
  * the email reset link Supabase sends them back with a fragment like
@@ -46,8 +64,10 @@ function detectRecoveryFromHash(): boolean {
   return /\btype=recovery\b/.test(hash) && /\baccess_token=/.test(hash);
 }
 
-export function AuthPage() {
-  const [mode, setMode] = useState<Mode>(() => (detectRecoveryFromHash() ? 'reset' : 'sign-in'));
+export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
+  const [mode, setMode] = useState<Mode>(
+    () => initialMode ?? (detectRecoveryFromHash() ? 'reset' : 'sign-in'),
+  );
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,6 +76,15 @@ export function AuthPage() {
   const [forgotSent, setForgotSent] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Seconds left before "Resend verification email" is allowed again —
+  // Supabase rejects a second send inside its 60s per-user window anyway.
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const id = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [resendIn]);
 
   // Clean up the hash once we've adopted reset mode so the screen doesn't
   // bounce back here on the next reload.
@@ -78,13 +107,14 @@ export function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: EMAIL_REDIRECT,
             ...(trimmedName ? { data: { first_name: trimmedName } } : {}),
           },
         });
         if (error) throw error;
         if (!data.session) {
           setPendingVerification(true);
+          setResendIn(60);
           toast.success('Check your email to verify your account.');
         }
       }
@@ -102,7 +132,7 @@ export function AuthPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: EMAIL_REDIRECT,
       });
       if (error) throw error;
       setForgotSent(true);
@@ -132,6 +162,7 @@ export function AuthPage() {
       setMode('sign-in');
       setNewPassword('');
       setConfirmPassword('');
+      onResetComplete?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not reset password';
       toast.error(msg);
@@ -146,9 +177,10 @@ export function AuthPage() {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
-        options: { emailRedirectTo: `${window.location.origin}/` },
+        options: { emailRedirectTo: EMAIL_REDIRECT },
       });
       if (error) throw error;
+      setResendIn(60);
       toast.success('Verification email resent.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not resend email';
@@ -279,15 +311,15 @@ export function AuthPage() {
             <div className="p-5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] space-y-2">
               <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">Check your email</h2>
               <p className="text-[13px] text-muted-text leading-relaxed">
-                We sent a verification link to <span className="text-foreground">{email}</span>. Click it to activate your account, then sign in.
+                We sent a verification link to <span className="text-foreground">{email}</span>. Tap it and you'll be signed in automatically.
               </p>
             </div>
             <button
               onClick={handleResend}
-              disabled={loading}
+              disabled={loading || resendIn > 0}
               className="w-full h-[52px] rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground font-medium hover:border-[hsl(0_0%_100%/0.18)] transition-colors disabled:opacity-50"
             >
-              {loading ? 'Sending…' : 'Resend verification email'}
+              {loading ? 'Sending…' : resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend verification email'}
             </button>
             <button
               onClick={() => {

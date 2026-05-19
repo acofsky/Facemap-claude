@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Keyboard, KeyboardResize } from "@capacitor/keyboard";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -57,12 +57,13 @@ function useKeyboardSetup() {
   }, []);
 }
 
-function useOAuthDeepLink() {
-  // Apple / Google sign-in opens Safari via Capacitor's Browser plugin and
-  // Supabase redirects back to `com.acofsky.facemap://login-callback`. iOS
-  // routes that URL to the app and the App plugin fires `appUrlOpen`. Pull
-  // the access + refresh tokens out of the URL hash and hand them to
-  // Supabase, which sets the session and unblocks AuthContent.
+function useAuthDeepLink(onRecovery: () => void) {
+  // Every auth flow that leaves the app — Apple/Google sign-in, the signup
+  // confirmation email, the password-reset email — comes back via the
+  // `com.acofsky.facemap://login-callback` URL scheme. iOS routes that URL
+  // to the app and the App plugin fires `appUrlOpen`. Pull the access +
+  // refresh tokens out of the URL hash and hand them to Supabase, which
+  // sets the session and unblocks AppContent.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const handle = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
@@ -76,6 +77,10 @@ function useOAuthDeepLink() {
           await supabase.auth.setSession({ access_token, refresh_token });
           // Close the in-app Safari so the user lands back on the app.
           await Browser.close().catch(() => {});
+          // A recovery link logs the user in with a session meant only for
+          // choosing a new password — route them to the reset screen
+          // instead of dropping them on the home tab.
+          if (params.get('type') === 'recovery') onRecovery();
         }
       } catch {
         // Ignore non-auth deep links (we only own one URL scheme anyway).
@@ -84,14 +89,16 @@ function useOAuthDeepLink() {
     return () => {
       handle.then((h) => h.remove());
     };
-  }, []);
+  }, [onRecovery]);
 }
 
 function AppContent() {
   const { user, loading } = useAuth();
   const { onboarded, markOnboarded } = useOnboarded();
+  const [recovery, setRecovery] = useState(false);
+  const enterRecovery = useCallback(() => setRecovery(true), []);
   useKeyboardSetup();
-  useOAuthDeepLink();
+  useAuthDeepLink(enterRecovery);
 
   if (loading) {
     return (
@@ -99,6 +106,12 @@ function AppContent() {
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // A password-reset deep link forces the reset screen even though the
+  // recovery token has technically signed the user in.
+  if (recovery) {
+    return <AuthPage initialMode="reset" onResetComplete={() => setRecovery(false)} />;
   }
 
   if (!user) {
