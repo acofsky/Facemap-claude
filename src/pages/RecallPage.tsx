@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Search, Loader2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAI } from "@/lib/invoke-ai";
 import { friendlyError } from "@/lib/errors";
 import { usePersons } from "@/hooks/use-data";
 import { PersonAvatar } from "@/components/PersonAvatar";
@@ -31,10 +31,9 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
     setLoading(true);
     setSearched(true);
     try {
-      const { data, error } = await supabase.functions.invoke("recall-search", {
-        body: { query: trimmed },
-      });
-      if (error) throw error;
+      const data = await invokeAI<{ results?: { id: string; reason: string }[] }>(
+        "recall-search", { query: trimmed },
+      );
       setResults(data?.results || []);
     } catch (e) {
       toast.error(friendlyError(e, "Couldn't run that search. Try again."));

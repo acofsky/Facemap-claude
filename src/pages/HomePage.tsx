@@ -10,7 +10,7 @@ import { UseCasesPage } from '@/pages/UseCasesPage';
 import { Search, Loader2, Sparkles, CalendarPlus, ArrowRight, X, Lightbulb } from 'lucide-react';
 import { differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeAI } from '@/lib/invoke-ai';
 import { friendlyError } from '@/lib/errors';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -74,8 +74,9 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
     setRecallLoading(true);
     const id = window.setTimeout(async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('recall-search', { body: { query: trimmed } });
-        if (error) throw error;
+        const data = await invokeAI<{ results?: { id: string; reason: string }[] }>(
+          'recall-search', { query: trimmed },
+        );
         setRecallResults(data?.results || []);
       } catch (e) {
         toast.error(friendlyError(e, "Couldn't run that search. Try again."));

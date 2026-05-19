@@ -14,7 +14,7 @@ import { AIBadge } from '@/components/AIBadge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PhotoCropModal } from '@/components/PhotoCropModal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeAI } from '@/lib/invoke-ai';
 import { isValidTone } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { friendlyError } from '@/lib/errors';
@@ -192,9 +192,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
     try {
       const { getPhotoUrl } = await import('@/lib/store');
       const photoUrl = await getPhotoUrl(photo);
-      const { data, error } = await supabase.functions.invoke('describe-from-photo', { body: { photoUrl } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeAI<{ description?: string }>('describe-from-photo', { photoUrl });
       const description = data?.description || '';
       if (description) {
         setPhysical(description);

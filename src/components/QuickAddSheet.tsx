@@ -16,6 +16,7 @@ import { PhotoCropModal } from '@/components/PhotoCropModal';
 import { matchSheetInputToCluster } from '@/lib/smart-circle';
 import { isValidTone } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeAI } from '@/lib/invoke-ai';
 import { friendlyError } from '@/lib/errors';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -122,9 +123,7 @@ export function QuickAddSheet({ onClose, variant = 'default' }: QuickAddSheetPro
       }
       const { getPhotoUrl } = await import('@/lib/store');
       const photoUrl = await getPhotoUrl(uploadedPath);
-      const { data, error } = await supabase.functions.invoke('describe-from-photo', { body: { photoUrl } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeAI<{ description?: string }>('describe-from-photo', { photoUrl });
       const description = data?.description || '';
       if (description) setPhysicalDescription(description);
     } catch (e) {

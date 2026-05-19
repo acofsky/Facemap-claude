@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Loader2, Sparkles, Copy, Check } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeAI } from '@/lib/invoke-ai';
 import { toast } from 'sonner';
 import { AIBadge } from '@/components/AIBadge';
 import { DragHandle } from '@/components/DragHandle';
@@ -25,11 +25,7 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
     const generate = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke('meeting-brief', {
-          body: { personId },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        const data = await invokeAI<{ brief?: string }>('meeting-brief', { personId });
         setBrief(data?.brief || '');
       } catch (e) {
         toast.error(friendlyError(e, "Couldn't generate a brief right now. Try again."));
