@@ -27,21 +27,22 @@ interface UseSwipeBackReturn {
  * Edge-swipe-to-go-back gesture for full-screen pages. Mirrors iOS's
  * built-in nav-controller swipe.
  *
- * Commit logic projects the release position ~100ms forward using the
- * recent swipe velocity (the way iOS does) — so a quick flick closes the
- * page even from a short drag, and a deliberate drag past ~40% of the
- * width closes regardless of speed. Anything less snaps back.
+ * Critically, the gesture is committed on BOTH `pointerup` and
+ * `pointercancel`. iOS WebView routinely ends a touch-drag with
+ * `pointercancel` rather than `pointerup`; treating cancel as "abort"
+ * (the obvious choice) means the page follows your finger but can never
+ * actually close — it always snaps back. Either event ends the gesture.
  *
- * Usage:
- *   const back = useSwipeBack(onBack);
- *   <div {...back.bind} style={{ transform: `translateX(${back.offsetX}px)` }}>
+ * Commit logic projects the release position ~100ms forward using recent
+ * velocity, so a flick closes from a short drag and a deliberate drag
+ * past ~30% of the width closes regardless of speed.
  */
 export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {}): UseSwipeBackReturn {
-  const { edgeWidth = 30, disabled = false } = opts;
+  const { edgeWidth = 32, disabled = false } = opts;
   const reduced = useReduceMotion();
   const startX = useRef<number | null>(null);
-  // Mirror offsetX into a ref so onPointerUp reads the true latest value
-  // rather than a possibly-stale render closure.
+  // Refs (not state) so the end handler reads the true latest values and
+  // isn't affected by render-closure staleness.
   const offsetRef = useRef(0);
   const velocity = useRef(0); // smoothed horizontal velocity, px per ms
   const lastX = useRef(0);
@@ -59,11 +60,25 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
     }
   }, [disabled]);
 
-  const snapBack = () => {
+  // Runs on whichever of pointerup / pointercancel fires first; the other
+  // then no-ops because startX is already cleared.
+  const end = () => {
+    if (startX.current === null) return;
     startX.current = null;
-    offsetRef.current = 0;
-    setOffsetX(0);
     setDragging(false);
+    const width = Math.min(window.innerWidth || 390, 480);
+    const dx = offsetRef.current;
+    const projected = dx + velocity.current * 100;
+    if (projected > width * 0.3) {
+      haptics.light();
+      // Leave offsetX where it is — the page unmounts and its exit
+      // animation slides it the rest of the way off-screen. Snapping it
+      // back to 0 here would yank the content left for a frame.
+      onBack();
+    } else {
+      offsetRef.current = 0;
+      setOffsetX(0);
+    }
   };
 
   return {
@@ -72,7 +87,7 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
         if (disabled || reduced) return;
         if (e.button !== undefined && e.button !== 0) return;
         // Gesture must start near the page's left edge — measured relative
-        // to the element, so it works whether the page fills the screen
+        // to the element so it works whether the page fills the screen
         // (iPhone) or sits in a centered column (wider screens).
         const rect = e.currentTarget.getBoundingClientRect();
         if (e.clientX - rect.left > edgeWidth) return;
@@ -82,15 +97,6 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
         lastX.current = e.clientX;
         lastT.current = performance.now();
         setDragging(true);
-        // Capture the pointer so every move/up event keeps coming to this
-        // element even once the finger travels off it — without this, iOS
-        // WebView can hand the gesture to its own scrolling and the swipe
-        // silently dies mid-drag.
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          /* setPointerCapture can throw if the pointer is already gone */
-        }
       },
       onPointerMove: (e) => {
         if (startX.current === null) return;
@@ -108,28 +114,8 @@ export function useSwipeBack(onBack: () => void, opts: UseSwipeBackOptions = {})
         offsetRef.current = dx;
         setOffsetX(dx);
       },
-      onPointerUp: () => {
-        if (startX.current === null) return;
-        startX.current = null;
-        const width = Math.min(window.innerWidth, 480);
-        const dx = offsetRef.current;
-        // Project where the page would land ~100ms after release.
-        const projected = dx + velocity.current * 100;
-        const triggered = projected > width * 0.4;
-        setDragging(false);
-        if (triggered) {
-          haptics.light();
-          // Leave offsetX where it is: the page is about to unmount and
-          // its exit animation slides it the rest of the way off-screen.
-          // Snapping offsetX back to 0 here would yank the content left
-          // for a frame before the exit — that was the visible jank.
-          onBack();
-        } else {
-          offsetRef.current = 0;
-          setOffsetX(0);
-        }
-      },
-      onPointerCancel: () => snapBack(),
+      onPointerUp: end,
+      onPointerCancel: end,
     },
     offsetX,
     dragging,
