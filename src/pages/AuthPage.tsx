@@ -172,8 +172,9 @@ export function AuthPage() {
     'w-full h-12 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-[15px] text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-6 safe-top safe-bottom">
-      <div className="w-full max-w-sm space-y-7">
+    <div className="h-screen overflow-y-auto bg-background safe-top scrollbar-hide">
+      <div className="auth-inner min-h-full flex flex-col justify-center px-6 py-10">
+        <div className="w-full max-w-sm mx-auto space-y-7">
         <div className="text-center">
           <Wordmark className="text-[44px]" />
           <p className="text-[13px] text-muted-text mt-3 leading-snug">Remember everyone. Miss no one.</p>
@@ -430,6 +431,7 @@ export function AuthPage() {
             </p>
           </>
         ))}
+        </div>
       </div>
     </div>
   );

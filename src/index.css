@@ -244,6 +244,15 @@ html.kb-open .corner-fabs {
   pointer-events: none;
 }
 
+/* Auth screen: KeyboardResize.None means the keyboard overlays the page.
+   When it's up, stop vertically centering the form and pad the bottom by
+   the keyboard height so the focused field and button can scroll clear
+   of the keyboard. */
+html.kb-open .auth-inner {
+  justify-content: flex-start;
+  padding-bottom: calc(var(--keyboard-height) + 24px);
+}
+
 /* Sheets that opt-in to keyboard-aware positioning. The Y animation comes
    from Framer Motion; the bottom offset + max-height come from CSS so they
    track the keyboard fluidly without ever extending past the safe-area-top. */
