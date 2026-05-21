@@ -278,7 +278,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
           <button
             onClick={handleSave}
             disabled={!canSave}
-            className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] shadow-[0_8px_24px_rgba(224,48,48,0.35)] disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create Event'}

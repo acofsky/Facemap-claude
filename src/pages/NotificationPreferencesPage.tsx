@@ -58,7 +58,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       {/* Inner layer carries the swipe-back transform so it never fights
           Framer Motion's entry/exit animation on the wrapper above. */}
       <div
-        className="absolute inset-0 bg-background flex flex-col safe-top safe-bottom"
+        className="absolute inset-0 ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom"
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -70,7 +70,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
         {...swipe.bind}
       >
       {/* Nav bar */}
-      <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
+      <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] relative z-10">
         <button
           onClick={onBack}
           aria-label="Back"
@@ -84,7 +84,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
 
       <div className="overflow-y-auto scrollbar-hide touch-pan-y flex-1 px-5 pt-4 space-y-6 pb-10">
         {needsPermission && (
-          <div className="rounded-lg bg-surface-1 border border-warning/30 p-3 flex items-start gap-2.5">
+          <div className="glass p-3 flex items-start gap-2.5 border-warning/30">
             <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" strokeWidth={1.75} />
             <div className="flex-1 text-[13px] text-foreground/90 leading-snug">
               Notifications are off in iOS Settings. Open <span className="font-medium">Settings → Membr → Notifications</span> to allow them.
@@ -93,7 +93,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
         )}
 
         {!isNative && (
-          <p className="text-[12px] text-muted-text italic">
+          <p className="text-[12px] font-display-italic text-[hsl(var(--foreground)/0.65)]">
             Notifications only run in the iPhone app. These settings are saved and will take effect there.
           </p>
         )}
@@ -124,7 +124,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
                   type="time"
                   value={prefs.eod.time}
                   onChange={(e) => update({ eod: { ...prefs.eod, time: e.target.value } })}
-                  className="h-9 px-2.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-foreground text-[14px] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                  className="h-9 px-2.5 glass-input text-foreground text-[14px]"
                 />
               </label>
             </>
@@ -154,7 +154,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       {showFreq && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60" onClick={() => setShowFreq(false)}>
           <div
-            className="w-full max-w-md bg-surface-2 rounded-t-2xl border border-[hsl(0_0%_100%/0.12)] safe-bottom"
+            className="w-full max-w-md glass-sheet rounded-t-2xl safe-bottom"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 pt-4 pb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">
@@ -181,7 +181,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
             <div className="px-5 pb-5 pt-3">
               <button
                 onClick={() => setShowFreq(false)}
-                className="w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-muted-text text-sm font-medium"
+                className="w-full h-11 rounded-2xl glass-input text-[hsl(var(--foreground)/0.65)] text-sm font-medium flex items-center justify-center"
               >
                 Cancel
               </button>

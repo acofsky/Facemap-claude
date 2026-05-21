@@ -150,7 +150,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
           </button>
         </div>
         {!native && (
-          <p className="text-[11px] text-muted-text italic mt-2">
+          <p className="text-[11px] font-display-italic text-[hsl(var(--foreground)/0.65)] mt-2">
             Available in the iPhone app — does nothing in web preview.
           </p>
         )}
@@ -183,7 +183,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
             ))}
           </div>
 
-          <p className="text-[11px] text-muted-text italic">
+          <p className="text-[11px] font-display-italic text-[hsl(var(--foreground)/0.65)]">
             One-time export. Editing this profile later won't change the contact.
           </p>
 

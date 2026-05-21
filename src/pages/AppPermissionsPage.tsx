@@ -88,7 +88,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
       {/* Inner layer carries the swipe-back transform so it never fights
           Framer Motion's entry/exit animation on the wrapper above. */}
       <div
-        className="absolute inset-0 bg-background flex flex-col safe-top safe-bottom"
+        className="absolute inset-0 ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom"
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -99,7 +99,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
         }}
         {...swipe.bind}
       >
-      <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
+      <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] relative z-10">
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
         </button>
@@ -136,12 +136,12 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
         <button
           onClick={openSettings}
           disabled={!isNative}
-          className="mt-4 w-full h-11 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground text-sm font-medium hover:border-[hsl(0_0%_100%/0.18)] transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50"
+          className="mt-4 w-full h-11 rounded-2xl glass-pill text-foreground text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
           Change in Settings <ChevronRight className="w-4 h-4" strokeWidth={1.75} />
         </button>
         {!isNative && (
-          <p className="mt-2 text-[12px] text-muted-text italic text-center">
+          <p className="mt-2 text-[12px] font-display-italic text-[hsl(var(--foreground)/0.65)] text-center">
             The deep link works only on the iPhone build.
           </p>
         )}

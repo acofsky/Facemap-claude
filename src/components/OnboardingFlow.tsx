@@ -60,7 +60,7 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background flex flex-col safe-top safe-bottom">
+    <div className="fixed inset-0 z-[60] ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom">
       {/* Top row: dots + skip */}
       <div className="flex items-center justify-between px-5 pt-3 pb-2">
         <span className="w-12" />
@@ -81,7 +81,7 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
           <button
             type="button"
             onClick={skip}
-            className="text-[14px] font-medium text-muted-text px-2 py-2 -mr-2 active:opacity-60 transition-opacity"
+            className="text-[14px] font-medium text-[hsl(var(--foreground)/0.55)] px-2 py-2 -mr-2 active:opacity-60 transition-opacity"
           >
             Skip
           </button>
@@ -109,7 +109,7 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
               {screen.headline}
             </h1>
             {screen.sub && (
-              <p className="text-[14px] text-muted-text text-center leading-relaxed mt-3 max-w-[300px]">
+              <p className="text-[14px] text-[hsl(var(--foreground)/0.65)] text-center leading-relaxed mt-3 max-w-[300px]">
                 {screen.sub}
               </p>
             )}
@@ -121,7 +121,7 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
       <div className="px-5 pb-6">
         <button
           onClick={advance}
-          className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
+          className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
         >
           {screen.cta}
         </button>
@@ -145,9 +145,9 @@ function WelcomeIllustration() {
 function AddIllustration() {
   // ONBD-02 — simplified Add Person sheet preview.
   return (
-    <div className="rounded-2xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-4 space-y-2.5 w-full">
+    <div className="glass p-4 space-y-2.5 w-full">
       <div className="flex justify-center">
-        <div className="w-16 h-16 rounded-full bg-surface-1 border border-dashed border-[hsl(0_0%_100%/0.16)] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-[hsl(0_0%_100%/0.05)] border border-dashed border-[hsl(0_0%_100%/0.18)] flex items-center justify-center">
           <Users className="w-5 h-5 text-muted-text" strokeWidth={1.75} />
         </div>
       </div>
@@ -190,7 +190,7 @@ function GroupsIllustration() {
 function BriefIllustration() {
   // ONBD-04 — simplified Meeting Brief card preview.
   return (
-    <div className="rounded-2xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-4 w-full">
+    <div className="glass p-4 w-full">
       <div className="flex items-center gap-2 mb-3">
         <Sparkles className="w-4 h-4 text-primary" strokeWidth={1.75} />
         <span className="text-[13px] font-semibold text-foreground tracking-[-0.01em]">Brief: Maya</span>
@@ -231,7 +231,7 @@ function PersonCardMock({ name, hint }: { name: string; hint: string }) {
 
 function FakeInput({ value }: { value: string }) {
   return (
-    <div className="w-full h-10 rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.08)] flex items-center px-3.5 text-[13px] text-foreground">
+    <div className="glass-input w-full h-10 flex items-center px-3.5 text-[13px] text-foreground">
       {value}
     </div>
   );

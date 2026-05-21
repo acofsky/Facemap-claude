@@ -85,7 +85,7 @@ export function PhotoCropModal({ imageSrc, onCancel, onCropped }: PhotoCropModal
         <button
           onClick={onCancel}
           disabled={processing}
-          className="h-9 px-2 text-[15px] text-muted-text disabled:opacity-50"
+          className="h-9 px-2 text-[15px] text-[hsl(var(--foreground)/0.55)] disabled:opacity-50"
         >
           Cancel
         </button>
@@ -127,7 +127,7 @@ export function PhotoCropModal({ imageSrc, onCancel, onCropped }: PhotoCropModal
           aria-label="Zoom"
           className="w-full accent-primary"
         />
-        <p className="text-[12px] text-muted-text text-center mt-2">
+        <p className="text-[12px] text-[hsl(var(--foreground)/0.55)] text-center mt-2">
           Drag to reposition · pinch or slide to zoom
         </p>
       </div>

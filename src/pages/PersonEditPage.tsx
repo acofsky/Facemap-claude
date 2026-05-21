@@ -235,8 +235,12 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
     >
       {/* Nav bar */}
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <button onClick={handleCancel} className="h-10 px-2 -ml-1 text-[15px] text-muted-text">
           Cancel
@@ -418,7 +422,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                 })}
               </div>
             ) : (
-              <p className="text-[13px] text-muted-text italic">No Events yet. Create one in the Circles tab.</p>
+              <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)]">No Events yet. Create one in the Circles tab.</p>
             )}
           </Field>
 
@@ -447,7 +451,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                 })}
               </div>
             ) : (
-              <p className="text-[13px] text-muted-text italic">No Circles yet. Create one in the Circles tab.</p>
+              <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)]">No Circles yet. Create one in the Circles tab.</p>
             )}
           </Field>
 
@@ -481,7 +485,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       )}
 
       {/* Save bar pinned at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pt-3 pb-5 bg-background border-t border-[hsl(0_0%_100%/0.08)] safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pt-3 pb-5 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom backdrop-blur-xl bg-black/55">
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
@@ -499,8 +503,12 @@ function PersonEditSkeleton() {
   return (
     <div className="flex flex-col min-h-screen safe-top animate-fade-in">
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <Skeleton className="h-4 w-14 bg-[hsl(0_0%_100%/0.04)]" />
         <Skeleton className="h-4 w-10 bg-[hsl(0_0%_100%/0.06)]" />

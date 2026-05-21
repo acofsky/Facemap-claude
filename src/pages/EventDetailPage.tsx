@@ -127,8 +127,12 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
     >
       {/* Nav bar — sticky just below the notch cover */}
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
@@ -158,7 +162,7 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           </div>
         </div>
         {event.archived_at && (
-          <p className="mt-2 text-[12px] text-muted-text italic">
+          <p className="mt-2 text-[12px] font-display-italic text-[hsl(var(--foreground)/0.65)]">
             Archived {new Date(event.archived_at).toLocaleDateString()}
           </p>
         )}
@@ -289,8 +293,12 @@ function EventDetailSkeleton() {
   return (
     <div className="pb-10 safe-top animate-fade-in">
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <div className="w-10 h-10" />
         <Skeleton className="h-4 w-32 bg-[hsl(0_0%_100%/0.06)]" />

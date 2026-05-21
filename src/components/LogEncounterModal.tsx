@@ -195,7 +195,7 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
               <button
                 onClick={handleSave}
                 disabled={createMeeting.isPending}
-                className="flex-1 h-[52px] rounded-md bg-primary text-primary-foreground text-[15px] font-semibold disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+                className="flex-1 h-[52px] rounded-2xl bg-primary text-primary-foreground text-[15px] font-semibold shadow-[0_8px_24px_rgba(224,48,48,0.35)] disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
               >
                 {createMeeting.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={1.75} />}
                 Save

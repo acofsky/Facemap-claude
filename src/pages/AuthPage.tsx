@@ -204,7 +204,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
     'glass-input w-full h-12 px-3.5 text-[15px]';
 
   return (
-    <div className="h-screen overflow-y-auto bg-background safe-top scrollbar-hide">
+    <div className="h-screen overflow-y-auto ambient-backdrop safe-top scrollbar-hide">
       <div className="auth-inner min-h-full flex flex-col justify-center px-6 py-10">
         <div className="w-full max-w-sm mx-auto space-y-7">
         <div className="text-center">

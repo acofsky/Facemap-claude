@@ -115,8 +115,12 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
     >
       {/* Nav bar — sticky just below the notch cover */}
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 -ml-1 flex items-center justify-center text-foreground active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
@@ -160,7 +164,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         {(person.how_we_met || person.where_when) && (
           <div className="text-center mt-3 space-y-0.5 max-w-xs">
             {person.how_we_met && (
-              <p className="text-[13px] text-muted-text italic leading-snug">{person.how_we_met}</p>
+              <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)] leading-snug">{person.how_we_met}</p>
             )}
             {person.where_when && (
               <p className="text-[13px] text-muted-text inline-flex items-center gap-1 leading-snug">
@@ -225,7 +229,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
             <BulletDisplay value={person.misc_notes} />
           </div>
         ) : (
-          <div className="glass p-4 text-[14px] text-muted-text italic">
+          <div className="glass p-4 text-[14px] font-display-italic text-[hsl(var(--foreground)/0.65)]">
             No notes yet. Tap Edit to add some.
           </div>
         )}
@@ -410,8 +414,12 @@ function PersonProfileSkeleton() {
   return (
     <div className="pb-10 safe-top animate-fade-in">
       <div
-        className="sticky z-20 bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]"
-        style={{ top: 'env(safe-area-inset-top)' }}
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        style={{
+          top: 'env(safe-area-inset-top)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
+        }}
       >
         <div className="w-10 h-10" />
         <Skeleton className="h-4 w-24 bg-[hsl(0_0%_100%/0.06)]" />
@@ -458,10 +466,8 @@ function ActionTile({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex flex-col items-center justify-center gap-1 h-[64px] rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground transition-colors active:scale-[0.98]',
-        disabled
-          ? 'opacity-40 cursor-not-allowed'
-          : 'hover:border-[hsl(0_0%_100%/0.2)] active:bg-primary active:text-primary-foreground',
+        'glass flex flex-col items-center justify-center gap-1 h-[64px] text-foreground transition-transform active:scale-[0.98]',
+        disabled && 'opacity-40 cursor-not-allowed',
       )}
     >
       <Icon className="w-4 h-4" strokeWidth={1.75} />

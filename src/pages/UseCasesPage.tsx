@@ -82,7 +82,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
       {/* Inner layer carries the swipe-back transform so it never fights
           Framer Motion's entry/exit animation on the wrapper above. */}
       <div
-        className="absolute inset-0 bg-background flex flex-col safe-top safe-bottom"
+        className="absolute inset-0 ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom"
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -94,7 +94,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
         {...swipe.bind}
       >
       {/* Nav bar */}
-      <div className="bg-background flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)]">
+      <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] relative z-10">
         <button
           onClick={onBack}
           aria-label="Back"
@@ -125,7 +125,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
                     className={
                       s.accent
                         ? 'w-8 h-8 rounded-md tile-red flex items-center justify-center shrink-0'
-                        : 'w-8 h-8 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.1)] flex items-center justify-center shrink-0'
+                        : 'w-8 h-8 rounded-md bg-[hsl(0_0%_100%/0.06)] border border-[hsl(0_0%_100%/0.10)] flex items-center justify-center shrink-0'
                     }
                   >
                     <Icon
@@ -155,7 +155,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
           })}
         </div>
 
-        <p className="text-[13px] text-muted-text italic leading-relaxed mt-6 text-center">
+        <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)] leading-relaxed mt-6 text-center">
           Every detail you capture makes the next conversation better.
         </p>
       </div>

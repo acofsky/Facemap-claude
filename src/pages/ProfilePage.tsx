@@ -215,10 +215,8 @@ export function ProfilePage() {
       </SectionCard>
 
       <SectionLabel>About</SectionLabel>
-      <div className="px-5 mb-3">
-        <AIDisclosure />
-      </div>
       <SectionCard>
+        <AIDisclosure />
         <SettingRow
           label="Version"
           rightLabel={APP_VERSION}

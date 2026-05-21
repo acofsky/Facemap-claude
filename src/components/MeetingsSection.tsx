@@ -80,7 +80,7 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
       )}
 
       {meetings.length === 0 && !adding && (
-        <p className="text-[13px] text-muted-text italic mb-3">No encounters logged yet.</p>
+        <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)] mb-3">No encounters logged yet.</p>
       )}
 
       <div className="space-y-2">

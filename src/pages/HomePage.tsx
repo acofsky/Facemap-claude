@@ -185,7 +185,7 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
             )}
             <span className="text-primary">.</span>
           </h1>
-          <p className="mt-2 text-[13px] text-[hsl(var(--foreground)/0.55)] leading-snug">
+          <p className="mt-2 text-[13px] text-[hsl(var(--foreground)/0.7)] leading-snug">
             {subtitle}
           </p>
         </header>
@@ -197,7 +197,17 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
             One red signal moment shared between the FAB and this red action,
             per LIQUID_GLASS §7. */}
         <section>
-          <SectionLabel>Quick actions</SectionLabel>
+          <SectionLabel
+            right={
+              people.length > 0 ? (
+                <span className="text-[11px] text-[hsl(var(--foreground)/0.55)] normal-case tracking-normal font-medium">
+                  {people.length} {people.length === 1 ? 'person' : 'people'}
+                </span>
+              ) : null
+            }
+          >
+            Quick actions
+          </SectionLabel>
           <div className="glass glass-warm glass-raised p-3 space-y-2.5">
             <button
               onClick={() => setBriefPickerOpen(true)}

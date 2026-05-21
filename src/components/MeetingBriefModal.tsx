@@ -104,7 +104,7 @@ export function MeetingBriefModal({ personId, personName, onClose }: MeetingBrie
           <div className="px-5 pt-3 pb-5 border-t border-[hsl(0_0%_100%/0.08)]">
             <button
               onClick={handleCopy}
-              className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
+              className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] shadow-[0_8px_24px_rgba(224,48,48,0.35)] active:scale-[0.98] transition-transform"
             >
               {copied ? <><Check className="w-4 h-4" strokeWidth={1.75} /> Copied!</> : <><Copy className="w-4 h-4" strokeWidth={1.75} /> Copy brief</>}
             </button>
