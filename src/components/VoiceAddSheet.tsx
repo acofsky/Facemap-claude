@@ -132,7 +132,29 @@ export function VoiceAddSheet({ onClose }: VoiceAddSheetProps) {
       setSheet('review');
       haptics.light();
     } catch (e) {
-      toast.error(friendlyError(e, "Couldn't make sense of that. Try again."));
+      const raw = e instanceof Error ? e.message : String(e);
+      console.error('parse-voice-input failed:', raw);
+      // Pick a specific message so the user knows whether to retry, redeploy,
+      // or check connectivity instead of just seeing the generic fallback.
+      let msg: string;
+      const lower = raw.toLowerCase();
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        msg = "You're offline. Connect and try again.";
+      } else if (lower.includes('not found') || lower.includes('404')) {
+        msg = "Voice add isn't deployed on the server yet. Run the supabase-deploy GitHub Action.";
+      } else if (lower.includes('api key') || lower.includes('anthropic_api_key')) {
+        msg = "Anthropic API key isn't set in Supabase. Run the supabase-deploy GitHub Action.";
+      } else if (lower.includes('rate limit') || lower.includes('429')) {
+        msg = 'Anthropic is rate-limiting. Wait a moment and try again.';
+      } else if (lower.includes('ai gateway') || lower.includes('5')) {
+        // Includes 500-class server errors from Anthropic and our own thrown
+        // "AI gateway error". Show the underlying message so we can tell
+        // whether it was an empty-parse or a real Anthropic failure.
+        msg = `Couldn't parse: ${raw}`;
+      } else {
+        msg = `Couldn't parse: ${raw}`;
+      }
+      toast.error(msg);
       setSheet('intro');
     }
   };
