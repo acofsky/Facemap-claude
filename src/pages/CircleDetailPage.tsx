@@ -137,7 +137,7 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
           members.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden"
+              className="flex items-center gap-3 p-3.5 glass overflow-hidden"
             >
               <button
                 onClick={() => onSelectPerson(p.id)}

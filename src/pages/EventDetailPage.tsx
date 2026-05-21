@@ -167,7 +167,7 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
       {/* Smart Circle Surface 3 — suggestions card at the top of the member list */}
       {surface3People.length > 0 && (
         <div className="px-5 mb-5">
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+          <div className="glass p-4">
             <div className="flex items-start justify-between gap-2 mb-3">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">
                 <Sparkles className="w-3.5 h-3.5 text-primary" strokeWidth={1.75} />
@@ -215,7 +215,7 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
 
       <div className="px-5 space-y-2">
         {members.length === 0 ? (
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-5 text-center">
+          <div className="glass p-5 text-center">
             <p className="text-[14px] text-muted-text">No one in this Event yet.</p>
             <p className="text-[12px] text-muted-text mt-1">
               Add people and tag this Event, or wait for a Smart suggestion.
@@ -225,7 +225,7 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           members.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3 p-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden"
+              className="flex items-center gap-3 p-3.5 glass overflow-hidden"
             >
               <button
                 onClick={() => onSelectPerson(p.id)}

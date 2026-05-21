@@ -230,18 +230,52 @@ Everything else from the spec is wired: 5-tab IA, all screens (HOME, PEOPLE-01/0
 - **In-app wordmark:** `<Wordmark />` from `src/components/Wordmark.tsx` — renders DM Serif Display + red period span. Use this everywhere the brand name appears in the React UI (auth, onboarding, etc.). Do NOT use a raster wordmark inline.
 - **Bare-hands SVG mark:** NOT in the repo yet. Spec calls for it at ≤32px (favicon, tab icons, notifications). Currently no UI uses it; will be vector-traced from the PDF or supplied by founder in M2.
 
-### Visual Brief hard rules — quick reference
+### Visual style — Liquid Glass (current direction)
 
-If you find yourself violating any of these, stop and re-read the brief:
+**Source of truth: `/LIQUID_GLASS.md` at repo root.** A redesign rolled the
+surface treatment from "flat dark cards on black" to a frosted-glass system
+over a warm ambient backdrop. The new recipes (`.glass`, `.glass-warm`,
+`.glass-red`, `.glass-pill`, `.glass-input`, `.glass-action-primary`,
+`.frosted-nav`, `.ambient-backdrop`) live in `src/index.css`. Read the spec
+before authoring any new surface; don't invent patterns that aren't there.
 
-- **One red moment per frame.** Primary Red (#E03030) appears exactly once per screen. If you use it twice, remove one.
-- **No ambient red glow.** The body background is pure `#000000`. No radial gradients, no warm wash. Glow was intentionally removed in M1.
-- **No glassmorphism / backdrop-blur.** Surfaces are flat with hairline borders. The old `.warm-shadow` with backdrop-filter is gone.
-- **No pill buttons.** Buttons are 8px radius. Never fully rounded.
-- **Two fonts only:** DM Serif Display (400) for emotionally-loaded headings; DM Sans (400/500/600/700) for everything operational. Never mix within a line.
-- **Lucide icons only, stroke 1.5–2px.** No filled icons, no mixed icon families.
-- **Tile colors are muted (~35% sat).** Only the Red tile is full saturation. New 8-tile palette lives in `src/index.css` as `--tile-{name}-from/to` and as Tailwind utility classes `.tile-red` through `.tile-teal`.
+Hard rules under Liquid Glass:
 
-### Legacy compatibility shim
+- **Ambient warm backdrop is the canvas.** Every screen sits inside
+  `<div class="ambient-backdrop">` (handled at `AppLayout` so individual
+  pages don't repeat it). Glass on flat black looks like translucent gray;
+  the warm radial gradient + grain overlay is what gives the blur something
+  to work against. Do not paint a per-screen solid background that
+  overrides the backdrop.
+- **One red signal per frame, with one exception.** Red is reserved for
+  the FAB, the active nav tab, the primary action inside a hero glass card
+  (`.glass-action-primary`), and the period after a name. The FAB + the
+  hero red action are allowed to coexist because they belong to the same
+  "moment" — see LIQUID_GLASS.md §7. Anywhere else, if you've used red,
+  use it once.
+- **Glass surfaces are mandatory for cards / inputs / nav / sheets.** Use
+  `.glass` for ordinary cards, `.glass-warm` for hero containers,
+  `.glass-red` for the one-action hero, `.glass-pill` for chips/status,
+  `.glass-input` for search/text inputs sitting on the backdrop. Sheets
+  use a glass fill on top of the standard sheet container.
+- **Pill chips, pill nav.** Glass pills are pill-shaped by design (radius
+  14px). Buttons inside cards stay at 8–14px (button-shaped, not fully
+  rounded).
+- **DM Serif Display + DM Sans.** DM Serif Display ships in regular and
+  italic — italic is reserved for emotional accents (user's first name,
+  Recall hero, person notes, "see all" affordances). Never bold the serif.
+  Section labels are uppercase DM Sans 600 with `letter-spacing: 0.16em`.
+- **Lucide icons only, stroke 1.5–2px.** Unchanged. Inside `.icon-tile`
+  containers (the small red gradient square in `.glass-action-primary`)
+  the icon is white at stroke 1.75.
+- **Tile colors stay muted (~35% sat) — red tile is full-sat.** The
+  12-tone tile palette in `src/index.css` continues to drive Circle and
+  Event emoji tiles. These are USER-OWNED visual content and survive the
+  glass redesign unchanged.
 
-`src/index.css` has a `@layer utilities` block at the bottom marked "v1 → v2 compatibility shim" that maps old utility classes (`.warm-shadow`, `.warm-shadow-lg`, `.icon-tile`, `.icon-tile-red`, `.shadow-glow-primary`, `.bg-gradient-primary`) to v2-compliant equivalents. These exist only so M1 ships without breaking the existing pages — they will be removed in M2 as each screen gets a full rewrite. Don't add new usages of these classes; write to the v2 tokens directly.
+### Legacy compatibility — `surface-1` / `surface-2`
+
+`src/index.css` still ships the flat `.surface-1` / `.surface-2` /
+`.surface-elevated` utilities so non-migrated components continue to
+render. Prefer the glass utilities for any new or rewritten surface.
+The flat surfaces will be removed once every screen is on glass.

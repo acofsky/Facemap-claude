@@ -42,12 +42,12 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
   };
 
   const inputClass =
-    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+    'glass-input w-full h-11 px-3.5 text-sm';
 
   return (
     <div>
       {adding && (
-        <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 mb-3 space-y-2 animate-fade-in">
+        <div className="glass p-4 mb-3 space-y-2 animate-fade-in">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
           <input
             value={place}
@@ -85,7 +85,7 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
 
       <div className="space-y-2">
         {meetings.map((m) => (
-          <div key={m.id} className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-3.5">
+          <div key={m.id} className="glass p-3.5">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 text-[12px] text-muted-text mb-1">

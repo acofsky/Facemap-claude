@@ -12,7 +12,7 @@ import { AppPermissionsPage } from '@/pages/AppPermissionsPage';
 import { cn } from '@/lib/utils';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const PRIVACY_POLICY_URL: string | null =
   'https://www.termsfeed.com/live/00f81b1d-cab0-4059-93ed-1103b7603d30';
 
@@ -48,8 +48,9 @@ export function ProfilePage() {
       toast.success('Check both your old and new email to confirm the change.');
       setNewEmail('');
       setSettingsOpen(null);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not update email.';
+      toast.error(msg);
     } finally {
       setEmailLoading(false);
     }
@@ -66,8 +67,9 @@ export function ProfilePage() {
       toast.success('Name updated.');
       setNewFirstName('');
       setSettingsOpen(null);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not update name.';
+      toast.error(msg);
     } finally {
       setNameLoading(false);
     }
@@ -91,8 +93,9 @@ export function ProfilePage() {
       setNewPassword('');
       setConfirmPassword('');
       setSettingsOpen(null);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not update password.';
+      toast.error(msg);
     } finally {
       setPwLoading(false);
     }
@@ -105,13 +108,8 @@ export function ProfilePage() {
   const handleDeleteConfirmed = async () => {
     setDeleting(true);
     try {
-      // Wipes the user's owned rows in every table + the photo folder in
-      // storage + auth.users itself. Lives in supabase/functions/delete-account.
-      // Required for App Store Guideline 5.1.1(v).
       const { error } = await supabase.functions.invoke('delete-account');
       if (error) throw error;
-      // Drop the local session — onAuthStateChange will bounce us back
-      // to AuthPage now that the JWT is invalid.
       await signOut();
       toast.success('Account deleted.');
     } catch (err) {
@@ -123,33 +121,50 @@ export function ProfilePage() {
 
   const displayName =
     currentFirstName ||
-    ((user?.user_metadata as any)?.full_name as string | undefined) ||
+    ((user?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
     '';
   const initials = (displayName[0] || user?.email?.[0] || '?').toUpperCase();
 
   return (
     <div className="pb-10 animate-fade-in">
-      {/* Nav bar */}
-      <div className="sticky top-0 z-20 bg-background flex items-center justify-center pt-3 pb-3 mb-1">
-        <h1 className="text-[17px] font-semibold text-foreground">Profile</h1>
+      <div className="sticky top-0 z-20 flex items-center justify-center pt-4 pb-3 mb-2">
+        <h1 className="font-display text-[26px] tracking-[-0.02em] text-foreground">Profile</h1>
       </div>
 
-      {/* User block */}
-      <div className="px-5 mb-7 flex items-center gap-3.5">
-        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-base">
-          {initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          {displayName && (
-            <div className="text-[16px] font-semibold text-foreground truncate">{displayName}</div>
-          )}
-          <div className={cn('truncate', displayName ? 'text-[13px] text-muted-text' : 'text-[15px] font-medium text-foreground')}>
-            {user?.email}
+      {/* User card — raised glass with serif name, red period, email, edit */}
+      <div className="px-5 mb-7">
+        <div className="glass glass-raised flex items-center gap-3.5 p-4">
+          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-display text-2xl">
+            {initials}
           </div>
+          <div className="min-w-0 flex-1">
+            {displayName ? (
+              <div className="font-display text-[22px] text-foreground truncate leading-tight">
+                {displayName}<span className="text-primary">.</span>
+              </div>
+            ) : null}
+            <div className={cn(
+              'truncate',
+              displayName
+                ? 'text-[13px] text-[hsl(var(--foreground)/0.55)] mt-0.5'
+                : 'font-display text-[20px] text-foreground'
+            )}>
+              {user?.email}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setNewFirstName(currentFirstName);
+              setSettingsOpen('name');
+            }}
+            aria-label="Edit name"
+            className="glass-pill !w-9 !h-9 !p-0 flex items-center justify-center text-foreground shrink-0"
+          >
+            <Pencil className="w-4 h-4" strokeWidth={1.75} />
+          </button>
         </div>
       </div>
 
-      {/* Account */}
       <SectionLabel>Account</SectionLabel>
       <SectionCard>
         <SettingRow
@@ -176,15 +191,14 @@ export function ProfilePage() {
           label="Sign out"
           onClick={handleSignOutConfirm}
           tone="destructive"
-          last
         />
       </SectionCard>
 
-      {/* Preferences */}
       <SectionLabel>Preferences</SectionLabel>
       <SectionCard>
         <SettingRow
           icon={Sparkles}
+          iconAccent
           label="Reintroduce me to Membr"
           onClick={resetOnboarding}
         />
@@ -197,11 +211,9 @@ export function ProfilePage() {
           icon={ShieldCheck}
           label="App Permissions"
           onClick={() => setPermsOpen(true)}
-          last
         />
       </SectionCard>
 
-      {/* About */}
       <SectionLabel>About</SectionLabel>
       <div className="px-5 mb-3">
         <AIDisclosure />
@@ -212,15 +224,10 @@ export function ProfilePage() {
           rightLabel={APP_VERSION}
           nonInteractive
         />
-        {/* Terms-of-Service row removed: Apple doesn't require ToS and we
-            don't have one. Privacy Policy stays, opens the live URL once
-            it's set — until then the row is hidden so the App Store
-            reviewer doesn't tap a dead link. */}
         {PRIVACY_POLICY_URL && (
           <SettingRow
             label="Privacy Policy"
             onClick={() => window.open(PRIVACY_POLICY_URL!, '_blank', 'noopener,noreferrer')}
-            last
           />
         )}
       </SectionCard>
@@ -229,9 +236,9 @@ export function ProfilePage() {
         <button
           onClick={() => setDeleteConfirmOpen(true)}
           disabled={deleting}
-          className="text-[14px] text-muted-text hover:text-destructive transition-colors disabled:opacity-50"
+          className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.5)] disabled:opacity-50"
         >
-          {deleting ? 'Deleting…' : 'Delete Account'}
+          {deleting ? 'Deleting…' : 'Delete account'}
         </button>
       </div>
 
@@ -239,14 +246,15 @@ export function ProfilePage() {
         open={deleteConfirmOpen}
         title="Delete your account?"
         description="This permanently removes your account, all the people you've added, your circles and events, encounters, and any photos. This cannot be undone."
-        confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
+        confirmLabel="Delete account"
         cancelLabel="Keep account"
         destructive
+        loading={deleting}
+        loadingLabel="Deleting"
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirmOpen(false)}
       />
 
-      {/* Settings inline sheet */}
       <AnimatePresence>
         {notifPrefsOpen && (
           <NotificationPreferencesPage onBack={() => setNotifPrefsOpen(false)} />
@@ -263,10 +271,11 @@ export function ProfilePage() {
             onClick={() => setSettingsOpen(null)}
           />
           <div
-            className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 border-t border-[hsl(0_0%_100%/0.12)] rounded-t-2xl overflow-y-auto safe-bottom z-[60] animate-scale-in"
+            className="kb-aware-sheet glass fixed left-0 right-0 mx-auto w-full max-w-md rounded-t-2xl overflow-y-auto safe-bottom z-[60] animate-scale-in"
+            style={{ background: 'rgba(20, 14, 14, 0.92)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-surface-2 flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]">
+            <div className="sticky top-0 flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]" style={{ background: 'rgba(20, 14, 14, 0.92)' }}>
               <h2 className="text-xl font-display text-foreground tracking-[-0.02em]">
                 {settingsOpen === 'email'
                   ? 'Change email'
@@ -274,15 +283,19 @@ export function ProfilePage() {
                   ? 'Your name'
                   : 'Change password'}
               </h2>
-              <button onClick={() => setSettingsOpen(null)} aria-label="Close" className="w-8 h-8 rounded-md hover:bg-[hsl(0_0%_100%/0.06)] flex items-center justify-center">
-                <X className="w-4 h-4 text-muted-text" strokeWidth={1.75} />
+              <button
+                onClick={() => setSettingsOpen(null)}
+                aria-label="Close"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-[hsl(var(--foreground)/0.55)]"
+              >
+                <X className="w-4 h-4" strokeWidth={1.75} />
               </button>
             </div>
 
             <div className="p-5">
               {settingsOpen === 'name' ? (
                 <form onSubmit={handleNameUpdate} className="space-y-3">
-                  <p className="text-[12px] text-muted-text">
+                  <p className="text-[12px] text-[hsl(var(--foreground)/0.6)]">
                     Used in your home greeting. First name only.
                   </p>
                   <input
@@ -295,12 +308,12 @@ export function ProfilePage() {
                     autoComplete="given-name"
                     maxLength={40}
                     autoFocus
-                    className="w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                    className="glass-input w-full h-11 px-3.5 text-sm"
                   />
                   <button
                     type="submit"
                     disabled={nameLoading || !newFirstName.trim() || newFirstName.trim() === currentFirstName}
-                    className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                   >
                     {nameLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                     Save name
@@ -308,7 +321,7 @@ export function ProfilePage() {
                 </form>
               ) : settingsOpen === 'email' ? (
                 <form onSubmit={handleEmailUpdate} className="space-y-3">
-                  <p className="text-[12px] text-muted-text">
+                  <p className="text-[12px] text-[hsl(var(--foreground)/0.6)]">
                     Current: <span className="text-foreground">{user?.email}</span>. You'll get a confirmation link at both addresses.
                   </p>
                   <input
@@ -316,12 +329,12 @@ export function ProfilePage() {
                     placeholder="New email address"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                    className="glass-input w-full h-11 px-3.5 text-sm"
                   />
                   <button
                     type="submit"
                     disabled={emailLoading || !newEmail}
-                    className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                   >
                     {emailLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                     Update email
@@ -329,14 +342,14 @@ export function ProfilePage() {
                 </form>
               ) : (
                 <form onSubmit={handlePasswordUpdate} className="space-y-3">
-                  <p className="text-[12px] text-muted-text">Use at least 6 characters.</p>
+                  <p className="text-[12px] text-[hsl(var(--foreground)/0.6)]">Use at least 6 characters.</p>
                   <input
                     type="password"
                     placeholder="New password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     minLength={6}
-                    className="w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                    className="glass-input w-full h-11 px-3.5 text-sm"
                   />
                   <input
                     type="password"
@@ -344,12 +357,12 @@ export function ProfilePage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     minLength={6}
-                    className="w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+                    className="glass-input w-full h-11 px-3.5 text-sm"
                   />
                   <button
                     type="submit"
                     disabled={pwLoading || !newPassword}
-                    className="w-full h-[52px] rounded-md bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                   >
                     {pwLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                     Update password
@@ -367,7 +380,9 @@ export function ProfilePage() {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-5 mb-2 mt-1">
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">{children}</h2>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--foreground)/0.55)]">
+        {children}
+      </h2>
     </div>
   );
 }
@@ -375,7 +390,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-5 mb-5">
-      <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden divide-y divide-[hsl(0_0%_100%/0.06)]">
+      <div className="glass overflow-hidden p-0">
         {children}
       </div>
     </div>
@@ -384,45 +399,52 @@ function SectionCard({ children }: { children: React.ReactNode }) {
 
 function SettingRow({
   icon: Icon,
+  iconAccent,
   label,
   rightLabel,
   onClick,
   tone,
   nonInteractive,
-  last,
 }: {
   icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
+  iconAccent?: boolean;
   label: string;
   rightLabel?: string;
   onClick?: () => void;
   tone?: 'default' | 'destructive';
   nonInteractive?: boolean;
-  last?: boolean;
 }) {
+  const isDestructive = tone === 'destructive';
   const cls = cn(
-    'w-full h-[52px] flex items-center gap-3 px-4 text-left',
-    !nonInteractive && 'hover:bg-[hsl(0_0%_100%/0.04)] active:bg-[hsl(0_0%_100%/0.06)]',
-    tone === 'destructive' ? 'text-primary' : 'text-foreground',
+    'glass-row w-full text-left',
+    isDestructive && 'destructive',
   );
   const Inner = (
     <>
       {Icon && (
         <Icon
-          className={cn('w-4 h-4 shrink-0', tone === 'destructive' ? 'text-primary' : 'text-muted-text')}
+          className={cn(
+            'w-4 h-4 shrink-0',
+            isDestructive
+              ? 'text-primary'
+              : iconAccent
+                ? 'text-primary'
+                : 'text-[hsl(var(--foreground)/0.55)]',
+          )}
           strokeWidth={1.75}
         />
       )}
       <span className="text-[15px] flex-1 truncate">{label}</span>
       {rightLabel ? (
-        <span className="text-[13px] text-muted-text">{rightLabel}</span>
+        <span className="text-[13px] text-[hsl(var(--foreground)/0.55)]">{rightLabel}</span>
       ) : !nonInteractive ? (
-        <ChevronRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+        <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
       ) : null}
     </>
   );
 
   if (nonInteractive) {
-    return <div className={cls + (last ? '' : '')}>{Inner}</div>;
+    return <div className={cls}>{Inner}</div>;
   }
   return (
     <button onClick={onClick} className={cls}>

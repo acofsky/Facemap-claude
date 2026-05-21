@@ -145,7 +145,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
   };
 
   const inputClass =
-    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+    'glass-input w-full h-11 px-3.5 text-base';
 
   return (
     <>
@@ -170,7 +170,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md glass-sheet rounded-t-2xl z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-center justify-between px-5 pt-2 pb-3">

@@ -112,7 +112,7 @@ export function AppPermissionsPage({ onBack }: AppPermissionsPageProps) {
           iOS doesn't let apps re-prompt for permissions once you've decided. To change anything below, tap "Change in Settings" — it'll open iOS Settings → Membr.
         </p>
 
-        <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden divide-y divide-[hsl(0_0%_100%/0.06)]">
+        <div className="glass overflow-hidden divide-y divide-[hsl(0_0%_100%/0.06)]">
           {rows.map((r) => (
             <div key={r.key} className="px-4 py-3.5 flex items-start gap-3">
               <r.icon className="w-4 h-4 text-muted-text mt-0.5 shrink-0" strokeWidth={1.75} />

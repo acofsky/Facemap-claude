@@ -86,7 +86,7 @@ export function PersonPickerSheet({
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md glass-sheet rounded-t-2xl z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-start justify-between px-5 pt-2 pb-3">

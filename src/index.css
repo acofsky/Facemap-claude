@@ -1,13 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
- * Membr v2 — Visual Design Brief tokens.
- * HSL is the source of truth. Hex equivalents are documented in the brief.
- * Black canvas. White text. One red signal per frame.
+ * Membr — Liquid Glass tokens (see /LIQUID_GLASS.md).
+ *
+ * The v2 black-canvas + DM Serif Display + DM Sans + one-red-moment system
+ * is preserved. Surfaces now use frosted glass (backdrop-filter blur +
+ * low-opacity fill + inset highlight + drop shadow) over a warm ambient
+ * dawn-gradient backdrop with a faint SVG grain overlay. HSL remains the
+ * source of truth for the foundational palette.
  */
 
 @layer base {
@@ -15,8 +19,8 @@
     /* Foundation — black to white */
     --background: 0 0% 0%;            /* #000000 */
     --foreground: 0 0% 96%;           /* #F4F4F4 */
-    --surface-1: 0 0% 6%;             /* #0F0F0F — cards, list rows */
-    --surface-2: 0 0% 10%;            /* #1A1A1A — elevated, sheets, inputs */
+    --surface-1: 0 0% 6%;             /* #0F0F0F — legacy flat cards, list rows */
+    --surface-2: 0 0% 10%;            /* #1A1A1A — legacy elevated, sheets, inputs */
     --border-hairline: 0 0% 100%;     /* used as rgba(255,255,255,0.08) via opacity */
     --muted-text: 0 0% 40%;           /* #666666 */
     --disabled: 0 0% 25%;             /* #404040 */
@@ -50,11 +54,19 @@
     --input: var(--surface-2);
     --ring: var(--primary);
 
-    /* Radii — buttons 8, cards 10, modal/featured 12 */
+    /* Radii — buttons 8, cards 10, modal/featured 12, glass cards 16 */
     --radius: 0.5rem;                 /* 8px — button + input baseline */
     --radius-card: 0.625rem;          /* 10px */
     --radius-card-elevated: 0.75rem;  /* 12px */
     --radius-sheet: 1rem;             /* 16px (top corners only on bottom sheets) */
+    --radius-glass: 1rem;             /* 16px — standard glass card */
+    --radius-glass-lg: 1.25rem;       /* 20px — hero glass card */
+
+    /* Text on glass — derived from --foreground at varying opacity */
+    --text-on-glass:        hsl(var(--foreground));
+    --text-on-glass-mid:    hsl(var(--foreground) / 0.70);
+    --text-on-glass-muted:  hsl(var(--foreground) / 0.55);
+    --text-on-glass-faint:  hsl(var(--foreground) / 0.40);
 
     /* Circle / Event tile gradients — 12 options, all at 135°. Red is the only full-saturation tile. */
     --tile-red-from:    0 75% 42%;    /* #B52020 */
@@ -124,7 +136,6 @@
   }
 
   body {
-    /* No ambient red glow. Pure black canvas — the brief is explicit. */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -144,8 +155,274 @@
     font-family: 'DM Serif Display', Georgia, serif;
     letter-spacing: -0.02em;
   }
+  .font-display-italic {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-style: italic;
+    letter-spacing: -0.02em;
+  }
 
-  /* Surfaces — Visual Brief §4 */
+  /* ───────────────────────────────────────────────────────────────────────
+   * AMBIENT BACKDROP
+   *
+   * Apply to the screen root. The warm radial gradient + grain overlay is
+   * what gives glass surfaces something to blur against — drop this and
+   * the glass cards look like flat translucent gray rectangles instead of
+   * frosted material. See LIQUID_GLASS.md §3.1.
+   * ─────────────────────────────────────────────────────────────────────── */
+  .ambient-backdrop {
+    position: relative;
+    background:
+      radial-gradient(ellipse 80% 70% at 100% 0%, rgba(224, 90, 50, 0.32), transparent 55%),
+      radial-gradient(ellipse 90% 60% at 0% 8%, rgba(178, 60, 90, 0.18), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 50% 35%, rgba(160, 60, 60, 0.08), transparent 70%),
+      #000;
+  }
+  .ambient-backdrop::after {
+    /* SVG grain noise — physical material texture, ~0.32 opacity. */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.32;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .ambient-backdrop > * { position: relative; z-index: 1; }
+
+  /* ───────────────────────────────────────────────────────────────────────
+   * GLASS SURFACES
+   * ─────────────────────────────────────────────────────────────────────── */
+
+  /* Base — neutral frosted card. Drop on any container. */
+  .glass {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-glass);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.03),
+      0 4px 20px rgba(0, 0, 0, 0.35);
+    position: relative;
+  }
+  /* Top-edge wet highlight — sits over the fill, under content. */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 30%);
+    pointer-events: none;
+  }
+  .glass > * { position: relative; z-index: 1; }
+
+  /* Raised hero card — stronger highlight, deeper shadow. */
+  .glass-raised {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.04),
+      0 1px 0 rgba(0, 0, 0, 0.3),
+      0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Warm-tinted glass — for hero containers (Quick Actions card on Home). */
+  .glass-warm {
+    background: rgba(255, 200, 160, 0.06);
+    border-color: rgba(255, 255, 255, 0.10);
+  }
+
+  /* Red-tinted glass — for the one primary action per screen. */
+  .glass-red {
+    background: rgba(224, 48, 48, 0.18);
+    border-color: rgba(224, 48, 48, 0.32);
+  }
+
+  /* Pill / chip — small status indicator, filter chip. */
+  .glass-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 14px;
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--r-glass-pill, 14px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+  }
+  .glass-pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--success));
+    box-shadow: 0 0 8px hsl(var(--success) / 0.5);
+  }
+
+  /* Glass input — search fields, dropdowns sitting on the ambient backdrop. */
+  .glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    color: hsl(var(--foreground));
+  }
+  .glass-input::placeholder { color: hsl(var(--foreground) / 0.40); }
+  .glass-input:focus-visible {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 3px hsl(var(--primary) / 0.18);
+  }
+
+  /* Primary red-glass action row — one per screen. */
+  .glass-action-primary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(224, 48, 48, 0.18);
+    border: 1px solid rgba(224, 48, 48, 0.32);
+    border-radius: 14px;
+    backdrop-filter: blur(10px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 4px 16px rgba(224, 48, 48, 0.18);
+    color: hsl(var(--foreground));
+    text-align: left;
+  }
+  .glass-action-primary:active { transform: scale(0.98); }
+  .glass-action-primary .icon-tile {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #E03030, #BE3A15);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 4px 12px rgba(224, 48, 48, 0.4);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+  }
+
+  /* Secondary glass action — neutral version of action-primary. */
+  .glass-action-secondary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    backdrop-filter: blur(10px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    color: hsl(var(--foreground));
+    text-align: left;
+  }
+  .glass-action-secondary:active { transform: scale(0.98); }
+  .glass-action-secondary .icon-tile {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: hsl(var(--foreground));
+  }
+
+  /* Settings list row — sits inside a .glass container. Hairlines divide. */
+  .glass-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: hsl(var(--foreground));
+  }
+  .glass-row:last-child { border-bottom: 0; }
+  .glass-row.destructive {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+   * SHEET CONTAINER — bottom sheet body. Sits over a dim overlay, so it
+   * needs a near-opaque dark fill (the ambient backdrop is hidden by the
+   * overlay); the inset highlight + hairline border give it the same
+   * material feel as the glass cards above the backdrop.
+   * ─────────────────────────────────────────────────────────────────────── */
+  .glass-sheet {
+    background: rgba(20, 14, 14, 0.92);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-bottom: none;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.04),
+      0 -8px 32px rgba(0, 0, 0, 0.55);
+    position: relative;
+  }
+  .glass-sheet::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 22%);
+    pointer-events: none;
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+   * FROSTED BOTTOM NAV — floats above content with FAB protruding.
+   * Class lives on the nav container; the inner FAB element gets .frosted-fab.
+   * ─────────────────────────────────────────────────────────────────────── */
+  .frosted-nav {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 28px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.04),
+      0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .frosted-fab {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.30),
+      0 8px 24px rgba(224, 48, 48, 0.45),
+      0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+   * LEGACY surfaces — kept for components that haven't been migrated yet.
+   * Prefer .glass / .glass-warm / .glass-red for new code.
+   * ─────────────────────────────────────────────────────────────────────── */
   .surface-1 {
     background-color: hsl(var(--surface-1));
     border: 1px solid hsl(0 0% 100% / 0.08);
@@ -161,7 +438,6 @@
     border-radius: var(--radius-card-elevated);
   }
 
-  /* Elevated / featured card — whisper-thin red ring per spec */
   .surface-elevated {
     background-color: hsl(var(--surface-2));
     border: 1px solid hsl(0 0% 100% / 0.12);
@@ -180,7 +456,7 @@
   .border-hairline { border-color: hsl(0 0% 100% / 0.08); }
   .border-hairline-stronger { border-color: hsl(0 0% 100% / 0.12); }
 
-  /* Circle tile gradients (135°) */
+  /* Circle tile gradients (135°) — preserved for Circle/Event emoji tiles. */
   .tile-red     { background: linear-gradient(135deg, hsl(var(--tile-red-from))     0%, hsl(var(--tile-red-to))     100%); }
   .tile-orange  { background: linear-gradient(135deg, hsl(var(--tile-orange-from))  0%, hsl(var(--tile-orange-to))  100%); }
   .tile-amber   { background: linear-gradient(135deg, hsl(var(--tile-amber-from))   0%, hsl(var(--tile-amber-to))   100%); }
@@ -194,11 +470,7 @@
   .tile-rose    { background: linear-gradient(135deg, hsl(var(--tile-rose-from))    0%, hsl(var(--tile-rose-to))    100%); }
   .tile-slate   { background: linear-gradient(135deg, hsl(var(--tile-slate-from))   0%, hsl(var(--tile-slate-to))   100%); }
 
-  /* Hidden scrollbar utility — preserved from v1, extended in M2 polish
-     pass to also suppress iOS WebView's momentum-scroll overlay scrollbar,
-     which `display: none` alone doesn't kill. `overscroll-behavior: contain`
-     stops bounce-scroll that triggers the overlay; the zero-size + transparent
-     thumb/track rules cover any browser that ignores `display: none`. */
+  /* Hidden scrollbar utility */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -222,21 +494,14 @@
 
 /*
  * Manual keyboard handling — driven by Capacitor Keyboard listeners in App.tsx.
- * When the iOS keyboard is open, `<html>` gets `.kb-open` and the keyboard's
- * height is published as `--keyboard-height`. UI that needs to sit flush
- * with the keyboard reads from these. See useKeyboardSetup() in App.tsx.
  */
 :root { --keyboard-height: 0px; }
 
-/* Hide the safe-bottom inset while the keyboard is up — iOS sets it to 0
-   automatically there anyway, but our class-based version sometimes lags. */
 html.kb-open .safe-bottom { padding-bottom: 0 !important; }
 
-/* Bottom tab bar slides off-screen when the keyboard takes over. */
 .bottom-tabs { transition: transform 0.18s ease-out; }
-html.kb-open .bottom-tabs { transform: translateY(100%); }
+html.kb-open .bottom-tabs { transform: translateY(120%); }
 
-/* The corner-anchored FABs also slide off so they don't peek above the keyboard. */
 .corner-fabs { transition: transform 0.18s ease-out, opacity 0.18s ease-out; }
 html.kb-open .corner-fabs {
   transform: translateY(calc(100% + var(--keyboard-height)));
@@ -244,18 +509,11 @@ html.kb-open .corner-fabs {
   pointer-events: none;
 }
 
-/* Auth screen: KeyboardResize.None means the keyboard overlays the page.
-   When it's up, stop vertically centering the form and pad the bottom by
-   the keyboard height so the focused field and button can scroll clear
-   of the keyboard. */
 html.kb-open .auth-inner {
   justify-content: flex-start;
   padding-bottom: calc(var(--keyboard-height) + 24px);
 }
 
-/* Sheets that opt-in to keyboard-aware positioning. The Y animation comes
-   from Framer Motion; the bottom offset + max-height come from CSS so they
-   track the keyboard fluidly without ever extending past the safe-area-top. */
 .kb-aware-sheet {
   bottom: var(--keyboard-height, 0px);
   max-height: calc(100dvh - var(--keyboard-height) - env(safe-area-inset-top) - 8px);
@@ -264,12 +522,8 @@ html.kb-open .auth-inner {
     max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* When the keyboard is up, paint a 16-px strip of the sheet's bg-surface-2
-   color below the sheet's bottom edge. The iOS keyboard's top has slightly
-   rounded corners; without this strip the body's bg-background bleeds
-   through those corners, looking like a visible seam between the sheet
-   and the keyboard. The strip lives behind the keyboard so it's only
-   visible where the keyboard's rounded corners reveal it. */
+/* Bottom-strip cover for the keyboard top-corner gap. Now matches the glass
+   sheet's fill instead of the legacy surface-2 fill. */
 html.kb-open .kb-aware-sheet::after {
   content: '';
   position: absolute;
@@ -277,16 +531,10 @@ html.kb-open .kb-aware-sheet::after {
   right: 0;
   bottom: -16px;
   height: 16px;
-  background: hsl(var(--surface-2));
+  background: rgba(20, 14, 14, 0.92);
   pointer-events: none;
 }
 
-/*
- * Spec §12 — when the OS reports prefers-reduced-motion: reduce, kill
- * every translateY / scale / pulse animation. Plain opacity fades are
- * fine to keep. Components reading useReduceMotion() handle this for
- * Framer Motion; this block handles CSS-driven animations.
- */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-scale-in,

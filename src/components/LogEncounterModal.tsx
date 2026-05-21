@@ -62,7 +62,7 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
   if (!open) return null;
 
   const inputClass =
-    'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+    'glass-input w-full h-11 px-3.5 text-sm';
 
   return (
     <>
@@ -71,7 +71,7 @@ export function LogEncounterModal({ open, onClose }: LogEncounterModalProps) {
         onClick={handleClose}
       />
       <div
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] p-5 z-[60] safe-bottom animate-scale-in"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md glass-sheet rounded-t-2xl p-5 z-[60] safe-bottom animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {!selected ? (

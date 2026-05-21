@@ -217,7 +217,7 @@ function PersonCardMock({ name, hint }: { name: string; hint: string }) {
     .slice(0, 2)
     .join('');
   return (
-    <div className="w-full rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 flex items-center gap-3">
+    <div className="w-full glass p-4 flex items-center gap-3">
       <div className="w-12 h-12 rounded-full tile-rose flex items-center justify-center text-white font-semibold">
         {initials}
       </div>

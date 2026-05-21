@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Plus, Loader2, ChevronDown, Archive, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, Archive, Pencil, Trash2 } from 'lucide-react';
 import {
   useCircles, useCreateCircle, usePersonCircles, useEvents, usePersonEvents,
   useArchiveEvent, useDeleteCircle, useDeleteEvent,
@@ -16,12 +16,6 @@ import { cn } from '@/lib/utils';
 interface CirclesPageProps {
   onSelectCircle: (id: string) => void;
   onSelectEvent: (id: string) => void;
-  /**
-   * When true, the page is rendered inside NetworkPage. Skip the top
-   * nav (NetworkPage owns the title + segment toggle) and surface the
-   * "+ Add Circle / Event" menu as a small inline button at the top
-   * of the body.
-   */
   embedded?: boolean;
 }
 
@@ -55,7 +49,6 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
   const [circleSheetOpen, setCircleSheetOpen] = useState(false);
   const [eventSheetOpen, setEventSheetOpen] = useState<{ event?: MembrEvent } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  // Long-press context menu for circle/event tiles.
   const [tileMenu, setTileMenu] = useState<
     | { kind: 'circle'; id: string; x: number; y: number }
     | { kind: 'event'; id: string; x: number; y: number }
@@ -75,24 +68,24 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
   const circleMemberCount = (id: string) => personCircles.filter((pc) => pc.circle_id === id).length;
   const eventMemberCount = (id: string) => personEvents.filter((pe) => pe.event_id === id).length;
 
-  const addMenu = (
+  const AddPlusButton = (
     <div className="relative">
       <button
         onClick={() => setAddMenuOpen((v) => !v)}
         onBlur={() => setTimeout(() => setAddMenuOpen(false), 150)}
         aria-label="Create"
-        className="w-9 h-9 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+        className="glass-pill !h-9 !w-9 !p-0 flex items-center justify-center text-foreground active:scale-95 transition-transform"
       >
-        <Plus className="w-5 h-5" strokeWidth={1.75} />
+        <Plus className="w-4 h-4" strokeWidth={1.75} />
       </button>
       {addMenuOpen && (
-        <div className="absolute right-0 top-full mt-1 w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+        <div className="glass absolute right-0 top-full mt-2 w-44 z-20 p-1.5">
           <button
             onClick={() => {
               setCircleSheetOpen(true);
               setAddMenuOpen(false);
             }}
-            className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+            className="w-full text-left px-3 py-2.5 text-[13px] rounded-md text-foreground"
           >
             New Circle
           </button>
@@ -101,7 +94,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
               setEventSheetOpen({});
               setAddMenuOpen(false);
             }}
-            className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-[hsl(0_0%_100%/0.04)]"
+            className="w-full text-left px-3 py-2.5 text-[13px] rounded-md text-foreground"
           >
             New Event
           </button>
@@ -114,16 +107,16 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
     return (
       <div className="pb-8 animate-fade-in">
         {!embedded && (
-          <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
             <span className="w-9" />
-            <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
+            <h1 className="font-display text-[20px] text-foreground">Circles</h1>
             <span className="w-9" />
           </div>
         )}
         <div className="px-5 mb-3">
           <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
         </div>
-        <div className="px-5 grid grid-cols-2 gap-3">
+        <div className="px-5 grid grid-cols-2 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <CircleTileSkeleton key={i} />
           ))}
@@ -132,7 +125,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
         <div className="px-5 mb-3">
           <Skeleton className="h-3 w-16 bg-[hsl(0_0%_100%/0.04)]" />
         </div>
-        <div className="px-5 grid grid-cols-2 gap-3">
+        <div className="px-5 grid grid-cols-2 gap-4">
           {Array.from({ length: 2 }).map((_, i) => (
             <EventTileSkeleton key={i} />
           ))}
@@ -143,25 +136,19 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
 
   return (
     <div className="pb-8 animate-fade-in">
-      {/* Nav bar — only when standalone. NetworkPage owns title + segments
-          when embedded, and the + menu surfaces inline at the top of body. */}
       {!embedded && (
-        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
           <span className="w-9" />
-          <h1 className="text-[17px] font-semibold text-foreground">Circles</h1>
-          <div className="-mr-2">{addMenu}</div>
+          <h1 className="font-display text-[20px] text-foreground">Circles</h1>
+          <div>{AddPlusButton}</div>
         </div>
       )}
 
-      {/* Inline + menu shown only when embedded */}
-      {embedded && (
-        <div className="px-5 pt-1 -mb-1 flex justify-end">{addMenu}</div>
-      )}
-
-      {/* Suggestions in empty state */}
       {circles.length === 0 && (
         <div className="px-5 mb-6">
-          <p className="text-[13px] text-muted-text mb-2.5">Quick start with a suggestion:</p>
+          <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-2.5 font-display-italic">
+            Quick start with a suggestion:
+          </p>
           <div className="flex flex-wrap gap-2">
             {CIRCLE_SUGGESTIONS.map((s) => (
               <button
@@ -169,7 +156,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
                 onClick={() =>
                   createCircle.mutateAsync({ name: s.name, emoji: s.emoji, color: 'hsl(0, 75%, 53%)', tone: 'red' })
                 }
-                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground hover:border-[hsl(0_0%_100%/0.14)] transition-colors"
+                className="glass-pill"
               >
                 <span>{s.emoji}</span>
                 <span>{s.name}</span>
@@ -180,9 +167,9 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
       )}
 
       {/* Circles tier */}
-      <SectionLabel>Circles</SectionLabel>
+      <SectionLabel right={embedded ? AddPlusButton : null}>Circles</SectionLabel>
       {circles.length > 0 ? (
-        <div className="px-5 grid grid-cols-2 gap-3">
+        <div className="px-5 grid grid-cols-2 gap-x-4 gap-y-5">
           {circles.map((circle) => (
             <CircleTile
               key={circle.id}
@@ -195,17 +182,18 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
         </div>
       ) : (
         <div className="px-5">
-          <p className="text-[13px] text-muted-text italic">No Circles yet. Tap + above to create one.</p>
+          <p className="text-[13px] text-[hsl(var(--foreground)/0.55)] font-display-italic">
+            No Circles yet. Tap + above to create one.
+          </p>
         </div>
       )}
 
-      {/* Section divider */}
-      <div className="mx-5 my-6 h-px bg-[hsl(0_0%_100%/0.08)]" />
+      <div className="mx-5 my-7 h-px bg-[hsl(0_0%_100%/0.08)]" />
 
       {/* Events tier */}
       <SectionLabel>Events</SectionLabel>
       {events.length > 0 ? (
-        <div className="px-5 grid grid-cols-2 gap-3">
+        <div className="px-5 space-y-3">
           {events.map((evt) => (
             <EventTile
               key={evt.id}
@@ -218,7 +206,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
         </div>
       ) : (
         <div className="px-5">
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-5 text-center">
+          <div className="glass p-5 text-center">
             <button
               onClick={() => setEventSheetOpen({})}
               className="text-[13px] text-primary font-semibold"
@@ -229,12 +217,11 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
         </div>
       )}
 
-      {/* Archived link */}
       {archivedOnly.length > 0 && (
-        <div className="px-5 mt-4">
+        <div className="px-5 mt-5">
           <button
             onClick={() => setShowArchived((v) => !v)}
-            className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-text hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1 text-[12px] font-medium text-[hsl(var(--foreground)/0.55)]"
           >
             <Archive className="w-3.5 h-3.5" strokeWidth={1.75} />
             Archived ({archivedOnly.length})
@@ -243,13 +230,10 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
           {showArchived && (
             <div className="mt-3 space-y-2">
               {archivedOnly.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)]"
-                >
+                <div key={evt.id} className="glass flex items-center justify-between p-3">
                   <button onClick={() => onSelectEvent(evt.id)} className="min-w-0 flex-1 text-left">
                     <div className="text-[14px] font-medium text-foreground truncate">{evt.name}</div>
-                    <div className="text-[12px] text-muted-text">
+                    <div className="text-[11px] text-[hsl(var(--foreground)/0.55)]">
                       {eventMemberCount(evt.id)} {eventMemberCount(evt.id) === 1 ? 'member' : 'members'}
                       {(evt.start_date || evt.end_date) && ` · ${formatRange(evt.start_date, evt.end_date)}`}
                     </div>
@@ -281,14 +265,13 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
         )}
       </AnimatePresence>
 
-      {/* Long-press context menu */}
       {tileMenu && (
         <div
           className="fixed inset-0 z-[55]"
           onPointerDown={() => setTileMenu(null)}
         >
           <div
-            className="absolute w-44 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 shadow-xl"
+            className="glass absolute w-44 p-1.5"
             style={{
               left: Math.max(12, Math.min(window.innerWidth - 188, tileMenu.x - 88)),
               top: Math.max(12, tileMenu.y),
@@ -372,8 +355,6 @@ function CircleTile({
   const longPress = useLongPress(() => {
     if (ref.current) onLongPress(ref.current);
   });
-  // Founder override of spec §CIRCLES-01: Circles render as colour discs
-  // with name + count below, not 3:2 rectangles. Reads more like "circles".
   return (
     <button
       ref={ref}
@@ -388,16 +369,20 @@ function CircleTile({
       <span
         aria-hidden="true"
         className={cn(
-          'w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white/95',
+          'w-28 h-28 rounded-full flex items-center justify-center text-[40px]',
           `tile-${circleTone(circle)}`,
         )}
+        style={{
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)',
+        }}
       >
         {circle.emoji || ''}
       </span>
-      <span className="text-[14px] font-semibold text-foreground text-center max-w-full px-2 truncate">
+      <span className="font-display text-[15px] text-foreground text-center max-w-full px-2 truncate leading-tight">
         {circle.name}
       </span>
-      <span className="text-[11px] text-muted-text -mt-1">
+      <span className="text-[11px] text-[hsl(var(--foreground)/0.55)] -mt-1.5">
         {memberCount} {memberCount === 1 ? 'member' : 'members'}
       </span>
     </button>
@@ -419,6 +404,7 @@ function EventTile({
   const longPress = useLongPress(() => {
     if (ref.current) onLongPress(ref.current);
   });
+  const tone = isValidTone(event.tone) ? event.tone : 'red';
   return (
     <button
       ref={ref}
@@ -429,17 +415,29 @@ function EventTile({
       }}
       {...longPress}
       className={cn(
-        'aspect-[3/2] rounded-xl p-3.5 flex flex-col justify-end text-left transition-transform active:scale-[0.98]',
-        `tile-${isValidTone(event.tone) ? event.tone : 'red'}`,
+        'relative w-full overflow-hidden rounded-2xl p-4 text-left transition-transform active:scale-[0.99]',
+        // The tile gradient washes in as the underlying fill; the .glass
+        // layer goes on top for the frosted highlight + hairline border.
+        `tile-${tone}`,
       )}
+      style={{
+        minHeight: 92,
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 24px rgba(0,0,0,0.4)',
+        border: '1px solid rgba(255,255,255,0.10)',
+      }}
     >
-      <div className="text-[15px] font-semibold text-white truncate">{event.name}</div>
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-[12px] text-white/70">
+      <div className="font-display text-[18px] text-white truncate leading-tight">
+        {event.name}
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[12px] text-white/80">
           {memberCount} {memberCount === 1 ? 'member' : 'members'}
         </span>
         {(event.start_date || event.end_date) && (
-          <span className="text-[11px] text-white/60">{formatRange(event.start_date, event.end_date)}</span>
+          <span className="text-[11px] text-white/65 font-display-italic">
+            {formatRange(event.start_date, event.end_date)}
+          </span>
         )}
       </div>
     </button>
@@ -461,8 +459,8 @@ function MenuItem({
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center gap-2',
-        destructive ? 'text-destructive' : 'text-foreground',
+        'w-full text-left px-3 py-2.5 text-sm rounded-md flex items-center gap-2',
+        destructive ? 'text-primary font-semibold' : 'text-foreground',
       )}
     >
       <Icon className="w-4 h-4" strokeWidth={1.75} />
@@ -471,10 +469,19 @@ function MenuItem({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({
+  children,
+  right,
+}: {
+  children: React.ReactNode;
+  right?: React.ReactNode;
+}) {
   return (
-    <div className="px-5 mb-3">
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">{children}</h2>
+    <div className="px-5 mb-3 flex items-end justify-between">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--foreground)/0.55)]">
+        {children}
+      </h2>
+      {right}
     </div>
   );
 }

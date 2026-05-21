@@ -118,7 +118,7 @@ export function UseCasesPage({ onBack }: UseCasesPageProps) {
             return (
               <div
                 key={s.title}
-                className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4"
+                className="glass p-4"
               >
                 <div className="flex items-center gap-2.5 mb-2">
                   <span

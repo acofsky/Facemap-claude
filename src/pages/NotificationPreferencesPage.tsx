@@ -198,7 +198,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] overflow-hidden">
+    <div className="glass overflow-hidden">
       {children}
     </div>
   );

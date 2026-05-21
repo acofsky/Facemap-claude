@@ -136,8 +136,8 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         <div className="rounded-full ring-2 ring-primary p-1 mb-3">
           <PersonAvatar name={person.name} photo={person.photos[0]} size="lg" className="!w-24 !h-24 !text-2xl" />
         </div>
-        <div className="text-[20px] font-sans font-bold text-foreground text-center leading-tight tracking-[-0.01em]">
-          {person.name || 'Unknown'}
+        <div className="font-display text-[26px] text-foreground text-center leading-tight tracking-[-0.02em]">
+          {person.name || 'Unknown'}<span className="text-primary">.</span>
         </div>
 
         {personEventObjects.length > 0 && (
@@ -221,11 +221,11 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
       <SectionLabel>About</SectionLabel>
       <div className="px-5 mb-6">
         {person.misc_notes ? (
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+          <div className="glass p-4">
             <BulletDisplay value={person.misc_notes} />
           </div>
         ) : (
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 text-[14px] text-muted-text italic">
+          <div className="glass p-4 text-[14px] text-muted-text italic">
             No notes yet. Tap Edit to add some.
           </div>
         )}
@@ -271,7 +271,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
                 <button
                   key={conn.id}
                   onClick={() => onSelectPerson(other.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                  className="w-full flex items-center gap-3 p-3 glass transition-colors text-left"
                 >
                   <PersonAvatar name={other.name} photo={other.photos[0]} size="sm" />
                   <div className="flex-1 min-w-0">
@@ -291,7 +291,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         <>
           <SectionLabel>Circles</SectionLabel>
           <div className="px-5 mb-6">
-            <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 flex flex-wrap gap-1.5">
+            <div className="glass p-4 flex flex-wrap gap-1.5">
               {personCircleObjects.map((c) => (
                 <span
                   key={c.id}
@@ -315,7 +315,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
       {/* Details */}
       <SectionLabel>Details</SectionLabel>
       <div className="px-5">
-        <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+        <div className="glass p-4">
           <div className="flex items-center gap-2 text-[13px]">
             <span className="text-muted-text">Added</span>
             <span className="text-foreground">{formatDistanceToNow(new Date(person.created_at), { addSuffix: true })}</span>
@@ -396,7 +396,7 @@ function DetailCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+    <div className="glass p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">{label}</span>
         {right}

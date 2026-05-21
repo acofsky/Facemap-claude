@@ -13,7 +13,7 @@ const SHIMMER_WEAK = 'bg-[hsl(0_0%_100%/0.04)]';
 /** Row used in PeoplePage, CircleDetailPage, EventDetailPage. */
 export function PersonRowSkeleton() {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)]">
+    <div className="flex items-center gap-3 p-4 glass">
       <Skeleton className={`w-14 h-14 rounded-full ${SHIMMER_STRONG}`} />
       <div className="flex-1 space-y-2">
         <Skeleton className={`h-3.5 w-32 ${SHIMMER_STRONG}`} />

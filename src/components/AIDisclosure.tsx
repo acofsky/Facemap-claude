@@ -41,19 +41,16 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={
-          "w-full flex items-center gap-3 px-4 py-3.5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left " +
-          (className ?? "")
-        }
+        className={"glass-row w-full text-left " + (className ?? "")}
       >
-        <Sparkles className="w-4 h-4 text-muted-text" strokeWidth={1.75} />
+        <Sparkles className="w-4 h-4 text-primary shrink-0" strokeWidth={1.75} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-foreground">Where AI is used in Membr</div>
-          <div className="text-[11px] text-muted-text mt-0.5">
+          <div className="text-[15px] text-foreground">Where AI is used in Membr</div>
+          <div className="font-display-italic text-[12px] text-[hsl(var(--foreground)/0.55)] mt-0.5">
             {AI_MODEL_LABEL} · {AI_PROVIDER_LABEL}
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-muted-text" strokeWidth={1.75} />
+        <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
       </button>
 
       <AnimatePresence>
@@ -80,7 +77,8 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
                   setOpen(false);
                 }
               }}
-              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-[60] bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] flex flex-col safe-bottom"
+              className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md z-[60] glass rounded-t-2xl flex flex-col safe-bottom"
+              style={{ background: 'rgba(20, 14, 14, 0.92)' }}
             >
               <DragHandle />
               <div className="flex items-center justify-between px-5 pt-2 pb-3">
@@ -93,7 +91,7 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="Close"
-                  className="p-1.5 rounded-md hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text"
+                  className="p-1.5 rounded-md text-[hsl(var(--foreground)/0.55)]"
                 >
                   <X className="w-4 h-4" strokeWidth={1.75} />
                 </button>
@@ -108,19 +106,18 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
 
                 <div className="space-y-3">
                   {FEATURES.map((f) => (
-                    <div
-                      key={f.title}
-                      className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4"
-                    >
+                    <div key={f.title} className="glass p-4">
                       <div className="text-sm font-semibold text-foreground mb-1">{f.title}</div>
-                      <p className="text-[13px] text-muted-text leading-relaxed">{f.detail}</p>
+                      <p className="text-[13px] text-[hsl(var(--foreground)/0.65)] leading-relaxed">
+                        {f.detail}
+                      </p>
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4 flex gap-3">
+                <div className="glass p-4 flex gap-3">
                   <ShieldCheck className="w-4 h-4 text-foreground mt-0.5 shrink-0" strokeWidth={1.75} />
-                  <div className="text-[13px] text-muted-text leading-relaxed">
+                  <div className="text-[13px] text-[hsl(var(--foreground)/0.7)] leading-relaxed">
                     Membr does not use your data to train any AI model. Inputs are sent to{" "}
                     {AI_PROVIDER_LABEL}'s API for the single request and aren't retained for training.
                     AI output can be wrong — review it before relying on it.

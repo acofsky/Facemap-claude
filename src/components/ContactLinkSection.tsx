@@ -97,7 +97,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   if (iosContactId) {
     return (
-      <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+      <div className="glass p-4">
         <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
           <Contact2 className="w-3.5 h-3.5" strokeWidth={1.75} />
           iPhone Contact
@@ -126,7 +126,7 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
 
   return (
     <>
-      <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-4">
+      <div className="glass p-4">
         <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
           <Contact2 className="w-3.5 h-3.5" strokeWidth={1.75} />
           iPhone Contact

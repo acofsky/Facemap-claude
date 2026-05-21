@@ -522,7 +522,7 @@ function PersonEditSkeleton() {
 }
 
 const fieldInputClass =
-  'w-full h-11 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-base text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+  'glass-input w-full h-11 px-3.5 text-base';
 
 function Field({
   label,

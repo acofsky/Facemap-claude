@@ -26,7 +26,7 @@ export function SmartCircleBanner() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
             transition={{ duration: 0.25 }}
-            className="rounded-lg bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-3.5"
+            className="glass glass-warm p-3.5"
           >
             <div className="flex items-start gap-2.5">
               <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" strokeWidth={1.75} />

@@ -35,7 +35,8 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
             animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
             exit={{ opacity: 0, scale: 0.94, x: '-50%', y: '-50%' }}
             transition={{ type: 'spring', damping: 24, stiffness: 360 }}
-            className="fixed left-1/2 top-1/2 z-[61] w-[min(86vw,360px)] rounded-xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-5"
+            className="glass fixed left-1/2 top-1/2 z-[61] w-[min(86vw,360px)] p-5"
+            style={{ background: 'rgba(20, 14, 14, 0.92)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">

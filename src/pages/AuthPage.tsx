@@ -201,7 +201,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
   };
 
   const inputClass =
-    'w-full h-12 px-3.5 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-[15px] text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors';
+    'glass-input w-full h-12 px-3.5 text-[15px]';
 
   return (
     <div className="h-screen overflow-y-auto bg-background safe-top scrollbar-hide">
@@ -287,7 +287,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
 
         {mode === 'forgot' && forgotSent && (
           <div className="space-y-3 text-center">
-            <div className="p-5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] space-y-2">
+            <div className="glass p-5 space-y-2">
               <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">Check your inbox</h2>
               <p className="text-[13px] text-muted-text leading-relaxed">
                 We sent a reset link to <span className="text-foreground">{email}</span>. Tap it on this device to set a new password.
@@ -308,7 +308,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
         {/* SIGN IN / SIGN UP */}
         {(mode === 'sign-in' || mode === 'sign-up') && (pendingVerification ? (
           <div className="space-y-3 text-center">
-            <div className="p-5 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] space-y-2">
+            <div className="glass p-5 space-y-2">
               <h2 className="font-display text-xl text-foreground tracking-[-0.02em]">Check your email</h2>
               <p className="text-[13px] text-muted-text leading-relaxed">
                 We sent a verification link to <span className="text-foreground">{email}</span>. Tap it and you'll be signed in automatically.
@@ -317,7 +317,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
             <button
               onClick={handleResend}
               disabled={loading || resendIn > 0}
-              className="w-full h-[52px] rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground font-medium hover:border-[hsl(0_0%_100%/0.18)] transition-colors disabled:opacity-50"
+              className="glass-pill !h-[52px] !rounded-2xl w-full text-foreground font-medium disabled:opacity-50"
             >
               {loading ? 'Sending…' : resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend verification email'}
             </button>
@@ -441,7 +441,7 @@ export function AuthPage({ initialMode, onResetComplete }: AuthPageProps = {}) {
 
             <button
               onClick={handleGoogle}
-              className="w-full h-[52px] rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-foreground font-medium hover:border-[hsl(0_0%_100%/0.18)] transition-colors flex items-center justify-center gap-2"
+              className="glass-pill !h-[52px] !rounded-2xl w-full text-foreground font-medium flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />

@@ -37,10 +37,14 @@ const Index = () => {
   // Detail pages are exclusive — fullscreen overlays that suspend the tab UI.
   if (selectedPersonId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+      <div className="ambient-backdrop max-w-md mx-auto min-h-screen relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 60%, transparent 100%)',
+          }}
         />
         <PersonProfilePage
           personId={selectedPersonId}
@@ -52,10 +56,14 @@ const Index = () => {
   }
   if (selectedCircleId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+      <div className="ambient-backdrop max-w-md mx-auto min-h-screen relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 60%, transparent 100%)',
+          }}
         />
         <CircleDetailPage
           circleId={selectedCircleId}
@@ -70,10 +78,14 @@ const Index = () => {
   }
   if (selectedEventId) {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-background relative">
+      <div className="ambient-backdrop max-w-md mx-auto min-h-screen relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-background safe-top pointer-events-none"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 60%, transparent 100%)',
+          }}
         />
         <EventDetailPage
           eventId={selectedEventId}

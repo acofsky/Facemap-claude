@@ -281,7 +281,7 @@ export function VoiceAddSheet({ onClose }: VoiceAddSheetProps) {
             onClose();
           }
         }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[60] flex flex-col safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md glass-sheet rounded-t-2xl z-[60] flex flex-col safe-bottom"
       >
         <DragHandle />
         <div className="flex items-center justify-between px-5 pt-2 pb-3">
@@ -709,7 +709,7 @@ function PersonPickerSheet({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 32, stiffness: 400 }}
-        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md bg-surface-2 rounded-t-2xl border-t border-[hsl(0_0%_100%/0.12)] z-[70] p-5 safe-bottom"
+        className="kb-aware-sheet fixed left-0 right-0 mx-auto w-full max-w-md glass-sheet rounded-t-2xl z-[70] p-5 safe-bottom"
       >
         <DragHandle />
         <h3 className="font-display text-xl text-foreground tracking-[-0.02em] mb-3">Pick a person</h3>

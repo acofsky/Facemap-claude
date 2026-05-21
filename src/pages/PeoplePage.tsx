@@ -6,29 +6,23 @@ import { LogEncounterModal } from '@/components/LogEncounterModal';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonRowSkeleton } from '@/components/skeletons';
-import { Search, Loader2, ListFilter, ChevronRight, ChevronDown, CalendarPlus, Sparkles } from 'lucide-react';
+import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
-  /**
-   * When true, the page is rendered inside NetworkPage. Skip the top
-   * nav (NetworkPage owns the title + segment toggle) and inline the
-   * sort menu alongside the search bar.
-   */
   embedded?: boolean;
 }
 
 type SortKey = 'recent' | 'az' | 'circle';
 
 const SORT_LABELS: Record<SortKey, string> = {
-  recent: 'Recently Added',
+  recent: 'Recently added',
   az: 'Alphabetical A–Z',
-  circle: 'By Circle',
+  circle: 'By circle',
 };
 
-// Active filter is one chip at a time: 'all' or `${'circle'|'event'}:${id}`.
 type FilterKey = string | null;
 
 export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps) {
@@ -100,12 +94,12 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
         onClick={() => setSortOpen((v) => !v)}
         onBlur={() => setTimeout(() => setSortOpen(false), 150)}
         aria-label="Sort"
-        className="w-9 h-9 flex items-center justify-center text-foreground active:scale-95 transition-transform"
+        className="glass-pill !h-11 !w-11 !p-0 flex items-center justify-center text-foreground active:scale-95 transition-transform"
       >
-        <ListFilter className="w-5 h-5" strokeWidth={1.75} />
+        <ListFilter className="w-4 h-4" strokeWidth={1.75} />
       </button>
       {sortOpen && (
-        <div className="absolute right-0 top-full mt-1 w-48 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] py-1 z-20 shadow-xl">
+        <div className="glass absolute right-0 top-full mt-2 w-52 z-20 p-1.5">
           {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
             <button
               key={key}
@@ -114,12 +108,12 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
                 setSortOpen(false);
               }}
               className={cn(
-                'w-full text-left px-3 py-2.5 text-sm hover:bg-[hsl(0_0%_100%/0.04)] flex items-center justify-between',
-                sortBy === key ? 'text-foreground' : 'text-muted-text',
+                'w-full text-left px-3 py-2.5 text-[13px] rounded-md flex items-center justify-between',
+                sortBy === key ? 'text-foreground' : 'text-[hsl(var(--foreground)/0.6)]',
               )}
             >
               {SORT_LABELS[key]}
-              {sortBy === key && <ChevronDown className="w-3 h-3 text-primary" />}
+              {sortBy === key && <Check className="w-3.5 h-3.5 text-primary" strokeWidth={2} />}
             </button>
           ))}
         </div>
@@ -131,14 +125,14 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
     return (
       <div className="pb-8 animate-fade-in">
         {!embedded && (
-          <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-            <span className="w-9" />
-            <h1 className="text-[17px] font-semibold text-foreground">People</h1>
-            <span className="w-9" />
+          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+            <span className="w-11" />
+            <h1 className="font-display text-[20px] text-foreground">People</h1>
+            <span className="w-11" />
           </div>
         )}
         <div className="px-5 mb-3">
-          <Skeleton className="h-11 w-full rounded-md bg-[hsl(0_0%_100%/0.05)]" />
+          <Skeleton className="h-11 w-full rounded-2xl bg-[hsl(0_0%_100%/0.05)]" />
         </div>
         <div className="px-5 space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -151,33 +145,32 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
 
   return (
     <div className="pb-8 animate-fade-in">
-      {/* Nav bar — only when standalone. NetworkPage owns the title + segment
-          toggle when embedded, and the sort menu moves inline below. */}
       {!embedded && (
-        <div className="sticky top-0 z-20 bg-background flex items-center justify-between px-5 pt-3 pb-3 mb-1">
-          <span className="w-9" />
-          <h1 className="text-[17px] font-semibold text-foreground">People</h1>
-          <div className="-mr-2">{sortMenu}</div>
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <span className="w-11" />
+          <h1 className="font-display text-[20px] text-foreground">People</h1>
+          <div>{sortMenu}</div>
         </div>
       )}
 
-      {/* Inline search + sort (sort only when embedded — otherwise it lives in the nav) */}
       <div className="px-5 mb-3">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
+            <Search
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--foreground)/0.45)]"
+              strokeWidth={1.75}
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search names and notes…"
-              className="w-full h-11 pl-10 pr-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.08)] text-sm text-foreground placeholder:text-muted-text focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-colors"
+              className="glass-input w-full h-11 pl-10 pr-3 text-sm"
             />
           </div>
           {embedded && sortMenu}
         </div>
       </div>
 
-      {/* Filter chips */}
       {(circles.length > 0 || events.length > 0) && (
         <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 px-5 scrollbar-hide">
           <FilterChip active={!filter} onClick={() => setFilter(null)} label="All" />
@@ -208,26 +201,31 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
         </div>
       )}
 
-      {/* List */}
       {filtered.length === 0 ? (
         <div className="px-5">
-          <div className="rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] p-8 text-center">
-            <p className="text-sm text-muted-text">
+          <div className="glass p-8 text-center">
+            <p className="text-sm font-display-italic text-[hsl(var(--foreground)/0.6)]">
               {people.length === 0
-                ? 'No people yet. Tap the red + button to add someone.'
+                ? "No people yet. Tap the red + to add someone."
                 : 'No results.'}
             </p>
           </div>
         </div>
       ) : (
-        <div className="px-5 space-y-2">
+        <div className="px-5 space-y-2.5">
           {filtered.map((p) => {
             const cIds = personCircleMap[p.id] || [];
             const cs = cIds.map((id) => circles.find((c) => c.id === id)).filter(Boolean);
+            const noteSnippet = p.misc_notes
+              ? p.misc_notes.replace(/^\s*[•\-*]\s*/gm, '').trim().split('\n')[0]?.slice(0, 80)
+              : null;
+            const meta = cs.length > 0
+              ? cs.map((c) => c!.name).join(' · ')
+              : p.where_when || null;
             return (
               <SwipeRow
                 key={p.id}
-                className="rounded-lg"
+                className="rounded-2xl"
                 actions={[
                   {
                     key: 'log',
@@ -247,24 +245,25 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
               >
                 <button
                   onClick={() => onSelectPerson(p.id)}
-                  className="w-full flex items-center gap-3 p-4 rounded-lg bg-surface-1 border border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)] transition-colors text-left"
+                  className="glass w-full flex items-center gap-3 p-3.5 text-left"
                 >
                   <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[15px] font-semibold text-foreground truncate">{p.name}</div>
-                    {cs.length > 0 ? (
-                      <div className="text-[12px] text-muted-text truncate">
-                        {cs.map((c) => c!.name).join(' · ')}
+                    <div className="font-display text-[17px] text-foreground truncate leading-tight">
+                      {p.name}
+                    </div>
+                    {noteSnippet && (
+                      <div className="font-display-italic text-[12px] text-[hsl(var(--foreground)/0.65)] truncate leading-snug mt-0.5">
+                        {noteSnippet}
                       </div>
-                    ) : (
-                      p.misc_notes && (
-                        <div className="text-[12px] text-muted-text truncate">
-                          {p.misc_notes.replace(/^\s*[•\-*]\s*/gm, '').slice(0, 60)}
-                        </div>
-                      )
+                    )}
+                    {meta && (
+                      <div className="text-[11px] text-[hsl(var(--foreground)/0.45)] truncate mt-0.5">
+                        {meta}
+                      </div>
                     )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-text shrink-0" strokeWidth={1.75} />
+                  <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
                 </button>
               </SwipeRow>
             );
@@ -293,19 +292,18 @@ function FilterChip({
   active: boolean;
   onClick: () => void;
   label: string;
-  /** Event chips get a gradient when active; circle/all chips stay Primary Red. */
   tone?: string;
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'shrink-0 px-3 h-8 inline-flex items-center rounded-sm text-[12px] font-medium whitespace-nowrap transition-colors border',
-        active
-          ? tone
-            ? `tile-${tone} text-white border-transparent`
-            : 'bg-primary text-primary-foreground border-primary'
-          : 'bg-surface-2 text-muted-text border-[hsl(0_0%_100%/0.08)] hover:border-[hsl(0_0%_100%/0.14)]',
+        'glass-pill shrink-0 whitespace-nowrap transition-colors',
+        active && tone && tone !== 'red'
+          ? `tile-${tone} text-white !border-transparent`
+          : active
+            ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
+            : 'text-[hsl(var(--foreground)/0.7)]',
       )}
     >
       {label}
