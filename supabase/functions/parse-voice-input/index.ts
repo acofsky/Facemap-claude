@@ -83,18 +83,18 @@ serve(async (req) => {
 
     const { data: persons, error: pErr } = await admin
       .from("persons")
-      .select("id, name, nickname, how_we_met, where_when, important_info, misc_notes")
+      .select("*")
       .eq("user_id", user.id);
     if (pErr) throw pErr;
 
     type PersonRow = {
       id: string;
       name: string;
-      nickname: string | null;
-      how_we_met: string | null;
-      where_when: string | null;
-      important_info: string | null;
-      misc_notes: string | null;
+      nickname?: string | null;
+      how_we_met?: string | null;
+      where_when?: string | null;
+      important_info?: string | null;
+      misc_notes?: string | null;
     };
 
     const personRows = (persons || []) as PersonRow[];
