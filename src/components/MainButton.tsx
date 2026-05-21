@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, UserPlus, CalendarPlus, Sparkles } from 'lucide-react';
+import { Plus, UserPlus, CalendarPlus, Sparkles, Mic } from 'lucide-react';
 import { haptics } from '@/lib/haptics';
 
 interface MainButtonProps {
   onAddPerson: () => void;
   onLogEncounter: () => void;
   onNewEvent: () => void;
+  onVoiceAdd: () => void;
 }
 
 /**
@@ -21,7 +22,7 @@ interface MainButtonProps {
  * inside that slot so its raised pose doesn't push the other tab
  * cells around.
  */
-export function MainButton({ onAddPerson, onLogEncounter, onNewEvent }: MainButtonProps) {
+export function MainButton({ onAddPerson, onLogEncounter, onNewEvent, onVoiceAdd }: MainButtonProps) {
   const [open, setOpen] = useState(false);
 
   const close = () => setOpen(false);
@@ -68,9 +69,9 @@ export function MainButton({ onAddPerson, onLogEncounter, onNewEvent }: MainButt
                   key="add-person"
                   icon={UserPlus}
                   label="Add Person"
-                  /* Upper-left */
-                  offsetX={-84}
-                  offsetY={-96}
+                  /* Far left */
+                  offsetX={-104}
+                  offsetY={-60}
                   delay={0.0}
                   onClick={handle(onAddPerson)}
                 />
@@ -78,20 +79,30 @@ export function MainButton({ onAddPerson, onLogEncounter, onNewEvent }: MainButt
                   key="log-encounter"
                   icon={CalendarPlus}
                   label="Log Encounter"
-                  /* Straight up */
-                  offsetX={0}
-                  offsetY={-120}
+                  /* Upper-left */
+                  offsetX={-60}
+                  offsetY={-104}
                   delay={0.04}
                   onClick={handle(onLogEncounter)}
+                />
+                <Bubble
+                  key="voice-add"
+                  icon={Mic}
+                  label="Voice add"
+                  /* Upper-right — primary thumb position */
+                  offsetX={60}
+                  offsetY={-104}
+                  delay={0.08}
+                  onClick={handle(onVoiceAdd)}
                 />
                 <Bubble
                   key="new-event"
                   icon={Sparkles}
                   label="New Event"
-                  /* Upper-right */
-                  offsetX={84}
-                  offsetY={-96}
-                  delay={0.08}
+                  /* Far right */
+                  offsetX={104}
+                  offsetY={-60}
+                  delay={0.12}
                   onClick={handle(onNewEvent)}
                 />
               </>

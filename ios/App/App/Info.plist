@@ -46,6 +46,10 @@
 	<string>Membr uses your photo library to let you add a photo to a person's record.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Membr uses your contacts to let you link a Membr person record to an existing iPhone contact.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Membr listens when you tap the voice add button so you can tell it about someone you just met or an encounter you had.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Membr converts your voice notes to text on-device so it can fill in a person or encounter for you.</string>
 	<!--
 	    Membr only uses standard HTTPS/TLS (Supabase, Anthropic). That's
 	    "exempt" encryption under US export rules, so declaring NO here

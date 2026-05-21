@@ -5,6 +5,7 @@ import { QuickAddSheet } from './QuickAddSheet';
 import { LogEncounterModal } from './LogEncounterModal';
 import { EventSheet } from './EventSheet';
 import { MainButton } from './MainButton';
+import { VoiceAddSheet } from './VoiceAddSheet';
 
 export type Tab = 'home' | 'network' | 'recall' | 'profile';
 
@@ -28,6 +29,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [logEncounterOpen, setLogEncounterOpen] = useState(false);
   const [newEventOpen, setNewEventOpen] = useState(false);
+  const [voiceAddOpen, setVoiceAddOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background relative">
@@ -49,6 +51,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         onAddPerson={() => setAddPersonOpen(true)}
         onLogEncounter={() => setLogEncounterOpen(true)}
         onNewEvent={() => setNewEventOpen(true)}
+        onVoiceAdd={() => setVoiceAddOpen(true)}
       />
 
       {/* Bottom Nav — 4 tabs split 2/2 around a transparent middle slot.
@@ -78,6 +81,9 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         )}
         {newEventOpen && (
           <EventSheet onClose={() => setNewEventOpen(false)} />
+        )}
+        {voiceAddOpen && (
+          <VoiceAddSheet onClose={() => setVoiceAddOpen(false)} />
         )}
       </AnimatePresence>
 

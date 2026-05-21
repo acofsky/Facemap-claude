@@ -50,3 +50,4 @@ jobs:
           supabase functions deploy meeting-brief
           supabase functions deploy recall-search
           supabase functions deploy delete-account
+          supabase functions deploy parse-voice-input
