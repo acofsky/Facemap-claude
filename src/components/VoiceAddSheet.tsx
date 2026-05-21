@@ -88,34 +88,34 @@ export function VoiceAddSheet({ onClose }: VoiceAddSheetProps) {
 
   // Drive the sheet's UI state off the voice capture state. When recognition
   // ends (manually or via silence timeout) we either analyze the transcript,
-  // or — if nothing was captured / permission was denied — return to intro.
+  // or — if nothing was captured — return to intro. Errors from start() are
+  // reported synchronously by startRecording(); this effect only handles
+  // mid-recording transitions.
   useEffect(() => {
     if (sheet !== 'recording') return;
-    if (voice.state === 'denied' || voice.state === 'unsupported') {
-      if (voice.error) toast.error(voice.error);
-      setSheet('intro');
-      return;
-    }
     if (voice.state === 'idle') {
       const text = voice.transcript.trim();
       if (text.length > 0) {
         void runAnalyze(text);
-      } else if (voice.error) {
-        toast.error(voice.error);
-        setSheet('intro');
       } else {
         // Stopped with no speech captured — bounce back without a toast.
         setSheet('intro');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voice.state, voice.transcript, voice.error, sheet]);
+  }, [voice.state, voice.transcript, sheet]);
 
   const startRecording = async () => {
     if (saving) return;
     voice.reset();
+    const res = await voice.start();
+    if (!res.ok) {
+      if (res.error) toast.error(res.error);
+      return;
+    }
+    // Only flip the UI to recording AFTER the native session confirmed it's
+    // listening, so a failed start doesn't briefly flash the recording panel.
     setSheet('recording');
-    await voice.start();
   };
 
   const stopRecording = async () => {

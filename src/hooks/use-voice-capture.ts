@@ -5,12 +5,17 @@ import { haptics } from '@/lib/haptics';
 
 type VoiceCaptureState = 'idle' | 'recording' | 'denied' | 'unsupported';
 
+export interface StartResult {
+  ok: boolean;
+  error?: string;
+}
+
 interface UseVoiceCaptureResult {
   state: VoiceCaptureState;
   transcript: string;
   partial: string;
   error: string | null;
-  start: () => Promise<void>;
+  start: () => Promise<StartResult>;
   stop: () => Promise<void>;
   reset: () => void;
 }
@@ -22,6 +27,11 @@ interface UseVoiceCaptureResult {
  * is native iOS SFSpeechRecognizer; on the web fallback we expose
  * `unsupported` so the UI can show a "device only" message rather than
  * silently doing nothing.
+ *
+ * start() returns { ok } so callers can wait for the native session to
+ * actually be running before they switch their UI into a recording
+ * state — flipping UI before the plugin confirms produces a flash if the
+ * session can't begin (e.g. mic busy, prior session still tearing down).
  */
 export function useVoiceCapture(): UseVoiceCaptureResult {
   const [state, setState] = useState<VoiceCaptureState>('idle');
@@ -32,18 +42,17 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
   // Keep the in-flight partial in a ref so the partial-results listener
   // can promote it to `transcript` on stop without racing React state.
   const partialRef = useRef('');
-  const listenerRef = useRef<PluginListenerHandle | null>(null);
-  const stateListenerRef = useRef<PluginListenerHandle | null>(null);
+  const listenersAttachedRef = useRef(false);
 
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
     return () => {
-      listenerRef.current?.remove().catch(() => {});
-      stateListenerRef.current?.remove().catch(() => {});
       if (isNative) {
         SpeechRecognition.stop().catch(() => {});
+        SpeechRecognition.removeAllListeners().catch(() => {});
       }
+      listenersAttachedRef.current = false;
     };
   }, [isNative]);
 
@@ -54,20 +63,91 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
     setError(null);
   }, []);
 
-  const start = useCallback(async () => {
+  const ensureCleanSession = async () => {
+    // The plugin throws "Ongoing speech recognition" if audioEngine.isRunning
+    // is true when start() is called. That happens when a previous session
+    // didn't tear down cleanly (sheet closed mid-record, silence auto-stop
+    // that didn't release the audio session, etc.). Belt-and-braces: query
+    // isListening, stop if needed, clear all listeners, and give iOS a
+    // beat to release the audio session.
+    try {
+      const { listening } = await SpeechRecognition.isListening();
+      if (listening) {
+        await SpeechRecognition.stop();
+      }
+    } catch {
+      // best-effort
+    }
+    try {
+      await SpeechRecognition.removeAllListeners();
+    } catch {
+      // best-effort
+    }
+    listenersAttachedRef.current = false;
+    await new Promise((r) => setTimeout(r, 60));
+  };
+
+  const attachListeners = async () => {
+    const partialHandle: PluginListenerHandle = await SpeechRecognition.addListener(
+      'partialResults',
+      (data: { matches?: string[] }) => {
+        const best = data?.matches?.[0] ?? '';
+        partialRef.current = best;
+        setPartial(best);
+      },
+    );
+    const stateHandle: PluginListenerHandle = await SpeechRecognition.addListener(
+      'listeningState',
+      (data: { status: 'started' | 'stopped' }) => {
+        if (data.status === 'stopped') {
+          // Promote whatever partial we ended on to the committed transcript.
+          setTranscript((prev) => {
+            const joined = [prev, partialRef.current].filter(Boolean).join(' ').trim();
+            return joined;
+          });
+          partialRef.current = '';
+          setPartial('');
+          setState('idle');
+        }
+      },
+    );
+    // Hold references so subsequent removeAllListeners() can clear them;
+    // we keep handles alive via the plugin's internal registry.
+    void partialHandle;
+    void stateHandle;
+    listenersAttachedRef.current = true;
+  };
+
+  const friendlyStartError = (raw: string): string => {
+    const lower = raw.toLowerCase();
+    if (lower.includes('ongoing')) {
+      return "Membr is still finishing the previous take. Wait a second and tap again.";
+    }
+    if (lower.includes('permission') || lower.includes('denied') || lower.includes('not authorized')) {
+      return 'Membr needs microphone and speech permissions. Enable them in Settings.';
+    }
+    if (lower.includes('audio') || lower.includes('engine')) {
+      return "Couldn't access the microphone. Close other apps using it and try again.";
+    }
+    return "Couldn't start listening. Try again.";
+  };
+
+  const start = useCallback(async (): Promise<StartResult> => {
     setError(null);
     if (!isNative) {
       setState('unsupported');
-      setError('Voice add only works on the iOS app.');
-      return;
+      const msg = 'Voice add only works on the iOS app.';
+      setError(msg);
+      return { ok: false, error: msg };
     }
 
     try {
       const { available } = await SpeechRecognition.available();
       if (!available) {
         setState('unsupported');
-        setError("This device doesn't support speech recognition.");
-        return;
+        const msg = "This device doesn't support speech recognition.";
+        setError(msg);
+        return { ok: false, error: msg };
       }
 
       const perm = await SpeechRecognition.checkPermissions();
@@ -75,39 +155,14 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
         const req = await SpeechRecognition.requestPermissions();
         if (req.speechRecognition !== 'granted') {
           setState('denied');
-          setError('Membr needs microphone and speech permissions to listen. Enable them in Settings.');
-          return;
+          const msg = 'Membr needs microphone and speech permissions to listen. Enable them in Settings.';
+          setError(msg);
+          return { ok: false, error: msg };
         }
       }
 
-      // Wire listeners before starting so we don't miss the first partial.
-      listenerRef.current?.remove().catch(() => {});
-      stateListenerRef.current?.remove().catch(() => {});
-
-      listenerRef.current = await SpeechRecognition.addListener(
-        'partialResults',
-        (data: { matches?: string[] }) => {
-          const best = data?.matches?.[0] ?? '';
-          partialRef.current = best;
-          setPartial(best);
-        },
-      );
-
-      stateListenerRef.current = await SpeechRecognition.addListener(
-        'listeningState',
-        (data: { status: 'started' | 'stopped' }) => {
-          if (data.status === 'stopped') {
-            // Promote whatever partial we ended on to the committed transcript.
-            setTranscript((prev) => {
-              const joined = [prev, partialRef.current].filter(Boolean).join(' ').trim();
-              return joined;
-            });
-            partialRef.current = '';
-            setPartial('');
-            setState('idle');
-          }
-        },
-      );
+      await ensureCleanSession();
+      await attachListeners();
 
       await SpeechRecognition.start({
         language: 'en-US',
@@ -117,10 +172,17 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
 
       haptics.light();
       setState('recording');
+      return { ok: true };
     } catch (e) {
       console.error('Voice capture start failed', e);
-      setError(e instanceof Error ? e.message : 'Could not start listening.');
+      const raw = e instanceof Error ? e.message : String(e);
+      const msg = friendlyStartError(raw);
+      setError(msg);
       setState('idle');
+      // Tear down any partially-attached listeners.
+      try { await SpeechRecognition.removeAllListeners(); } catch { /* ignore */ }
+      listenersAttachedRef.current = false;
+      return { ok: false, error: msg };
     }
   }, [isNative]);
 
