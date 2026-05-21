@@ -107,7 +107,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
     return (
       <div className="pb-8 animate-fade-in">
         {!embedded && (
-          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-2 pb-2 mb-1">
             <span className="w-9" />
             <h1 className="font-display text-[20px] text-foreground">Circles</h1>
             <span className="w-9" />
@@ -137,7 +137,7 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
   return (
     <div className="pb-8 animate-fade-in">
       {!embedded && (
-        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-2 pb-2 mb-1">
           <span className="w-9" />
           <h1 className="font-display text-[20px] text-foreground">Circles</h1>
           <div>{AddPlusButton}</div>

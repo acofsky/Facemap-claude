@@ -58,7 +58,7 @@ export function NotificationPreferencesPage({ onBack }: NotificationPreferencesP
       {/* Inner layer carries the swipe-back transform so it never fights
           Framer Motion's entry/exit animation on the wrapper above. */}
       <div
-        className="absolute inset-0 ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom"
+        className="fixed inset-0 z-[55] ambient-backdrop overflow-hidden flex flex-col safe-top safe-bottom max-w-md mx-auto"
         style={{
           transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
           transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',

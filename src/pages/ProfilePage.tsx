@@ -127,7 +127,7 @@ export function ProfilePage() {
 
   return (
     <div className="pb-10 animate-fade-in">
-      <div className="sticky top-0 z-20 flex items-center justify-center pt-4 pb-3 mb-2">
+      <div className="sticky top-0 z-20 flex items-center justify-center pt-2 pb-3 mb-2">
         <h1 className="font-display text-[26px] tracking-[-0.02em] text-foreground">Profile</h1>
       </div>
 
@@ -269,8 +269,7 @@ export function ProfilePage() {
             onClick={() => setSettingsOpen(null)}
           />
           <div
-            className="kb-aware-sheet glass fixed left-0 right-0 mx-auto w-full max-w-md rounded-t-2xl overflow-y-auto safe-bottom z-[60] animate-scale-in"
-            style={{ background: 'rgba(20, 14, 14, 0.92)' }}
+            className="kb-aware-sheet glass-sheet fixed left-0 right-0 mx-auto w-full max-w-md rounded-t-2xl overflow-y-auto safe-bottom z-[60] animate-scale-in flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]" style={{ background: 'rgba(20, 14, 14, 0.92)' }}>

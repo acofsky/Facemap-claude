@@ -133,7 +133,7 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
 
   if (isLoading) {
     return (
-      <div className="px-5 pt-5 pb-8 animate-fade-in space-y-7">
+      <div className="px-5 pt-2 pb-8 animate-fade-in space-y-7">
         <header className="space-y-2">
           <Skeleton className="h-7 w-60 bg-[hsl(0_0%_100%/0.06)]" />
           <Skeleton className="h-3 w-72 bg-[hsl(0_0%_100%/0.04)]" />
@@ -166,7 +166,7 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
 
   return (
     <div className="pb-8 animate-fade-in">
-      <div className="px-5 pt-5 space-y-6">
+      <div className="px-5 pt-2 space-y-5">
         {addedThisWeek > 0 && (
           <span className="glass-pill">
             <span className="glass-pill-dot" />

@@ -80,7 +80,7 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
   const headlineWords = useMemo(() => ['Find anyone', "you've met"], []);
 
   return (
-    <div className="px-5 pt-5 pb-8 animate-fade-in">
+    <div className="px-5 pt-2 pb-8 animate-fade-in">
       <header className="mb-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--foreground)/0.55)] mb-2">
           Recall
@@ -104,7 +104,7 @@ export function RecallPage({ onSelectPerson }: RecallPageProps) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           placeholder='e.g. "tall guy from the gym with a beard"'
-          className="glass-input w-full h-12 pl-10 pr-[5.5rem] text-sm"
+          className="glass-input w-full h-12 pl-10 pr-[6.75rem] text-sm text-ellipsis overflow-hidden"
         />
         <button
           onClick={() => handleSearch()}

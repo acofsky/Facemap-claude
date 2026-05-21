@@ -125,7 +125,7 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
     return (
       <div className="pb-8 animate-fade-in">
         {!embedded && (
-          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+          <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-2 pb-2 mb-1">
             <span className="w-11" />
             <h1 className="font-display text-[20px] text-foreground">People</h1>
             <span className="w-11" />
@@ -146,7 +146,7 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
   return (
     <div className="pb-8 animate-fade-in">
       {!embedded && (
-        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3 pb-3 mb-1">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-2 pb-2 mb-1">
           <span className="w-11" />
           <h1 className="font-display text-[20px] text-foreground">People</h1>
           <div>{sortMenu}</div>
@@ -245,7 +245,7 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
               >
                 <button
                   onClick={() => onSelectPerson(p.id)}
-                  className="glass w-full flex items-center gap-3 p-3.5 text-left"
+                  className="glass-card-solid w-full flex items-center gap-3 p-3.5 text-left"
                 >
                   <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
                   <div className="flex-1 min-w-0">

@@ -49,17 +49,13 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         openVoiceAdd: () => setVoiceAddOpen(true),
       }}
     >
-    <div className="ambient-backdrop flex flex-col min-h-screen max-w-md mx-auto relative overflow-hidden">
-      {/* Notch cover — the ambient-backdrop already paints behind, but we
-          want a fade-to-black mask near the camera notch so glass at the top
-          of a page doesn't blend awkwardly with system status text. */}
+    <div className="ambient-backdrop flex flex-col min-h-[100dvh] max-w-md mx-auto relative overflow-hidden">
+      {/* Notch cover — solid black up to the safe-area inset so the status
+          bar (time, battery, TestFlight indicator) sits on opaque black and
+          content scrolling under the notch is fully masked. */}
       <div
         aria-hidden="true"
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 60%, transparent 100%)',
-        }}
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none bg-black"
       />
       <main className="flex-1 overflow-y-auto overflow-x-hidden pb-32 safe-top scrollbar-hide relative z-10">
         {children}
@@ -80,8 +76,9 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
           inset highlight + drop shadow. The FAB sits in the centre cell
           and protrudes upward via negative top margin (Liquid Glass §3.5). */}
       <nav
-        className="bottom-tabs fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 safe-bottom px-3 pb-3 pt-0"
+        className="bottom-tabs fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-3 pt-0"
         aria-label="Primary"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
       >
         <div className="frosted-nav h-[68px] grid grid-cols-5 items-center px-1">
           {tabs.slice(0, 2).map((tab) => (
