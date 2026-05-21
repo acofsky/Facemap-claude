@@ -40,7 +40,12 @@ const Index = () => {
       <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none bg-black"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+          style={{
+            height: 'calc(env(safe-area-inset-top) + 24px)',
+            background:
+              'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+          }}
         />
         <PersonProfilePage
           personId={selectedPersonId}
@@ -55,7 +60,12 @@ const Index = () => {
       <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none bg-black"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+          style={{
+            height: 'calc(env(safe-area-inset-top) + 24px)',
+            background:
+              'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+          }}
         />
         <CircleDetailPage
           circleId={selectedCircleId}
@@ -73,7 +83,12 @@ const Index = () => {
       <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none bg-black"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+          style={{
+            height: 'calc(env(safe-area-inset-top) + 24px)',
+            background:
+              'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+          }}
         />
         <EventDetailPage
           eventId={selectedEventId}

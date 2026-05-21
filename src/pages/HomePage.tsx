@@ -330,7 +330,11 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
               Recent
             </SectionLabel>
             <div className="glass p-4">
-              <div className="flex gap-5 overflow-x-scroll overflow-y-visible scrollbar-hide py-1">
+              {/* Horizontal scroll for avatar row. py-2 + extra inner padding
+                  on each pill gives the red 'fresh' ring enough room not to
+                  be clipped by overflow-x: scroll (iOS WebView treats x-only
+                  scroll as clipping both axes). */}
+              <div className="flex gap-5 overflow-x-auto scrollbar-hide py-2 -my-1">
                 {recentPeople.map((p) => (
                   <button
                     key={p.id}
@@ -341,7 +345,11 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
                       className="rounded-full"
                       style={
                         isFresh(p.created_at)
-                          ? { boxShadow: '0 0 0 1.5px hsl(var(--primary))', padding: 2 }
+                          ? {
+                              padding: 2,
+                              border: '1.5px solid hsl(var(--primary))',
+                              boxSizing: 'content-box',
+                            }
                           : undefined
                       }
                     >

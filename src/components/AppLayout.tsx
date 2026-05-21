@@ -50,14 +50,19 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
       }}
     >
     <div className="ambient-backdrop flex flex-col min-h-[100dvh] max-w-md mx-auto relative overflow-hidden">
-      {/* Notch cover — solid black up to the safe-area inset so the status
-          bar (time, battery, TestFlight indicator) sits on opaque black and
-          content scrolling under the notch is fully masked. */}
+      {/* Notch cover — solid black up to the safe-area inset, then a soft
+          fade to transparent over the next few pixels so the bottom edge
+          blends into the ambient backdrop instead of cutting hard. */}
       <div
         aria-hidden="true"
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 safe-top pointer-events-none bg-black"
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+        style={{
+          height: 'calc(env(safe-area-inset-top) + 24px)',
+          background:
+            'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+        }}
       />
-      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-32 safe-top scrollbar-hide relative z-10">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-32 safe-top scrollbar-hide">
         {children}
       </main>
 
@@ -78,7 +83,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
       <nav
         className="bottom-tabs fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-3 pt-0"
         aria-label="Primary"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="frosted-nav h-[68px] grid grid-cols-5 items-center px-1">
           {tabs.slice(0, 2).map((tab) => (

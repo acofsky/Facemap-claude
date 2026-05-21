@@ -75,8 +75,21 @@ export function SwipeRow({ actions, actionWidth = 72, className, children }: Swi
 
   return (
     <div className={`relative overflow-hidden ${className ?? ''}`} data-swipe-row>
-      {/* Action layer */}
-      <div className="absolute inset-y-0 right-0 flex" style={{ width: revealWidth }} aria-hidden={offset === 0}>
+      {/* Action layer — hidden by opacity when the row is closed so the
+          red/orange backgrounds never flash on mount or during scroll
+          before the foreground has fully painted on top (iOS WebView
+          paints the absolute action layer first; with a translucent
+          foreground that was visible as orange peeks). */}
+      <div
+        className="absolute inset-y-0 right-0 flex"
+        style={{
+          width: revealWidth,
+          opacity: offset < 0 ? 1 : 0,
+          transition: dragging ? 'none' : 'opacity 0.15s ease-out',
+          pointerEvents: offset === 0 ? 'none' : 'auto',
+        }}
+        aria-hidden={offset === 0}
+      >
         {actions.map((a) => (
           <button
             key={a.key}

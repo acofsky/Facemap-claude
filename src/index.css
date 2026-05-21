@@ -168,9 +168,17 @@
    * what gives glass surfaces something to blur against — drop this and
    * the glass cards look like flat translucent gray rectangles instead of
    * frosted material. See LIQUID_GLASS.md §3.1.
+   *
+   * Note: `position: relative` is in :where() so Tailwind's `.fixed`
+   * wins when the same element is also used as a fixed overlay (e.g.
+   * OnboardingFlow, NotificationPreferencesPage). The grain ::before
+   * still positions correctly because both `relative` and `fixed`
+   * establish a containing block for the absolute pseudo.
    * ─────────────────────────────────────────────────────────────────────── */
-  .ambient-backdrop {
+  :where(.ambient-backdrop) {
     position: relative;
+  }
+  .ambient-backdrop {
     background:
       radial-gradient(ellipse 80% 70% at 100% 0%, rgba(224, 90, 50, 0.32), transparent 55%),
       radial-gradient(ellipse 90% 60% at 0% 8%, rgba(178, 60, 90, 0.18), transparent 55%),
@@ -252,9 +260,7 @@
     position: relative;
   }
   .glass-card-solid {
-    background: rgba(20, 16, 16, 0.90);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: rgb(18, 14, 14);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-glass);
     box-shadow:
