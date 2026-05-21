@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 
@@ -10,6 +11,14 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Destructive uses Primary Red on the confirm button. */
   destructive?: boolean;
+  /** While true, the confirm button shows a spinner and both buttons are
+   *  disabled. Lets the dialog signal "the work is happening" instead of
+   *  vanishing immediately and leaving the user staring at a frozen screen
+   *  while a slow mutation runs. */
+  loading?: boolean;
+  /** Label shown next to the spinner while loading. Defaults to the
+   *  confirmLabel + "…". */
+  loadingLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -27,6 +36,8 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive,
+  loading = false,
+  loadingLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -40,7 +51,7 @@ export function ConfirmDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] bg-black/70"
-            onClick={onCancel}
+            onClick={loading ? undefined : onCancel}
           />
           <motion.div
             role="alertdialog"
@@ -68,20 +79,23 @@ export function ConfirmDialog({
             <div className="mt-5 flex gap-2">
               <button
                 onClick={onCancel}
-                className="flex-1 h-11 rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.12)] text-foreground text-[14px] font-medium active:scale-[0.98] transition-transform"
+                disabled={loading}
+                className="flex-1 h-11 rounded-md bg-surface-1 border border-[hsl(0_0%_100%/0.12)] text-foreground text-[14px] font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
+                disabled={loading}
                 className={cn(
-                  'flex-1 h-11 rounded-md text-[14px] font-semibold active:scale-[0.98] transition-transform',
+                  'flex-1 h-11 rounded-md text-[14px] font-semibold active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2 disabled:opacity-80',
                   destructive
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-foreground text-background',
                 )}
               >
-                {confirmLabel}
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {loading ? (loadingLabel ?? `${confirmLabel}…`) : confirmLabel}
               </button>
             </div>
           </motion.div>

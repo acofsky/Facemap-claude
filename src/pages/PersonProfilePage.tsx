@@ -61,6 +61,8 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
     setDeleting(true);
     try {
       await deletePersonMut.mutateAsync(personId);
+      // Leave the dialog open until the mutation resolves so the user sees
+      // the in-dialog spinner instead of an inert frozen screen.
       setDeleteConfirmOpen(false);
       onBack();
     } catch (e) {
@@ -340,6 +342,8 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         confirmLabel="Remove"
         cancelLabel="Keep"
         destructive
+        loading={deleting}
+        loadingLabel="Removing"
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirmOpen(false)}
       />

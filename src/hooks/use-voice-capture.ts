@@ -100,12 +100,16 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
       'listeningState',
       (data: { status: 'started' | 'stopped' }) => {
         if (data.status === 'stopped') {
-          // Promote whatever partial we ended on to the committed transcript.
+          // Snapshot the partial *before* we queue any state updates. The
+          // setTranscript updater runs asynchronously during React's commit
+          // phase, by which point partialRef.current may already have been
+          // reset below — losing the final spoken text.
+          const finalPartial = partialRef.current;
+          partialRef.current = '';
           setTranscript((prev) => {
-            const joined = [prev, partialRef.current].filter(Boolean).join(' ').trim();
+            const joined = [prev, finalPartial].filter(Boolean).join(' ').trim();
             return joined;
           });
-          partialRef.current = '';
           setPartial('');
           setState('idle');
         }

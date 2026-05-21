@@ -470,6 +470,8 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
         confirmLabel="Remove"
         cancelLabel="Keep"
         destructive
+        loading={deleting}
+        loadingLabel="Removing"
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirmOpen(false)}
       />
