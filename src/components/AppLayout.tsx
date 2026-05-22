@@ -83,7 +83,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
       <nav
         className="bottom-tabs fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-3 pt-0"
         aria-label="Primary"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom) - 0.5rem))' }}
       >
         <div className="frosted-nav h-[68px] grid grid-cols-5 items-center px-1">
           {tabs.slice(0, 2).map((tab) => (

@@ -37,6 +37,10 @@ export function QuickActionsMenu({
         <AnimatePresence>
           {open && (
             <>
+              {/* Four bubbles distributed across a 120° arc at 40° spacing
+                  (radius ~120). Earlier the gap between the inner two
+                  bubbles was 60° vs the outer two at 30°, which read as
+                  uneven. */}
               <Bubble
                 key="add-person"
                 icon={UserPlus}
@@ -50,8 +54,8 @@ export function QuickActionsMenu({
                 key="log-encounter"
                 icon={CalendarPlus}
                 label="Log Encounter"
-                offsetX={-60}
-                offsetY={-104}
+                offsetX={-41}
+                offsetY={-113}
                 delay={0.04}
                 onClick={onLogEncounter}
               />
@@ -59,8 +63,8 @@ export function QuickActionsMenu({
                 key="voice-add"
                 icon={Mic}
                 label="Voice add"
-                offsetX={60}
-                offsetY={-104}
+                offsetX={41}
+                offsetY={-113}
                 delay={0.08}
                 onClick={onVoiceAdd}
               />

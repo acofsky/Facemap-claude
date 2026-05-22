@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PeoplePage } from './PeoplePage';
 import { CirclesPage } from './CirclesPage';
 
@@ -10,6 +10,14 @@ interface NetworkPageProps {
 
 type Segment = 'people' | 'circles';
 
+const SEGMENT_KEY = 'membr.network-segment';
+
+function loadSegment(): Segment {
+  if (typeof window === 'undefined') return 'people';
+  const v = window.localStorage.getItem(SEGMENT_KEY);
+  return v === 'circles' ? 'circles' : 'people';
+}
+
 /**
  * Network — unified People + Circles tab. People and Circles started as
  * separate tabs but cover the same conceptual space ("who's in my world
@@ -19,9 +27,28 @@ type Segment = 'people' | 'circles';
  * The page owns the title + segmented control at the top; PeoplePage
  * and CirclesPage render in embedded mode below, which drops their own
  * nav bars and surfaces their action buttons inline.
+ *
+ * The active segment is persisted in localStorage so navigating into a
+ * person/circle/event detail and back doesn't snap the user back to
+ * People when they were on Circles.
  */
 export function NetworkPage({ onSelectPerson, onSelectCircle, onSelectEvent }: NetworkPageProps) {
-  const [segment, setSegment] = useState<Segment>('people');
+  const [segment, setSegmentState] = useState<Segment>(loadSegment);
+
+  const setSegment = (s: Segment) => {
+    setSegmentState(s);
+    try { window.localStorage.setItem(SEGMENT_KEY, s); } catch { /* ignore quota */ }
+  };
+
+  // Re-sync if localStorage changes from another tab/page (also keeps the
+  // state in step if a future feature ever writes to SEGMENT_KEY elsewhere).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SEGMENT_KEY) setSegmentState(loadSegment());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   return (
     <div className="pb-8 animate-fade-in">

@@ -65,6 +65,14 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
     [archivedEvents],
   );
 
+  // Most recent first by start_date (fallback to end_date, then archived_at)
+  // so the archived list reads chronologically newest → oldest.
+  const sortedArchived = useMemo(() => {
+    const keyFor = (e: typeof archivedOnly[number]) =>
+      e.start_date || e.end_date || e.archived_at || e.created_at || '';
+    return [...archivedOnly].sort((a, b) => keyFor(b).localeCompare(keyFor(a)));
+  }, [archivedOnly]);
+
   const circleMemberCount = (id: string) => personCircles.filter((pc) => pc.circle_id === id).length;
   const eventMemberCount = (id: string) => personEvents.filter((pe) => pe.event_id === id).length;
 
@@ -228,24 +236,46 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showArchived && 'rotate-180')} strokeWidth={1.75} />
           </button>
           {showArchived && (
-            <div className="mt-3 space-y-2">
-              {archivedOnly.map((evt) => (
-                <div key={evt.id} className="glass flex items-center justify-between p-3">
-                  <button onClick={() => onSelectEvent(evt.id)} className="min-w-0 flex-1 text-left">
-                    <div className="text-[14px] font-medium text-foreground truncate">{evt.name}</div>
-                    <div className="text-[11px] text-[hsl(var(--foreground)/0.55)]">
-                      {eventMemberCount(evt.id)} {eventMemberCount(evt.id) === 1 ? 'member' : 'members'}
-                      {(evt.start_date || evt.end_date) && ` · ${formatRange(evt.start_date, evt.end_date)}`}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => archiveEvt.mutate({ id: evt.id, archived: false })}
-                    className="text-[12px] font-semibold text-primary"
+            <div className="glass mt-3 overflow-hidden">
+              {sortedArchived.map((evt, i) => {
+                const tone = isValidTone(evt.tone) ? evt.tone : 'red';
+                const count = eventMemberCount(evt.id);
+                const range = formatRange(evt.start_date, evt.end_date);
+                return (
+                  <div
+                    key={evt.id}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5',
+                      i < sortedArchived.length - 1 && 'border-b border-[hsl(0_0%_100%/0.06)]',
+                    )}
                   >
-                    Unarchive
-                  </button>
-                </div>
-              ))}
+                    <button
+                      onClick={() => onSelectEvent(evt.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    >
+                      {/* Compact 8px tone swatch — same tile gradient as the
+                          event tile above, just shrunk into a line item. */}
+                      <span
+                        aria-hidden="true"
+                        className={cn('w-2.5 h-2.5 rounded-full shrink-0', `tile-${tone}`)}
+                      />
+                      <span className="font-display text-[14px] text-foreground truncate">
+                        {evt.name}
+                      </span>
+                      <span className="text-[11px] text-[hsl(var(--foreground)/0.5)] shrink-0 ml-auto">
+                        {range || `${count} ${count === 1 ? 'member' : 'members'}`}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => archiveEvt.mutate({ id: evt.id, archived: false })}
+                      className="text-[11px] font-semibold text-primary shrink-0 px-1 py-1 -mr-1"
+                      aria-label={`Unarchive ${evt.name}`}
+                    >
+                      Unarchive
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

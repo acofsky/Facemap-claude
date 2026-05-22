@@ -8,7 +8,7 @@ import { PersonPickerSheet } from '@/components/PersonPickerSheet';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { UseCasesPage } from '@/pages/UseCasesPage';
 import { useQuickActions } from '@/lib/quick-actions';
-import { Search, Loader2, Sparkles, UserPlus, ArrowRight, X, Lightbulb } from 'lucide-react';
+import { Search, Loader2, Sparkles, Mic, ArrowRight, X, Lightbulb } from 'lucide-react';
 import { differenceInDays, differenceInHours, formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { invokeAI } from '@/lib/invoke-ai';
@@ -167,13 +167,6 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
   return (
     <div className="pb-8 animate-fade-in">
       <div className="px-5 pt-2 space-y-5">
-        {addedThisWeek > 0 && (
-          <span className="glass-pill">
-            <span className="glass-pill-dot" />
-            {addedThisWeek} added this week
-          </span>
-        )}
-
         <header>
           <h1 className="font-display text-[34px] leading-[1.05] text-foreground tracking-[-0.02em]">
             Good {tod}
@@ -227,16 +220,16 @@ export function HomePage({ onSelectPerson, onSelectCircle }: HomePageProps) {
             </button>
 
             <button
-              onClick={quickActions.openAddPerson}
+              onClick={quickActions.openVoiceAdd}
               className="glass-action-secondary"
             >
               <span className="icon-tile">
-                <UserPlus className="w-5 h-5" strokeWidth={1.75} />
+                <Mic className="w-5 h-5" strokeWidth={1.75} />
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[15px] font-semibold text-foreground">Add someone</span>
+                <span className="block text-[15px] font-semibold text-foreground">Voice add</span>
                 <span className="block text-[12px] text-[hsl(var(--foreground)/0.55)] leading-snug mt-0.5">
-                  Name. Two lines. Done.
+                  Just talk. Membr handles the rest.
                 </span>
               </span>
               <ArrowRight className="w-4 h-4 text-[hsl(var(--foreground)/0.55)] shrink-0" strokeWidth={1.75} />
