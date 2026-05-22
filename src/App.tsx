@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
 import { useOnboarded } from "@/hooks/use-onboarded";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { prewarm } from "@/lib/invoke-ai";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,46 @@ function useAuthDeepLink(onRecovery: () => void) {
   }, [onRecovery]);
 }
 
+// Pre-warm the four AI edge functions once a user is authenticated, and
+// again whenever the app comes back to foreground after being backgrounded
+// long enough that the isolates may have shut down. Each ping is
+// fire-and-forget and short-circuits inside the function (no Anthropic
+// call), so this is cheap.
+const AI_FUNCTIONS = ['describe-from-photo', 'meeting-brief', 'recall-search', 'parse-voice-input'];
+const PREWARM_COOLDOWN_MS = 5 * 60 * 1000;
+let lastPrewarmAt = 0;
+
+function prewarmAll() {
+  const now = Date.now();
+  if (now - lastPrewarmAt < PREWARM_COOLDOWN_MS) return;
+  lastPrewarmAt = now;
+  for (const fn of AI_FUNCTIONS) prewarm(fn);
+}
+
+function usePrewarmAI(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    prewarmAll();
+
+    // Re-warm when the app returns to the foreground (Capacitor on
+    // device) or when the tab regains visibility (web fallback). The
+    // cooldown above prevents this from firing multiple times per
+    // session if the user quickly tabs away and back.
+    let removeListener: (() => void) | undefined;
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) prewarmAll();
+      }).then((h) => { removeListener = () => h.remove(); });
+    }
+    const onVis = () => { if (document.visibilityState === 'visible') prewarmAll(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      removeListener?.();
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [active]);
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
   const { onboarded, markOnboarded } = useOnboarded();
@@ -99,6 +140,7 @@ function AppContent() {
   const enterRecovery = useCallback(() => setRecovery(true), []);
   useKeyboardSetup();
   useAuthDeepLink(enterRecovery);
+  usePrewarmAI(!!user);
 
   if (loading) {
     return (

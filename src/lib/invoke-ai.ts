@@ -1,16 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const RETRY_DELAY_MS = 700;
+// Three attempts with exponential backoff. Most cold starts on Supabase
+// edge functions complete in 500ms-1.5s; if the isolate is rebuilding
+// (deploy just happened, or it's been hours of inactivity) it can take
+// up to ~2.5s. The 700ms / 1500ms gaps catch both cases without making
+// real failures feel slow — the first retry fires before most users
+// would have realized anything was off.
+const RETRY_DELAYS_MS = [700, 1500];
 
 /**
- * Invoke a Supabase edge function with one automatic retry.
+ * Invoke a Supabase edge function with automatic cold-start retries.
  *
  * The AI functions (describe-from-photo, meeting-brief, recall-search,
- * parse-voice-input) are read-only and idempotent, and their most common
+ * parse-voice-input) are read-only and idempotent. Their most common
  * failure is a cold start on the first call of a session — the on-demand
- * Deno isolate has to boot before it can answer. A single retry after a
- * short pause clears that transient failure before the user ever sees an
- * error.
+ * Deno isolate has to boot before it can answer. We do two retries with
+ * exponential backoff, which clears the vast majority of cold-start
+ * failures before the user ever sees an error.
  *
  * For non-2xx responses, Supabase's FunctionsHttpError swallows the body
  * and surfaces the unhelpful 'Edge Function returned a non-2xx status
@@ -21,9 +27,10 @@ const RETRY_DELAY_MS = 700;
  */
 export async function invokeAI<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Total attempts = 1 initial + RETRY_DELAYS_MS.length retries.
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt - 1]));
     }
     try {
       const { data, error } = await supabase.functions.invoke(fn, { body });
@@ -70,4 +77,20 @@ async function unwrapFunctionError(err: unknown): Promise<Error> {
   }
   if (err instanceof Error) return err;
   return new Error(String(err));
+}
+
+/**
+ * Pre-warm an AI edge function by firing a `{ warm: true }` ping. The
+ * function checks the flag and returns 200 immediately without calling
+ * Anthropic, so the call is cheap (no model cost) but boots the Deno
+ * isolate so the user's next real call hits a hot function.
+ *
+ * Fire-and-forget — errors are swallowed because pre-warming is best
+ * effort and we don't want a stale token or network blip to turn into a
+ * user-visible toast.
+ */
+export function prewarm(fn: string): void {
+  supabase.functions.invoke(fn, { body: { warm: true } }).catch(() => {
+    /* swallow — best-effort */
+  });
 }

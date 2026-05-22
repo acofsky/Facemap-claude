@@ -17,7 +17,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { photoUrl } = await req.json();
+    const reqBody = await req.json();
+    // Pre-warm ping from the client on app launch — return immediately
+    // so the Deno isolate stays hot without burning an Anthropic call.
+    if (reqBody?.warm === true) {
+      return new Response(JSON.stringify({ warmed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { photoUrl } = reqBody;
     if (!photoUrl || typeof photoUrl !== "string") {
       return new Response(JSON.stringify({ error: "photoUrl is required" }), {
         status: 400,

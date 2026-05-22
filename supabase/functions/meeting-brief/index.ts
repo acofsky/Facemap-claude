@@ -30,7 +30,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { personId } = await req.json();
+    const reqBody = await req.json();
+    if (reqBody?.warm === true) {
+      return new Response(JSON.stringify({ warmed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { personId } = reqBody;
     if (!personId) {
       return new Response(JSON.stringify({ error: "personId required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

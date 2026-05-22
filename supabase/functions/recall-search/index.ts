@@ -38,7 +38,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { query } = await req.json();
+    const reqBody = await req.json();
+    if (reqBody?.warm === true) {
+      return new Response(JSON.stringify({ warmed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { query } = reqBody;
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return new Response(JSON.stringify({ error: "query is required" }), {
         status: 400,

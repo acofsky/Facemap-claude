@@ -55,7 +55,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { transcript } = await req.json();
+    const reqBody = await req.json();
+    // Pre-warm ping from the client on app launch. Return 200 immediately
+    // without doing any real work so the Deno isolate is hot for the
+    // user's next real call.
+    if (reqBody?.warm === true) {
+      return new Response(JSON.stringify({ warmed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { transcript } = reqBody;
     if (!transcript || typeof transcript !== "string" || transcript.trim().length === 0) {
       return new Response(JSON.stringify({ error: "transcript is required" }), {
         status: 400,
