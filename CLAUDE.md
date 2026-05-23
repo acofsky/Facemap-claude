@@ -200,7 +200,7 @@ A full UX/UI redesign is underway. The guiding documents are `Membr_UX_UI_Spec_v
 - **Q4 — Recall search ranking:** Best semantic match first. Recency only as tiebreaker. No relevance indicators on result cards.
 - **Q5 — Onboarding skip:** Shown once after account creation. Re-accessible via Profile → "Reintroduce me to Membr."
 - **Q6 — Dark mode:** Permanent. `UIUserInterfaceStyle = Dark` in `Info.plist`. No light theme will ever ship.
-- **Q7 + Q10 — Smart Circle Engine thresholds:** Trigger on 2+ people added in 48h with keyword overlap, OR 3+ people added in 24h regardless. Easy to retune post-launch.
+- **Q7 + Q10 — Smart Circle Engine thresholds:** Trigger on 3+ people added in 48h with keyword overlap, OR 4+ people added in 24h regardless. (Originally 2 / 3 at launch; bumped after 1.0.2 because the keyword rule was firing eagerly the moment a single new add overlapped with an older one.) Suggestions are also fuzzy-deduped against existing Event AND Circle names via `clusterDuplicatesExisting()` in `src/lib/smart-circle.ts`, so the banner won't pitch the user a circle they already have under slightly different wording.
 - **Q8 — Archived Events access:** Small "Archived" link below the Events grid on CIRCLES-01 → archived list. Members and their data remain searchable everywhere.
 - **Q9 — End-of-Day notification deep link:** Opens the Add Person sheet with the contextual variant header "Who'd you meet today?" instead of "Add Person."
 - **Q11 — Person count display:** Shown as a small chip on the Home greeting line (alongside the date), not in the People List.

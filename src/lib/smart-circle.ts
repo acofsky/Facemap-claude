@@ -6,8 +6,15 @@ import type { Person } from '@/lib/store';
  * the same event/scene, generates a suggested Event name + member list.
  * No API calls.
  *
- * Founder decisions (Q7 + Q10): trigger on 2+ people added in 48h with
- * keyword overlap, OR 3+ added in 24h regardless.
+ * Trigger rules (tuned post-launch — adding 2 in 48h was firing too
+ * eagerly, especially when one of the two was older and the user was
+ * just topping up a single new add):
+ *   A. keyword:  ≥3 people in the last 48h share at least one signal term
+ *   B. timing :  ≥4 people added in the last 24h regardless of overlap
+ *
+ * Suggestions are de-duplicated against existing Events AND Circles
+ * via fuzzy name matching at the hook layer (see use-smart-clusters),
+ * so the engine never proposes a circle the user already has.
  */
 
 const STOP_WORDS = new Set([
@@ -43,24 +50,26 @@ export interface SmartCluster {
   startDate: string | null;
   /** Latest creation date among members. */
   endDate: string | null;
+  /** Tokens we picked up from members — exposed so the hook layer can
+   *  fuzzy-match against existing Event / Circle names without re-doing
+   *  the personSignals work. */
+  tokens: string[];
 }
 
 const HOUR = 60 * 60 * 1000;
+
+/** Minimum people in the 48h window sharing a keyword token to trigger
+ *  a keyword cluster. */
+const MIN_KEYWORD_MEMBERS = 3;
+/** Minimum people in the 24h window to trigger a pure timing cluster
+ *  (no keyword overlap required). */
+const MIN_TIMING_MEMBERS = 4;
 
 interface DetectOptions {
   /** Optional override for "now" — handy in tests. */
   now?: Date;
 }
 
-/**
- * Detection rules:
- *   A. keyword:  ≥2 people in the last 48h share at least one signal term
- *   B. timing :  ≥3 people added in the last 24h regardless of overlap
- *
- * Returns at most one cluster per matched signal — each cluster is a
- * candidate suggestion. Dismissal is handled separately via the hook
- * layer using the cluster fingerprint.
- */
 export function detectClusters(people: Person[], opts: DetectOptions = {}): SmartCluster[] {
   const now = opts.now ?? new Date();
   const within48h = (p: Person) => now.getTime() - new Date(p.created_at).getTime() <= 48 * HOUR;
@@ -70,7 +79,7 @@ export function detectClusters(people: Person[], opts: DetectOptions = {}): Smar
   const recent24 = recent48.filter(within24h);
   const clusters: SmartCluster[] = [];
 
-  // --- Rule A: keyword overlap across 2+ people in 48h ---
+  // --- Rule A: keyword overlap across ≥MIN_KEYWORD_MEMBERS people in 48h ---
   const tokenIndex = new Map<string, Set<string>>(); // token -> set of person ids
   for (const p of recent48) {
     for (const t of new Set(personSignals(p))) {
@@ -82,7 +91,7 @@ export function detectClusters(people: Person[], opts: DetectOptions = {}): Smar
   // group with the highest member count wins. Ties broken by frequency.
   const groupedByMemberSet = new Map<string, { tokens: string[]; ids: string[] }>();
   for (const [token, idsSet] of tokenIndex) {
-    if (idsSet.size < 2) continue;
+    if (idsSet.size < MIN_KEYWORD_MEMBERS) continue;
     const key = [...idsSet].sort().join(',');
     if (!groupedByMemberSet.has(key))
       groupedByMemberSet.set(key, { tokens: [], ids: [...idsSet].sort() });
@@ -95,8 +104,8 @@ export function detectClusters(people: Person[], opts: DetectOptions = {}): Smar
     clusters.push(buildCluster(cand.ids, cand.tokens, 'keyword', people));
   }
 
-  // --- Rule B: 3+ in 24h without keyword requirement ---
-  if (recent24.length >= 3) {
+  // --- Rule B: ≥MIN_TIMING_MEMBERS in 24h regardless of keyword overlap ---
+  if (recent24.length >= MIN_TIMING_MEMBERS) {
     const ids = recent24.map((p) => p.id);
     // Only add if not already covered by a keyword cluster with the same set.
     const already = clusters.some((c) => sameSet(c.personIds, ids));
@@ -125,6 +134,7 @@ function buildCluster(
     reason,
     startDate: dates[0]?.slice(0, 10) ?? null,
     endDate: dates[dates.length - 1]?.slice(0, 10) ?? null,
+    tokens,
   };
 }
 
@@ -226,4 +236,60 @@ export function suggestEventMembers(
   }
   scored.sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name));
   return scored.slice(0, limit).map((x) => x.p);
+}
+
+/**
+ * Fuzzy name match for de-duplicating Smart Circle suggestions against
+ * existing Events / Circles. Returns true when two names probably refer
+ * to the same thing despite different wording.
+ *
+ * Matches when:
+ *   - normalized strings are equal, or
+ *   - one normalized string is a substring of the other (≥3 chars), or
+ *   - their content tokens (length ≥3, stop-words stripped) overlap by
+ *     at least 50% of the shorter set's size.
+ *
+ * Examples that match: "Stanford Mixer" vs "Stanford alumni",
+ * "Booth MBA" vs "Booth", "Tribeca Rooftop dinner" vs "Tribeca dinner".
+ */
+export function namesProbablyMatch(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.length >= 3 && nb.length >= 3) {
+    if (na.includes(nb) || nb.includes(na)) return true;
+  }
+  const at = new Set(tokenize(a));
+  const bt = new Set(tokenize(b));
+  if (at.size === 0 || bt.size === 0) return false;
+  let overlap = 0;
+  for (const t of at) if (bt.has(t)) overlap++;
+  const shorter = Math.min(at.size, bt.size);
+  return overlap >= Math.max(1, Math.ceil(shorter * 0.5));
+}
+
+/**
+ * True when the cluster's suggested name or any of its source tokens
+ * obviously overlaps with an existing Event / Circle name — used to
+ * suppress the banner so we don't pitch the user a circle they already
+ * have. Tokens are checked in addition to the suggested name so a poor
+ * naming heuristic doesn't bypass the dedupe.
+ */
+export function clusterDuplicatesExisting(
+  cluster: SmartCluster,
+  existingNames: string[],
+): boolean {
+  for (const name of existingNames) {
+    if (!name) continue;
+    if (namesProbablyMatch(cluster.suggestedName, name)) return true;
+    // Also dedupe by raw token: if a cluster keyword token sits in an
+    // existing name's tokens (e.g. cluster token "stanford" and existing
+    // event "Stanford Mixer"), treat as a duplicate.
+    const nameTokens = new Set(tokenize(name));
+    if (cluster.tokens.some((t) => nameTokens.has(t))) return true;
+  }
+  return false;
 }
