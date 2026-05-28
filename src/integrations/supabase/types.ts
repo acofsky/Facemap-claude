@@ -80,6 +80,102 @@ export type Database = {
         }
         Relationships: []
       }
+      import_candidates: {
+        Row: {
+          ai_bullets: Json | null
+          ai_rationale: string | null
+          ai_relevance_score: number | null
+          company: string | null
+          created_at: string
+          dedupe_key: string | null
+          dismissed: boolean
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          photo_path: string | null
+          promoted: boolean
+          promoted_person_id: string | null
+          raw: Json
+          session_id: string
+          source: string
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_bullets?: Json | null
+          ai_rationale?: string | null
+          ai_relevance_score?: number | null
+          company?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          dismissed?: boolean
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          photo_path?: string | null
+          promoted?: boolean
+          promoted_person_id?: string | null
+          raw?: Json
+          session_id: string
+          source: string
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_bullets?: Json | null
+          ai_rationale?: string | null
+          ai_relevance_score?: number | null
+          company?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          dismissed?: boolean
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          photo_path?: string | null
+          promoted?: boolean
+          promoted_person_id?: string | null
+          raw?: Json
+          session_id?: string
+          source?: string
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      import_sessions: {
+        Row: {
+          candidates_count: number
+          created_at: string
+          filter_text: string | null
+          id: string
+          promoted_count: number
+          sources: string[]
+          user_id: string
+        }
+        Insert: {
+          candidates_count?: number
+          created_at?: string
+          filter_text?: string | null
+          id?: string
+          promoted_count?: number
+          sources?: string[]
+          user_id: string
+        }
+        Update: {
+          candidates_count?: number
+          created_at?: string
+          filter_text?: string | null
+          id?: string
+          promoted_count?: number
+          sources?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       person_events: {
         Row: {
           created_at: string

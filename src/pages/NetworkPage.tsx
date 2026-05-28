@@ -6,6 +6,7 @@ interface NetworkPageProps {
   onSelectPerson: (id: string) => void;
   onSelectCircle: (id: string) => void;
   onSelectEvent: (id: string) => void;
+  onOpenImport?: () => void;
 }
 
 type Segment = 'people' | 'circles';
@@ -32,7 +33,7 @@ function loadSegment(): Segment {
  * person/circle/event detail and back doesn't snap the user back to
  * People when they were on Circles.
  */
-export function NetworkPage({ onSelectPerson, onSelectCircle, onSelectEvent }: NetworkPageProps) {
+export function NetworkPage({ onSelectPerson, onSelectCircle, onSelectEvent, onOpenImport }: NetworkPageProps) {
   const [segment, setSegmentState] = useState<Segment>(loadSegment);
 
   const setSegment = (s: Segment) => {
@@ -92,7 +93,7 @@ export function NetworkPage({ onSelectPerson, onSelectCircle, onSelectEvent }: N
       </div>
 
       {segment === 'people' ? (
-        <PeoplePage onSelectPerson={onSelectPerson} embedded />
+        <PeoplePage onSelectPerson={onSelectPerson} embedded onOpenImport={onOpenImport} />
       ) : (
         <CirclesPage
           onSelectCircle={onSelectCircle}

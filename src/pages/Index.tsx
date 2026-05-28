@@ -9,6 +9,7 @@ import { PersonProfilePage } from './PersonProfilePage';
 import { CircleDetailPage } from './CircleDetailPage';
 import { EventDetailPage } from './EventDetailPage';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
+import { ImportPage } from './ImportPage';
 import { onNotificationTap } from '@/lib/notifications';
 
 const Index = () => {
@@ -17,6 +18,18 @@ const Index = () => {
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eodSheetOpen, setEodSheetOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Onboarding can pre-arm a Smart Import by stashing this flag. We pop the
+  // flag on mount so we never re-open the wizard after the user has dismissed
+  // it once.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem('membr.pendingImport') === '1') {
+      window.localStorage.removeItem('membr.pendingImport');
+      setImportOpen(true);
+    }
+  }, []);
 
   // EoD notification tap → open the Add Person sheet with the spec §9 variant
   // header ("Who'd you meet today?"). Listener is no-op on web.
@@ -116,16 +129,26 @@ const Index = () => {
             onSelectPerson={setSelectedPersonId}
             onSelectCircle={setSelectedCircleId}
             onSelectEvent={setSelectedEventId}
+            onOpenImport={() => setImportOpen(true)}
           />
         )}
         {activeTab === 'recall' && <RecallPage onSelectPerson={setSelectedPersonId} />}
-        {activeTab === 'profile' && <ProfilePage />}
+        {activeTab === 'profile' && <ProfilePage onOpenImport={() => setImportOpen(true)} />}
       </AppLayout>
       <AnimatePresence>
         {eodSheetOpen && (
           <QuickAddSheet variant="end-of-day" onClose={() => setEodSheetOpen(false)} />
         )}
       </AnimatePresence>
+      {importOpen && (
+        <ImportPage
+          onClose={() => setImportOpen(false)}
+          onSelectPerson={(id) => {
+            setImportOpen(false);
+            setSelectedPersonId(id);
+          }}
+        />
+      )}
     </>
   );
 };

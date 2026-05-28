@@ -13,6 +13,8 @@ const ANTHROPIC_VERSION = "2023-06-01";
 const SYSTEM_PROMPT =
   "You write short, factual physical descriptions of people from photos to help someone remember them. Focus on observable, distinctive features: hair (color, length, style), eye color if visible, build, approximate age range, facial hair, glasses, distinctive clothing/style/accessories. Keep it 2-3 sentences. Do NOT speculate on race, ethnicity, mood, or personality. Be respectful and matter-of-fact.";
 
+const EXTRACT_PEOPLE_SYSTEM = `You extract named people from a photo. Look at visible text — name badges, captions, conference slide bylines, signs, lower-thirds, handwritten labels. Only include a person if you can see their actual name written somewhere in the image. Do NOT guess names from faces. Return STRICT JSON only.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -25,13 +27,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { photoUrl } = reqBody;
+    const { photoUrl, mode } = reqBody;
     if (!photoUrl || typeof photoUrl !== "string") {
       return new Response(JSON.stringify({ error: "photoUrl is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const isExtractPeople = mode === "extract_people";
 
     // Auth required
     const authHeader = req.headers.get("Authorization");
@@ -72,14 +75,21 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 384,
-        system: SYSTEM_PROMPT,
+        max_tokens: isExtractPeople ? 1024 : 384,
+        system: isExtractPeople ? EXTRACT_PEOPLE_SYSTEM : SYSTEM_PROMPT,
         messages: [
           {
             role: "user",
             content: [
               { type: "image", source: { type: "url", url: photoUrl } },
-              { type: "text", text: "Write a short physical description of the person in this photo." },
+              {
+                type: "text",
+                text: isExtractPeople
+                  ? `Extract the named people from this image. Return JSON in this exact shape (no prose, no markdown fences):
+{"people":[{"name":"<full name as shown>","role":"<title if visible, else omit>","company":"<org if visible, else omit>"}]}
+If no names are visible, return {"people":[]}.`
+                  : "Write a short physical description of the person in this photo.",
+              },
             ],
           },
         ],
@@ -100,13 +110,20 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const description = ((data.content || []) as Array<{ type: string; text?: string }>)
+    const text = ((data.content || []) as Array<{ type: string; text?: string }>)
       .filter((b) => b.type === "text")
       .map((b) => b.text || "")
       .join("")
       .trim();
 
-    return new Response(JSON.stringify({ description }), {
+    if (isExtractPeople) {
+      const people = parsePeople(text);
+      return new Response(JSON.stringify({ people }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ description: text }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
@@ -116,3 +133,25 @@ serve(async (req) => {
     });
   }
 });
+
+function parsePeople(text: string): Array<{ name: string; role?: string; company?: string }> {
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  try {
+    const parsed = JSON.parse(cleaned);
+    const arr = (parsed as { people?: unknown[] })?.people;
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((p) => {
+        if (!p || typeof p !== "object") return null;
+        const rec = p as Record<string, unknown>;
+        const name = typeof rec.name === "string" ? rec.name.trim() : "";
+        if (!name) return null;
+        const role = typeof rec.role === "string" ? rec.role.trim() : undefined;
+        const company = typeof rec.company === "string" ? rec.company.trim() : undefined;
+        return { name, role: role || undefined, company: company || undefined };
+      })
+      .filter((p): p is { name: string; role?: string; company?: string } => !!p);
+  } catch {
+    return [];
+  }
+}

@@ -1,18 +1,22 @@
 import { useState, useMemo } from 'react';
 import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents } from '@/hooks/use-data';
+import { usePendingImportsCount } from '@/hooks/use-pending-imports';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { SwipeRow } from '@/components/SwipeRow';
 import { LogEncounterModal } from '@/components/LogEncounterModal';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
+import { EnrichInfoModal } from '@/components/EnrichInfoModal';
+import { PendingImportsSheet } from '@/components/import/PendingImportsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonRowSkeleton } from '@/components/skeletons';
-import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles } from 'lucide-react';
+import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles, Info, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
   embedded?: boolean;
+  onOpenImport?: () => void;
 }
 
 type SortKey = 'recent' | 'az' | 'circle';
@@ -25,19 +29,22 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 type FilterKey = string | null;
 
-export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps) {
+export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: PeoplePageProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>(null);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [sortOpen, setSortOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [briefFor, setBriefFor] = useState<{ id: string; name: string } | null>(null);
+  const [enrichInfoOpen, setEnrichInfoOpen] = useState(false);
+  const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
 
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
   const { data: personCircles = [] } = usePersonCircles();
   const { data: events = [] } = useEvents({ includeArchived: false });
   const { data: personEvents = [] } = usePersonEvents();
+  const { data: pendingImportsCount = 0 } = usePendingImportsCount();
 
   const personCircleMap = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -171,6 +178,37 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
         </div>
       </div>
 
+      {onOpenImport && (
+        <div className="px-5 mb-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onOpenImport}
+              className="glass-pill flex-1 h-11 inline-flex items-center justify-center gap-2 text-[13px] text-foreground active:scale-[0.98] transition-transform"
+            >
+              <Upload className="w-4 h-4" strokeWidth={1.75} />
+              Smart Import
+            </button>
+            <button
+              onClick={() => setEnrichInfoOpen(true)}
+              className="glass-pill flex-1 h-11 inline-flex items-center justify-center gap-2 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform"
+            >
+              <Sparkles className="w-4 h-4 text-primary" strokeWidth={1.75} />
+              Enrich all
+              <Info className="w-3 h-3 opacity-60" strokeWidth={1.75} />
+            </button>
+          </div>
+          {pendingImportsCount > 0 && (
+            <button
+              onClick={() => setPendingDrawerOpen(true)}
+              className="w-full glass-pill h-10 inline-flex items-center justify-between px-4 text-[13px] text-foreground active:scale-[0.99] transition-transform"
+            >
+              <span>{pendingImportsCount} import{pendingImportsCount === 1 ? '' : 's'} waiting</span>
+              <ChevronRight className="w-4 h-4 opacity-60" strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+      )}
+
       {(circles.length > 0 || events.length > 0) && (
         <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 px-5 scrollbar-hide">
           <FilterChip active={!filter} onClick={() => setFilter(null)} label="All" />
@@ -279,6 +317,8 @@ export function PeoplePage({ onSelectPerson, embedded = false }: PeoplePageProps
           onClose={() => setBriefFor(null)}
         />
       )}
+      <EnrichInfoModal open={enrichInfoOpen} onClose={() => setEnrichInfoOpen(false)} />
+      <PendingImportsSheet open={pendingDrawerOpen} onClose={() => setPendingDrawerOpen(false)} />
     </div>
   );
 }

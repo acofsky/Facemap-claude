@@ -1,12 +1,13 @@
 import { useState, type ComponentType } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
-import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles } from 'lucide-react';
+import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles, Upload, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { friendlyError } from '@/lib/errors';
 import { toast } from 'sonner';
 import { AIDisclosure } from '@/components/AIDisclosure';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { EnrichInfoModal } from '@/components/EnrichInfoModal';
 import { NotificationPreferencesPage } from '@/pages/NotificationPreferencesPage';
 import { AppPermissionsPage } from '@/pages/AppPermissionsPage';
 import { cn } from '@/lib/utils';
@@ -16,12 +17,17 @@ const APP_VERSION = '1.0.3';
 const PRIVACY_POLICY_URL: string | null =
   'https://www.termsfeed.com/live/00f81b1d-cab0-4059-93ed-1103b7603d30';
 
-export function ProfilePage() {
+interface ProfilePageProps {
+  onOpenImport?: () => void;
+}
+
+export function ProfilePage({ onOpenImport }: ProfilePageProps = {}) {
   const { user, signOut } = useAuth();
   const { resetOnboarding } = useOnboarded();
   const [settingsOpen, setSettingsOpen] = useState<null | 'email' | 'password' | 'name'>(null);
   const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(false);
+  const [enrichInfoOpen, setEnrichInfoOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -214,6 +220,25 @@ export function ProfilePage() {
         />
       </SectionCard>
 
+      <SectionLabel>People</SectionLabel>
+      <SectionCard>
+        {onOpenImport && (
+          <SettingRow
+            icon={Upload}
+            label="Smart Import"
+            onClick={onOpenImport}
+          />
+        )}
+        <SettingRow
+          icon={Sparkles}
+          iconAccent
+          label="AI Enrichment"
+          rightLabel="Soon"
+          info
+          onClick={() => setEnrichInfoOpen(true)}
+        />
+      </SectionCard>
+
       <SectionLabel>About</SectionLabel>
       <SectionCard>
         <AIDisclosure />
@@ -239,6 +264,8 @@ export function ProfilePage() {
           {deleting ? 'Deleting…' : 'Delete account'}
         </button>
       </div>
+
+      <EnrichInfoModal open={enrichInfoOpen} onClose={() => setEnrichInfoOpen(false)} />
 
       <ConfirmDialog
         open={deleteConfirmOpen}
@@ -402,6 +429,7 @@ function SettingRow({
   onClick,
   tone,
   nonInteractive,
+  info,
 }: {
   icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
   iconAccent?: boolean;
@@ -410,6 +438,7 @@ function SettingRow({
   onClick?: () => void;
   tone?: 'default' | 'destructive';
   nonInteractive?: boolean;
+  info?: boolean;
 }) {
   const isDestructive = tone === 'destructive';
   const cls = cn(
@@ -433,8 +462,13 @@ function SettingRow({
       )}
       <span className="text-[15px] flex-1 truncate">{label}</span>
       {rightLabel ? (
-        <span className="text-[13px] text-[hsl(var(--foreground)/0.55)]">{rightLabel}</span>
-      ) : !nonInteractive ? (
+        <span className="text-[12px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[hsl(0_0%_100%/0.08)] text-[hsl(var(--foreground)/0.6)]">
+          {rightLabel}
+        </span>
+      ) : null}
+      {info ? (
+        <Info className="w-3.5 h-3.5 text-[hsl(var(--foreground)/0.45)] shrink-0 ml-1" strokeWidth={1.75} />
+      ) : !rightLabel && !nonInteractive ? (
         <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
       ) : null}
     </>

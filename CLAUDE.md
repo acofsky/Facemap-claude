@@ -279,3 +279,90 @@ Hard rules under Liquid Glass:
 `.surface-elevated` utilities so non-migrated components continue to
 render. Prefer the glass utilities for any new or rewritten surface.
 The flat surfaces will be removed once every screen is on glass.
+
+## Smart Import v1
+
+Multi-source bulk import for People. Reachable from:
+- Onboarding screen 5 ("Bring your people in")
+- `Network → People → Smart Import` glass pill
+- `Profile → People → Smart Import` row
+
+### Sources (v1)
+
+| Source | Status | Notes |
+|---|---|---|
+| iOS Contacts | ✓ | Uses `@capacitor-community/contacts`. Photos pulled when available. |
+| LinkedIn CSV | ✓ | Pure browser parse of `Connections.csv` via `papaparse`. No photos in the export. |
+| Photo OCR | ✓ | Reuses `describe-from-photo` edge function in `mode: "extract_people"`. Names only — only includes people whose name is visibly written somewhere in the image (no face recognition). |
+| Calendar | stub | `isCalendarSourceAvailable()` returns false. Picker shows "Soon" chip. To enable, see `FUTURE_PREMIUM_FEATURES.md`. |
+| Gmail | deferred to v1.5 | See `FUTURE_PREMIUM_FEATURES.md`. |
+
+### Flow
+
+`Pick → Gather → Free-write filter → AI rank → Review (top 20) + drawer`.
+
+1. **Pick** — multi-select source cards in `src/pages/ImportPage.tsx`.
+2. **Gather** — each chosen source's adapter (`src/lib/import/sources/`)
+   produces `CandidateDraft[]`. Adapters never write to the DB.
+3. **Filter** — single textarea, free-write goal (e.g. "people for my
+   finance career, excluding college friends"). Optional. Disclosure
+   reminds the user that filter accuracy depends on what each source
+   exposes (LinkedIn ≫ Contacts for filterable signal).
+4. **Rank** — `mergeDrafts()` dedupes within the batch (name-normalized;
+   merges drafts unless phone/email conflict; fuzzy-merges name-only
+   orphans). Then `insertCandidates()` writes `import_candidates` rows,
+   then `rankCandidates()` posts batched to `rank-import-candidates`
+   edge function which returns `{score, rationale, bullets}` per
+   candidate and writes results back.
+5. **Review** — top 20 by score render as `ImportCandidateCard`. The
+   editable bullets seed the `misc_notes` (About) field on promote.
+   Source-derived facts (email/phone/company/title) land in
+   `important_info` (Background). Anything past the top 20 sits in a
+   "More imports" drawer one tap away.
+6. **Dedupe vs existing People** — `findMatchesAgainstPeople()` flips
+   the per-card action from "Add to People" to "Merge in" when a
+   candidate's name (and optionally phone/email) collides with an
+   existing person. `mergeCandidateIntoPerson()` then fills empty
+   fields only — never overwrites.
+
+### Pending candidates across sessions
+
+Promotion is not all-or-nothing. The user can finish triaging days
+later: `usePendingImportsCount()` powers the "N imports waiting" pill
+on PeoplePage, and `PendingImportsSheet` loads pending rows from any
+past session.
+
+### Premium-enrichment placeholders (UI only, no logic yet)
+
+- `Profile → People → AI Enrichment` row with `Soon` chip
+- `Network → People → Enrich all` glass pill with (i) info button
+- Shared `EnrichInfoModal` explainer — DO NOT remove without first
+  removing all three entry points
+
+Anything labeled as enrichment is **out of scope until the Premium
+tier ships**. See `FUTURE_PREMIUM_FEATURES.md` for the deferred backlog.
+
+### Schema additions
+
+Migration `20260528100000_smart_import.sql` adds:
+- `import_sessions` — one row per wizard run (filter_text, sources,
+  counts)
+- `import_candidates` — one row per discovered stub (source, raw,
+  name/email/phone/company/title/photo_path, AI ranking, dedupe_key,
+  promoted/dismissed flags)
+
+Both have user-scoped RLS. The `import_candidates.source` CHECK
+constraint enumerates the 4 source ids — adding Gmail requires altering
+this constraint, see `FUTURE_PREMIUM_FEATURES.md`.
+
+### Edge function
+
+`supabase/functions/rank-import-candidates/` — Claude Haiku 4.5 call.
+Hard cap of 80 candidates per request; the client batches at 60.
+Returns strict JSON; falls back to neutral 0.5 scores if the model's
+JSON is malformed. Like the other AI edge functions, supports a
+`warm: true` ping for prewarm.
+
+`describe-from-photo` now has two modes: the original (default)
+returns `{description}`, and `mode: "extract_people"` returns
+`{people: [{name, role?, company?}]}`.

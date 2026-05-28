@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Calendar, MapPin, Users } from 'lucide-react';
+import { Sparkles, Calendar, MapPin, Users, Upload } from 'lucide-react';
 import { Wordmark } from '@/components/Wordmark';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,11 @@ interface Screen {
   sub?: string;
   cta: string;
   illustration: () => JSX.Element;
+  /** Optional secondary CTA shown beneath the primary one. */
+  secondaryCta?: string;
+  /** If set, tapping the primary CTA stashes a flag the main app reads on
+   *  mount to auto-open the corresponding flow (e.g. Smart Import). */
+  primarySideEffect?: 'open-import';
 }
 
 const SCREENS: Screen[] = [
@@ -41,6 +46,14 @@ const SCREENS: Screen[] = [
     cta: "Let's go",
     illustration: BriefIllustration,
   },
+  {
+    headline: 'Bring your people in.',
+    sub: 'Pull from Contacts, LinkedIn, or a photo. Describe who you want and the AI ranks the rest for you.',
+    cta: 'Import people now',
+    secondaryCta: 'Maybe later',
+    illustration: ImportIllustration,
+    primarySideEffect: 'open-import',
+  },
 ];
 
 export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
@@ -50,6 +63,9 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
 
   const advance = () => {
     haptics.light();
+    if (screen.primarySideEffect === 'open-import') {
+      try { window.localStorage.setItem('membr.pendingImport', '1'); } catch { /* ignore quota */ }
+    }
     if (isLast) onDone();
     else setIndex((i) => i + 1);
   };
@@ -57,6 +73,12 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
   const skip = () => {
     haptics.light();
     onDone();
+  };
+
+  const secondary = () => {
+    haptics.light();
+    if (isLast) onDone();
+    else setIndex((i) => i + 1);
   };
 
   return (
@@ -118,13 +140,21 @@ export function OnboardingFlow({ onDone }: OnboardingFlowProps) {
       </div>
 
       {/* CTA */}
-      <div className="px-5 pb-6">
+      <div className="px-5 pb-6 space-y-2">
         <button
           onClick={advance}
           className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
         >
           {screen.cta}
         </button>
+        {screen.secondaryCta && (
+          <button
+            onClick={secondary}
+            className="w-full h-[44px] rounded-2xl text-[14px] font-medium text-[hsl(var(--foreground)/0.65)] active:opacity-60 transition-opacity"
+          >
+            {screen.secondaryCta}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -182,6 +212,39 @@ function GroupsIllustration() {
           <span className="text-[11px] text-white/70">7 members</span>
           <span className="text-[11px] text-white/60">Apr 14–16</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ImportIllustration() {
+  // ONBD-05 — stack of source chips with the AI-rank moment implied.
+  return (
+    <div className="space-y-2.5 w-full">
+      <div className="glass-warm p-3.5 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-md bg-[hsl(0_0%_100%/0.08)] flex items-center justify-center">
+          <Upload className="w-4 h-4 text-primary" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-semibold text-foreground">Smart Import</div>
+          <div className="text-[11px] text-[hsl(var(--foreground)/0.6)]">Contacts · LinkedIn · Photo</div>
+        </div>
+      </div>
+      <div className="glass p-2.5 flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full tile-blue flex items-center justify-center text-white text-[11px] font-semibold">PM</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-foreground truncate">Pat Morgan</div>
+          <div className="text-[10px] text-[hsl(var(--foreground)/0.55)] truncate">Senior PM · Stripe</div>
+        </div>
+        <Sparkles className="w-3 h-3 text-primary" strokeWidth={1.75} />
+      </div>
+      <div className="glass p-2.5 flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full tile-purple flex items-center justify-center text-white text-[11px] font-semibold">AK</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-foreground truncate">Aria Kim</div>
+          <div className="text-[10px] text-[hsl(var(--foreground)/0.55)] truncate">Founder · seed-stage fintech</div>
+        </div>
+        <Sparkles className="w-3 h-3 text-primary" strokeWidth={1.75} />
       </div>
     </div>
   );
