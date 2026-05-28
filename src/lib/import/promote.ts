@@ -82,6 +82,7 @@ function sourceLabel(source: string): string {
   switch (source) {
     case 'contacts': return 'iOS Contacts';
     case 'linkedin': return 'LinkedIn export';
+    case 'spreadsheet': return 'a spreadsheet';
     case 'calendar': return 'Calendar';
     case 'photo_ocr': return 'a photo';
     default: return source;

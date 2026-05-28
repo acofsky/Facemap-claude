@@ -1,6 +1,6 @@
 import type { Tables } from '@/integrations/supabase/types';
 
-export type ImportSource = 'contacts' | 'linkedin' | 'calendar' | 'photo_ocr';
+export type ImportSource = 'contacts' | 'linkedin' | 'spreadsheet' | 'calendar' | 'photo_ocr';
 
 export type ImportCandidateRow = Tables<'import_candidates'>;
 export type ImportSessionRow = Tables<'import_sessions'>;

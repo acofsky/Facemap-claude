@@ -48,7 +48,7 @@ const SCREENS: Screen[] = [
   },
   {
     headline: 'Bring your people in.',
-    sub: 'Pull from Contacts, LinkedIn, or a photo. Describe who you want and the AI ranks the rest for you.',
+    sub: 'Pull from Contacts, LinkedIn, your own spreadsheet, or a photo. Describe who you want and the AI ranks the rest for you.',
     cta: 'Import people now',
     secondaryCta: 'Maybe later',
     illustration: ImportIllustration,

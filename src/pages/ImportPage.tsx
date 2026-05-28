@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowLeft, Calendar, Camera, Check, FileText, Image as ImageIcon,
+  ArrowLeft, Calendar, Camera, Check, FileSpreadsheet, FileText, Image as ImageIcon,
   Info, Loader2, Sparkles, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,9 +14,11 @@ import { cn } from '@/lib/utils';
 import { isNativeIOS } from '@/lib/ios-contacts';
 import { ImportCandidateCard } from '@/components/import/ImportCandidateCard';
 import { LinkedInHowToModal } from '@/components/import/LinkedInHowToModal';
+import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal';
 import { sourceLabel } from '@/components/import/sourceLabels';
 import { gatherContactsCandidates } from '@/lib/import/sources/contacts-source';
 import { parseLinkedInCsv } from '@/lib/import/sources/linkedin-source';
+import { parseSpreadsheetFile, SpreadsheetParseError } from '@/lib/import/sources/spreadsheet-source';
 import { gatherPhotoOcrCandidates } from '@/lib/import/sources/photo-ocr-source';
 import { isCalendarSourceAvailable } from '@/lib/import/sources/calendar-source';
 import { mergeDrafts, findMatchesAgainstPeople } from '@/lib/import/dedupe';
@@ -51,6 +53,7 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
   const [gatherProgress, setGatherProgress] = useState(0);
   const [completedSources, setCompletedSources] = useState<Set<ImportSource>>(new Set());
   const [linkedInHowTo, setLinkedInHowTo] = useState(false);
+  const [spreadsheetHowTo, setSpreadsheetHowTo] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [ranking, setRanking] = useState(false);
   const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
@@ -58,6 +61,7 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
 
   const linkedInRef = useRef<HTMLInputElement>(null);
+  const spreadsheetRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   const toggleSource = (source: ImportSource) => {
@@ -107,6 +111,29 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
       toast.success(`Parsed ${got.length} LinkedIn connections`);
     } catch (e) {
       toast.error(friendlyError(e, 'That CSV did not look like a LinkedIn export.'));
+    } finally {
+      setGathering(null);
+    }
+  };
+
+  const runSpreadsheetFile = async (file: File) => {
+    setGathering('spreadsheet');
+    try {
+      const { drafts: got, unmappedRows } = await parseSpreadsheetFile(file);
+      if (got.length === 0) {
+        toast.error('No rows with a name found in that spreadsheet.');
+      } else {
+        setDrafts((d) => [...d, ...got]);
+        const skipped = unmappedRows > 0 ? ` (skipped ${unmappedRows} row${unmappedRows === 1 ? '' : 's'} with no name)` : '';
+        toast.success(`Parsed ${got.length} people from ${file.name}${skipped}`);
+      }
+      setCompletedSources((s) => new Set(s).add('spreadsheet'));
+    } catch (e) {
+      if (e instanceof SpreadsheetParseError) {
+        toast.error(e.message);
+      } else {
+        toast.error(friendlyError(e, "Couldn't parse that file as CSV."));
+      }
     } finally {
       setGathering(null);
     }
@@ -299,8 +326,10 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
             draftsCount={drafts.length}
             onRunContacts={runContacts}
             onPickLinkedIn={() => linkedInRef.current?.click()}
+            onPickSpreadsheet={() => spreadsheetRef.current?.click()}
             onPickPhoto={() => photoRef.current?.click()}
             onShowLinkedInHowTo={() => setLinkedInHowTo(true)}
+            onShowSpreadsheetHowTo={() => setSpreadsheetHowTo(true)}
             onContinue={handleGoToFilter}
             allDone={allSelectedDone}
           />
@@ -346,6 +375,7 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
       )}
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />
+      <SpreadsheetHowToModal open={spreadsheetHowTo} onClose={() => setSpreadsheetHowTo(false)} />
 
       <input
         ref={linkedInRef}
@@ -356,6 +386,17 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
           const f = e.target.files?.[0];
           e.target.value = '';
           if (f) runLinkedInFile(f);
+        }}
+      />
+      <input
+        ref={spreadsheetRef}
+        type="file"
+        accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (f) runSpreadsheetFile(f);
         }}
       />
       <input
@@ -406,6 +447,12 @@ function PickStep({
       title: 'LinkedIn export',
       icon: FileText,
       description: 'Drop a Connections.csv. Names, titles, companies, connection dates.',
+    },
+    {
+      key: 'spreadsheet',
+      title: 'A spreadsheet',
+      icon: FileSpreadsheet,
+      description: 'Your own CSV of people. Notes and convo columns flow into the bullets.',
     },
     {
       key: 'photo_ocr',
@@ -505,8 +552,10 @@ function GatherStep({
   draftsCount,
   onRunContacts,
   onPickLinkedIn,
+  onPickSpreadsheet,
   onPickPhoto,
   onShowLinkedInHowTo,
+  onShowSpreadsheetHowTo,
   onContinue,
   allDone,
 }: {
@@ -517,8 +566,10 @@ function GatherStep({
   draftsCount: number;
   onRunContacts: () => void;
   onPickLinkedIn: () => void;
+  onPickSpreadsheet: () => void;
   onPickPhoto: () => void;
   onShowLinkedInHowTo: () => void;
+  onShowSpreadsheetHowTo: () => void;
   onContinue: () => void;
   allDone: boolean;
 }) {
@@ -560,6 +611,28 @@ function GatherStep({
             ctaLabel={completedSources.has('linkedin') ? 'Pick another' : 'Choose CSV'}
             onClick={onPickLinkedIn}
             icon={FileText}
+          />
+        )}
+        {selectedSources.has('spreadsheet') && (
+          <SourceCard
+            title="A spreadsheet"
+            description={
+              <>
+                CSV/TSV with a header row. Name + any columns of notes or convos.{' '}
+                <button
+                  type="button"
+                  onClick={onShowSpreadsheetHowTo}
+                  className="underline text-foreground"
+                >
+                  How it works
+                </button>
+              </>
+            }
+            busy={gathering === 'spreadsheet'}
+            done={completedSources.has('spreadsheet')}
+            ctaLabel={completedSources.has('spreadsheet') ? 'Add another file' : 'Choose file'}
+            onClick={onPickSpreadsheet}
+            icon={FileSpreadsheet}
           />
         )}
         {selectedSources.has('photo_ocr') && (
@@ -670,7 +743,7 @@ function FilterStep({
   onRank: () => void;
   sources: ImportSource[];
 }) {
-  const richSources = sources.some((s) => s === 'linkedin' || s === 'photo_ocr');
+  const richSources = sources.some((s) => s === 'linkedin' || s === 'photo_ocr' || s === 'spreadsheet');
   const onlyContacts = sources.length === 1 && sources[0] === 'contacts';
 
   return (
@@ -692,9 +765,9 @@ function FilterStep({
         <span>
           Filter accuracy depends on what each source provides.{' '}
           {onlyContacts
-            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with LinkedIn.'
+            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with a spreadsheet or LinkedIn.'
             : richSources
-              ? 'LinkedIn gives titles + companies; Contacts may only have phone numbers. We do our best with what each source has.'
+              ? 'Spreadsheet notes columns and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
               : 'Some sources expose more fields than others.'}
         </span>
       </div>
