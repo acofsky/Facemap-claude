@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowLeft, Calendar, Camera, Check, FileSpreadsheet, FileText, Image as ImageIcon,
+  ArrowLeft, Calendar, Check, FileText, Files,
   Info, Loader2, Plus, RotateCcw, Sparkles, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,8 +18,8 @@ import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal
 import { RankResultModal } from '@/components/import/RankResultModal';
 import { gatherContactsCandidates } from '@/lib/import/sources/contacts-source';
 import { parseLinkedInCsv } from '@/lib/import/sources/linkedin-source';
-import { parseSpreadsheetFile, SpreadsheetParseError } from '@/lib/import/sources/spreadsheet-source';
-import { gatherPhotoOcrCandidates } from '@/lib/import/sources/photo-ocr-source';
+import { gatherFileCandidates, UnsupportedFileError } from '@/lib/import/sources/file-source';
+import { SpreadsheetParseError } from '@/lib/import/sources/spreadsheet-source';
 import { isCalendarSourceAvailable } from '@/lib/import/sources/calendar-source';
 import { mergeDrafts, findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import {
@@ -72,8 +72,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [showLowScores, setShowLowScores] = useState(false);
 
   const linkedInRef = useRef<HTMLInputElement>(null);
-  const spreadsheetRef = useRef<HTMLInputElement>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // ---- back navigation ----
 
@@ -153,42 +152,27 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     }
   };
 
-  const runSpreadsheetFile = async (file: File) => {
+  const runFile = async (file: File) => {
     setGathering('spreadsheet');
     try {
-      const { drafts: got, unmappedRows } = await parseSpreadsheetFile(file);
+      const got = await gatherFileCandidates(file);
       if (got.length === 0) {
-        toast.error('No rows with a name found in that spreadsheet.');
+        toast.error(
+          file.type.startsWith('image/')
+            ? "No names visible in that photo. Try one with name badges or a caption."
+            : 'No rows with a name found in that file.',
+        );
       } else {
         setDrafts((d) => [...d, ...got]);
-        const skipped = unmappedRows > 0 ? ` (skipped ${unmappedRows} row${unmappedRows === 1 ? '' : 's'} with no name)` : '';
-        toast.success(`Parsed ${got.length} people from ${file.name}${skipped}`);
+        toast.success(`Pulled ${got.length} ${got.length === 1 ? 'person' : 'people'} from ${file.name}`);
       }
       setCompletedSources((s) => new Set(s).add('spreadsheet'));
     } catch (e) {
-      if (e instanceof SpreadsheetParseError) {
+      if (e instanceof UnsupportedFileError || e instanceof SpreadsheetParseError) {
         toast.error(e.message);
       } else {
-        toast.error(friendlyError(e, "Couldn't parse that file as CSV."));
+        toast.error(friendlyError(e, "Couldn't read that file."));
       }
-    } finally {
-      setGathering(null);
-    }
-  };
-
-  const runPhotoFile = async (file: File) => {
-    setGathering('photo_ocr');
-    try {
-      const got = await gatherPhotoOcrCandidates(file);
-      if (got.length === 0) {
-        toast.error("No names visible in this photo. Try one with name badges or a caption.");
-      } else {
-        setDrafts((d) => [...d, ...got]);
-        toast.success(`Found ${got.length} ${got.length === 1 ? 'person' : 'people'} in the photo`);
-      }
-      setCompletedSources((s) => new Set(s).add('photo_ocr'));
-    } catch (e) {
-      toast.error(friendlyError(e, 'Could not read that photo.'));
     } finally {
       setGathering(null);
     }
@@ -385,6 +369,19 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       }}
       {...swipe.bind}
     >
+      {/* Notch cover — matches the gradient the detail pages use so the
+          status-bar region reads as solid black instead of letting the
+          warm ambient backdrop bleed up there. Pointer-none so the
+          header swipe still wins. */}
+      <div
+        aria-hidden="true"
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+        style={{
+          height: 'calc(env(safe-area-inset-top) + 24px)',
+          background:
+            'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+        }}
+      />
       <div className="sticky top-0 z-20 flex items-center justify-between px-3 pt-3 pb-2 backdrop-blur-xl bg-black/40">
         <button
           onClick={goBack}
@@ -423,10 +420,9 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             filterText={filterText}
             onRunContacts={runContacts}
             onPickLinkedIn={() => linkedInRef.current?.click()}
-            onPickSpreadsheet={() => spreadsheetRef.current?.click()}
-            onPickPhoto={() => photoRef.current?.click()}
+            onPickFile={() => fileRef.current?.click()}
             onShowLinkedInHowTo={() => setLinkedInHowTo(true)}
-            onShowSpreadsheetHowTo={() => setSpreadsheetHowTo(true)}
+            onShowFileHowTo={() => setSpreadsheetHowTo(true)}
             onContinue={handleRankAndReview}
             ranking={ranking}
           />
@@ -488,25 +484,14 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         }}
       />
       <input
-        ref={spreadsheetRef}
+        ref={fileRef}
         type="file"
-        accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain"
+        accept="image/*,.csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = '';
-          if (f) runSpreadsheetFile(f);
-        }}
-      />
-      <input
-        ref={photoRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = '';
-          if (f) runPhotoFile(f);
+          if (f) runFile(f);
         }}
       />
     </div>
@@ -549,15 +534,9 @@ function PickStep({
     },
     {
       key: 'spreadsheet',
-      title: 'A spreadsheet',
-      icon: FileSpreadsheet,
-      description: 'Your own CSV of people. Notes and convo columns flow into the bullets.',
-    },
-    {
-      key: 'photo_ocr',
-      title: 'A photo',
-      icon: ImageIcon,
-      description: 'Group shot, slide, conference badge. AI reads visible names.',
+      title: 'A file',
+      icon: Files,
+      description: 'CSV, Excel, or a photo. Spreadsheets become rows of people; photos turn into names from any visible text.',
     },
     {
       key: 'calendar',
@@ -653,7 +632,7 @@ function FilterStep({
   sources: ImportSource[];
   onContinue: () => void;
 }) {
-  const richSources = sources.some((s) => s === 'linkedin' || s === 'photo_ocr' || s === 'spreadsheet');
+  const richSources = sources.some((s) => s === 'linkedin' || s === 'spreadsheet');
   const onlyContacts = sources.length === 1 && sources[0] === 'contacts';
 
   return (
@@ -675,9 +654,9 @@ function FilterStep({
         <span>
           Filter accuracy depends on what each source provides.{' '}
           {onlyContacts
-            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with a spreadsheet or LinkedIn.'
+            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with a file or LinkedIn.'
             : richSources
-              ? 'Spreadsheet notes columns and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
+              ? 'File contents and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
               : 'Some sources expose more fields than others.'}
         </span>
       </div>
@@ -704,10 +683,9 @@ function GatherStep({
   filterText,
   onRunContacts,
   onPickLinkedIn,
-  onPickSpreadsheet,
-  onPickPhoto,
+  onPickFile,
   onShowLinkedInHowTo,
-  onShowSpreadsheetHowTo,
+  onShowFileHowTo,
   onContinue,
   ranking,
 }: {
@@ -719,10 +697,9 @@ function GatherStep({
   filterText: string;
   onRunContacts: () => void;
   onPickLinkedIn: () => void;
-  onPickSpreadsheet: () => void;
-  onPickPhoto: () => void;
+  onPickFile: () => void;
   onShowLinkedInHowTo: () => void;
-  onShowSpreadsheetHowTo: () => void;
+  onShowFileHowTo: () => void;
   onContinue: () => void;
   ranking: boolean;
 }) {
@@ -775,13 +752,13 @@ function GatherStep({
         )}
         {selectedSources.has('spreadsheet') && (
           <SourceCard
-            title="A spreadsheet"
+            title="A file"
             description={
               <>
-                CSV/TSV with a header row. Name + any columns of notes or convos.{' '}
+                CSV, Excel, or a photo. Auto-routed by file type.{' '}
                 <button
                   type="button"
-                  onClick={onShowSpreadsheetHowTo}
+                  onClick={onShowFileHowTo}
                   className="underline text-foreground"
                 >
                   How it works
@@ -791,19 +768,8 @@ function GatherStep({
             busy={gathering === 'spreadsheet'}
             done={completedSources.has('spreadsheet')}
             ctaLabel={completedSources.has('spreadsheet') ? 'Add another file' : 'Choose file'}
-            onClick={onPickSpreadsheet}
-            icon={FileSpreadsheet}
-          />
-        )}
-        {selectedSources.has('photo_ocr') && (
-          <SourceCard
-            title="A photo"
-            description="A photo with visible name tags, captions, or a slide of speakers."
-            busy={gathering === 'photo_ocr'}
-            done={completedSources.has('photo_ocr')}
-            ctaLabel={completedSources.has('photo_ocr') ? 'Add another photo' : 'Pick photo'}
-            onClick={onPickPhoto}
-            icon={Camera}
+            onClick={onPickFile}
+            icon={Files}
           />
         )}
         {selectedSources.has('calendar') && (

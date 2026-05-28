@@ -293,8 +293,7 @@ Multi-source bulk import for People. Reachable from:
 |---|---|---|
 | iOS Contacts | ✓ | Uses `@capacitor-community/contacts`. Photos pulled when available. |
 | LinkedIn CSV | ✓ | Pure browser parse of `Connections.csv` via `papaparse`. No photos in the export. |
-| Spreadsheet | ✓ | User-supplied CSV/TSV. `parseSpreadsheetFile()` does heuristic column detection (name/email/phone/company/title); every other column flows into the AI ranker's `context` so notes/conv columns become bullets. |
-| Photo OCR | ✓ | Reuses `describe-from-photo` edge function in `mode: "extract_people"`. Names only — only includes people whose name is visibly written somewhere in the image (no face recognition). |
+| **A file** (merged) | ✓ | One picker card, accepts CSV / TSV / XLSX / images. `gatherFileCandidates()` in `src/lib/import/sources/file-source.ts` sniffs MIME and dispatches: spreadsheets go through `parseSpreadsheetFile` (heuristic column detection, notes columns flow into AI context), Excel files convert to CSV via SheetJS first, images go to `gatherPhotoOcrCandidates` (describe-from-photo `mode: "extract_people"`). Per-row source ids in the DB stay accurate: 'spreadsheet' vs 'photo_ocr'. PDFs throw a friendly "coming soon" message. |
 | Calendar | stub | `isCalendarSourceAvailable()` returns false. Picker shows "Soon" chip. To enable, see `FUTURE_PREMIUM_FEATURES.md`. |
 | Gmail | deferred to v1.5 | See `FUTURE_PREMIUM_FEATURES.md`. |
 

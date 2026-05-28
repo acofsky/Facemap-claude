@@ -59,6 +59,25 @@ ranking + drawer flow.
    `gmail` to the CHECK constraint on `source` and add a new
    `gmail-source.ts` module.
 
+## PDF support in the "A file" source
+
+The merged file picker accepts CSV / Excel / images today. PDFs throw a
+friendly `UnsupportedFileError` — the plumbing in `file-source.ts` already
+checks for the MIME type, the missing piece is the parser.
+
+Two routes:
+
+1. **Server-side via Claude Vision:** Anthropic's `document` content type
+   accepts PDFs directly. The `describe-from-photo` edge function already
+   handles the `extract_people` mode and just needs a branch for PDFs —
+   stream the file to Supabase Storage, sign a URL, pass as a document
+   block instead of an image block.
+2. **Client-side via pdf.js:** render each page to a canvas, OCR each as
+   an image. More bundle weight, no edge-function changes.
+
+Probably (1). Worth doing whenever a user shows up with a PDF directory or
+conference list.
+
 ## Calendar as a source
 
 Plumbing is in place (`calendar-source.ts`, picker UI shows the option
