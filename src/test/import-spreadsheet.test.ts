@@ -10,7 +10,7 @@ function makeFile(text: string, name = 'test.csv', type = 'text/csv'): File {
 }
 
 describe('parseSpreadsheetFile', () => {
-  it('parses a vanilla Name/Email/Notes CSV', async () => {
+  it('parses a vanilla Name/Email/Notes CSV and maps notes into misc_notes', async () => {
     const csv = [
       'Name,Email,Notes',
       'Alex Chen,alex@example.com,Met at design conf. Wants to chat about ML.',
@@ -23,7 +23,9 @@ describe('parseSpreadsheetFile', () => {
       name: 'Alex Chen',
       email: 'alex@example.com',
     });
-    expect(drafts[0].context).toContain('Notes: Met at design conf');
+    expect(drafts[0].mappedFields?.misc_notes).toContain('Met at design conf');
+    // Mapped columns shouldn't double up in the AI context blob.
+    expect(drafts[0].context).toBeUndefined();
   });
 
   it('joins First Name + Last Name when no single name column exists', async () => {
@@ -34,7 +36,25 @@ describe('parseSpreadsheetFile', () => {
     const { drafts } = await parseSpreadsheetFile(makeFile(csv));
     expect(drafts[0].name).toBe('Mira Khan');
     expect(drafts[0].company).toBe('Stripe');
-    expect(drafts[0].context).toContain('Conversation: Talked about her new fintech role');
+    // 'Conversation' is mapped to misc_notes.
+    expect(drafts[0].mappedFields?.misc_notes).toContain('Talked about her new fintech role');
+  });
+
+  it('maps rich free-text columns to specific Person fields', async () => {
+    const csv = [
+      'Name,How I met them,Where met,Description,Important notes,Who they know',
+      'Sam Liu,Coffee chat through Jamie,Tribeca rooftop,Tall blond beard,VP at small fintech,Knows Mira Khan',
+    ].join('\n');
+    const { drafts } = await parseSpreadsheetFile(makeFile(csv));
+    expect(drafts[0].mappedFields).toMatchObject({
+      how_we_met: 'Coffee chat through Jamie',
+      where_when: 'Tribeca rooftop',
+      physical_description: 'Tall blond beard',
+      important_info: 'VP at small fintech',
+      known_people_notes: 'Knows Mira Khan',
+    });
+    // Nothing left over.
+    expect(drafts[0].context).toBeUndefined();
   });
 
   it('identifies misnamed identity columns by fuzzy header', async () => {
@@ -76,14 +96,16 @@ describe('parseSpreadsheetFile', () => {
     const { drafts } = await parseSpreadsheetFile(makeFile(tsv, 'people.tsv', 'text/tab-separated-values'));
     expect(drafts).toHaveLength(1);
     expect(drafts[0].email).toBe('alex@x.com');
-    expect(drafts[0].context).toContain('Convo: hi');
+    expect(drafts[0].mappedFields?.misc_notes).toBe('hi');
   });
 
-  it('caps long notes cells', async () => {
+  it('caps long context cells from truly unmapped columns', async () => {
     const long = 'a'.repeat(500);
-    const csv = `Name,Notes\nAlex,${long}\n`;
+    const csv = `Name,Random Column,Random2\nAlex,${long},short\n`;
     const { drafts } = await parseSpreadsheetFile(makeFile(csv));
-    expect(drafts[0].context!.length).toBeLessThan(280);
-    expect(drafts[0].context).toMatch(/…$/);
+    // Random Column and Random2 don't match any identity header, so they
+    // fall into context — and context's per-cell cap should kick in.
+    expect(drafts[0].context).toBeDefined();
+    expect(drafts[0].context!.length).toBeLessThan(800);
   });
 });

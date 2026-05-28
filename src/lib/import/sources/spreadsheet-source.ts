@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { CandidateDraft } from '../types';
+import type { CandidateDraft, MappedPersonFields } from '../types';
 
 const NAME_HEADERS = [
   'full name', 'name', 'person', 'contact', 'who', 'their name',
@@ -10,6 +10,35 @@ const EMAIL_HEADERS = ['email', 'e-mail', 'email address', 'mail'];
 const PHONE_HEADERS = ['phone', 'phone number', 'mobile', 'cell', 'cellphone', 'telephone', 'tel'];
 const COMPANY_HEADERS = ['company', 'organization', 'org', 'employer', 'workplace', 'business'];
 const TITLE_HEADERS = ['title', 'position', 'role', 'job title', 'job', 'occupation'];
+
+// Person free-text fields. Each list is checked in `matchFirst` order —
+// place specific phrases before short fuzzy ones so they win the substring
+// fallback (e.g., 'how we met' must be tested before 'met').
+const HOW_WE_MET_HEADERS = [
+  'how we met', 'how met', 'how i met', 'how did we meet',
+  'introduced by', 'introduction', 'met via', 'met through', 'origin',
+];
+const WHERE_WHEN_HEADERS = [
+  'where we met', 'where met', 'where', 'place', 'venue', 'location',
+  'when we met', 'when met', 'when', 'context',
+];
+const PHYSICAL_HEADERS = [
+  'physical description', 'appearance', 'looks', 'looks like', 'description',
+  'physical', 'what they look like',
+];
+const MISC_NOTES_HEADERS = [
+  'about', 'notes', 'note', 'misc', 'about them', 'comments',
+  'conversation', 'convo', 'last convo', 'last conversation',
+  'what we talked about', 'discussion', 'details',
+];
+const IMPORTANT_INFO_HEADERS = [
+  'important', 'important info', 'important notes', 'background',
+  'context', 'info', 'key info', 'priority',
+];
+const KNOWN_PEOPLE_HEADERS = [
+  'who they know', 'knows', 'mutual', 'mutual friends', 'connections',
+  'mutuals', 'related to',
+];
 
 const EMAIL_RE = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;
 const PHONE_RE = /^\+?[\d\s().-]{7,}$/;
@@ -22,8 +51,14 @@ interface ColumnMap {
   phone?: number;
   company?: number;
   title?: number;
-  /** Every column that isn't an identity field — folded into context. */
-  notes: number[];
+  howWeMet?: number;
+  whereWhen?: number;
+  physical?: number;
+  miscNotes?: number;
+  importantInfo?: number;
+  knownPeople?: number;
+  /** Columns the heuristic couldn't categorize — folded into context. */
+  context: number[];
 }
 
 interface ParseResult {
@@ -40,9 +75,12 @@ export class SpreadsheetParseError extends Error {
 
 /**
  * Parse a user-supplied CSV/TSV of people. Header row is required.
- * Heuristically maps columns to name/email/phone/company/title; everything
- * else becomes context for the AI ranker (so a "Notes" or "Conversation"
- * column flows through as bullets on the candidate card).
+ *
+ * The heuristic maps as many columns as possible directly onto Person
+ * fields (`how_we_met`, `where_when`, `misc_notes`, etc.) so the import
+ * promotes into rich Person rows instead of dumping everything into a
+ * single bullet blob. Truly unmapped columns become per-row `context`
+ * for the AI ranker.
  *
  * Throws `SpreadsheetParseError` with code 'NO_NAME_COL' if we can't find
  * a name column — the caller surfaces a guidance toast.
@@ -53,8 +91,6 @@ export async function parseSpreadsheetFile(file: File): Promise<ParseResult> {
     throw new SpreadsheetParseError('That file looks empty.', 'EMPTY');
   }
 
-  // TSV gets a leg up if the file extension or sniff suggests it; Papa's
-  // default delimiter detection handles standard CSVs fine.
   const isTSV = file.name.toLowerCase().endsWith('.tsv');
 
   const result = Papa.parse<string[]>(text, {
@@ -89,6 +125,18 @@ export async function parseSpreadsheetFile(file: File): Promise<ParseResult> {
     const phone = pickCell(row, columnMap.phone) || sniffPhone(row, columnMap);
     const company = pickCell(row, columnMap.company);
     const title = pickCell(row, columnMap.title);
+
+    const mappedFields: MappedPersonFields = {};
+    const setIf = (key: keyof MappedPersonFields, val: string | undefined) => {
+      if (val) mappedFields[key] = val;
+    };
+    setIf('how_we_met', pickCell(row, columnMap.howWeMet));
+    setIf('where_when', pickCell(row, columnMap.whereWhen));
+    setIf('physical_description', pickCell(row, columnMap.physical));
+    setIf('misc_notes', pickCell(row, columnMap.miscNotes));
+    setIf('important_info', pickCell(row, columnMap.importantInfo));
+    setIf('known_people_notes', pickCell(row, columnMap.knownPeople));
+
     const context = buildContext(headers, row, columnMap);
 
     drafts.push({
@@ -98,6 +146,7 @@ export async function parseSpreadsheetFile(file: File): Promise<ParseResult> {
       phone,
       company,
       title,
+      mappedFields: Object.keys(mappedFields).length > 0 ? mappedFields : undefined,
       context,
       raw: { file_name: file.name, row_index: i, raw_row: row },
     });
@@ -108,40 +157,66 @@ export async function parseSpreadsheetFile(file: File): Promise<ParseResult> {
 
 function mapColumns(headers: string[], sampleRows: string[][]): ColumnMap {
   const normalized = headers.map((h) => h.toLowerCase().trim());
-  const map: ColumnMap = { notes: [] };
+  const claimed = new Set<number>();
+  const map: ColumnMap = { context: [] };
 
   const matchFirst = (candidates: string[]): number | undefined => {
+    // Exact match first — most reliable.
     for (const c of candidates) {
       const idx = normalized.indexOf(c);
-      if (idx !== -1) return idx;
+      if (idx !== -1 && !claimed.has(idx)) return idx;
     }
     // Looser "header includes phrase" pass.
     for (let i = 0; i < normalized.length; i++) {
+      if (claimed.has(i)) continue;
       if (candidates.some((c) => normalized[i].includes(c))) return i;
     }
     return undefined;
   };
 
-  // Check First/Last Name pair FIRST. "First Name" loosely matches "name"
-  // via substring, which would pollute the single-name search otherwise. If
-  // both halves of the pair exist we treat them as the source of truth and
-  // skip the single-name lookup entirely.
-  map.firstName = matchFirst(FIRST_NAME_HEADERS);
-  map.lastName = matchFirst(LAST_NAME_HEADERS);
-  if (map.firstName === undefined || map.lastName === undefined) {
-    map.firstName = undefined;
-    map.lastName = undefined;
-    map.name = matchFirst(NAME_HEADERS);
+  const claim = (key: keyof Omit<ColumnMap, 'context'>, candidates: string[]) => {
+    const idx = matchFirst(candidates);
+    if (idx !== undefined) {
+      map[key] = idx;
+      claimed.add(idx);
+    }
+  };
+
+  // Identity columns first — they have the strictest matching.
+  // First/Last name pair check before single Name lookup so "First Name"
+  // doesn't get swallowed by the loose "name" substring rule.
+  const firstIdx = matchFirst(FIRST_NAME_HEADERS);
+  const lastIdx = matchFirst(LAST_NAME_HEADERS);
+  if (firstIdx !== undefined && lastIdx !== undefined) {
+    map.firstName = firstIdx;
+    map.lastName = lastIdx;
+    claimed.add(firstIdx);
+    claimed.add(lastIdx);
+  } else {
+    claim('name', NAME_HEADERS);
   }
-  map.email = matchFirst(EMAIL_HEADERS);
-  map.phone = matchFirst(PHONE_HEADERS);
-  map.company = matchFirst(COMPANY_HEADERS);
-  map.title = matchFirst(TITLE_HEADERS);
+  claim('email', EMAIL_HEADERS);
+  claim('phone', PHONE_HEADERS);
+  claim('company', COMPANY_HEADERS);
+  claim('title', TITLE_HEADERS);
+
+  // Person free-text fields. Long phrases first within each list (see
+  // ordering in the constants above) so substring fallback is safe.
+  claim('howWeMet', HOW_WE_MET_HEADERS);
+  claim('whereWhen', WHERE_WHEN_HEADERS);
+  claim('physical', PHYSICAL_HEADERS);
+  // important_info before misc_notes — "Important notes" should beat the
+  // generic "notes" substring match. Plain "Notes" still falls through to
+  // misc_notes after the importantInfo pass leaves it unclaimed.
+  claim('importantInfo', IMPORTANT_INFO_HEADERS);
+  claim('miscNotes', MISC_NOTES_HEADERS);
+  claim('knownPeople', KNOWN_PEOPLE_HEADERS);
 
   // If we still don't have name but a column happens to look like full
   // names in the sample, use that.
   if (map.name === undefined && map.firstName === undefined) {
     for (let i = 0; i < headers.length; i++) {
+      if (claimed.has(i)) continue;
       const looksLikeName = sampleRows.every((r) => {
         const v = (r[i] || '').trim();
         if (!v) return true;
@@ -149,17 +224,15 @@ function mapColumns(headers: string[], sampleRows: string[][]): ColumnMap {
       });
       if (looksLikeName && sampleRows.some((r) => (r[i] || '').trim())) {
         map.name = i;
+        claimed.add(i);
         break;
       }
     }
   }
 
-  const claimed = new Set<number>();
-  [map.name, map.firstName, map.lastName, map.email, map.phone, map.company, map.title].forEach((idx) => {
-    if (typeof idx === 'number') claimed.add(idx);
-  });
+  // Everything still unclaimed becomes context for the AI ranker.
   for (let i = 0; i < headers.length; i++) {
-    if (!claimed.has(i)) map.notes.push(i);
+    if (!claimed.has(i)) map.context.push(i);
   }
 
   return map;
@@ -178,8 +251,16 @@ function pickCell(row: string[], idx: number | undefined): string | undefined {
   return v || undefined;
 }
 
+function identityCols(map: ColumnMap): Array<number | undefined> {
+  return [
+    map.name, map.firstName, map.lastName, map.email, map.phone,
+    map.company, map.title, map.howWeMet, map.whereWhen, map.physical,
+    map.miscNotes, map.importantInfo, map.knownPeople,
+  ];
+}
+
 function sniffEmail(row: string[], map: ColumnMap): string | undefined {
-  const exclude = new Set([map.name, map.firstName, map.lastName, map.email, map.phone, map.company, map.title]);
+  const exclude = new Set(identityCols(map));
   for (let i = 0; i < row.length; i++) {
     if (exclude.has(i)) continue;
     const v = (row[i] || '').trim();
@@ -189,7 +270,7 @@ function sniffEmail(row: string[], map: ColumnMap): string | undefined {
 }
 
 function sniffPhone(row: string[], map: ColumnMap): string | undefined {
-  const exclude = new Set([map.name, map.firstName, map.lastName, map.email, map.phone, map.company, map.title]);
+  const exclude = new Set(identityCols(map));
   for (let i = 0; i < row.length; i++) {
     if (exclude.has(i)) continue;
     const v = (row[i] || '').trim();
@@ -200,11 +281,10 @@ function sniffPhone(row: string[], map: ColumnMap): string | undefined {
 
 function buildContext(headers: string[], row: string[], map: ColumnMap): string | undefined {
   const parts: string[] = [];
-  for (const idx of map.notes) {
+  for (const idx of map.context) {
     const header = (headers[idx] || '').trim();
     const value = (row[idx] || '').trim();
     if (!value) continue;
-    // Trim absurdly long cells so the AI prompt doesn't blow past its budget.
     const v = value.length > 240 ? value.slice(0, 240).trimEnd() + '…' : value;
     parts.push(header ? `${header}: ${v}` : v);
   }

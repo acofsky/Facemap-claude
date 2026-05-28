@@ -40,7 +40,11 @@ export async function insertCandidates(
     title: d.title || null,
     photo_path: d.photoPath || null,
     dedupe_key: makeDedupeKey({ name: d.name, email: d.email, phone: d.phone }),
-    raw: (d.raw || {}) as Json,
+    raw: {
+      ...(d.raw || {}),
+      ...(d.mappedFields ? { mapped_fields: d.mappedFields } : {}),
+      ...(d.context ? { context: d.context } : {}),
+    } as Json,
   }));
 
   // Supabase has a soft cap on row count per insert. Chunk to stay safe.

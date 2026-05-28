@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { ImportCandidateRow as ImportCandidateRowComponent } from './ImportCandidateRow';
+import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
 import {
   fetchPendingCandidates,
   dismissCandidate,
@@ -13,6 +14,7 @@ import {
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import { usePersons } from '@/hooks/use-data';
+import type { Person } from '@/lib/store';
 import type { ImportCandidateRow, ImportSource } from '@/lib/import/types';
 
 interface PendingImportsSheetProps {
@@ -30,6 +32,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
   const [loading, setLoading] = useState(true);
   const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const { data: existingPeople = [] } = usePersons();
 
   useEffect(() => {
@@ -57,13 +60,19 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
     return byId;
   }, [candidates, existingPeople]);
 
-  const handlePromote = async (c: ImportCandidateRow, bullets: string[]) => {
+  const reviewingCandidate = useMemo(
+    () => candidates.find((c) => c.id === reviewingId) || null,
+    [candidates, reviewingId],
+  );
+
+  const handlePromote = async (c: ImportCandidateRow, overrides?: Partial<Person>) => {
     setBusyId(c.id);
     try {
-      await promoteCandidate({ ...c, ai_bullets: bullets as unknown as ImportCandidateRow['ai_bullets'] });
+      await promoteCandidate(c, overrides ? { fieldOverrides: overrides } : undefined);
       setCandidates((cur) => cur.filter((x) => x.id !== c.id));
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setReviewingId((cur) => (cur === c.id ? null : cur));
     } catch (e) {
       toast.error(friendlyError(e, 'Could not add that person.'));
     } finally {
@@ -79,6 +88,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
       qc.invalidateQueries({ queryKey: ['persons', personId] });
+      setReviewingId((cur) => (cur === c.id ? null : cur));
       toast.success('Merged into existing person.');
     } catch (e) {
       toast.error(friendlyError(e, 'Could not merge.'));
@@ -93,6 +103,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
       await dismissCandidate(c.id);
       setCandidates((cur) => cur.filter((x) => x.id !== c.id));
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setReviewingId((cur) => (cur === c.id ? null : cur));
     } catch (e) {
       toast.error(friendlyError(e, 'Could not dismiss.'));
     } finally {
@@ -132,7 +143,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-3 safe-bottom">
+        <div className="flex-1 overflow-y-auto p-5 space-y-2.5 safe-bottom">
           {loading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -142,20 +153,34 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
               All caught up.
             </p>
           ) : (
-            candidates.map((c) => (
-              <div key={c.id} className={cn(busyId === c.id && 'opacity-60')}>
-                <ImportCandidateRowComponent
-                  candidate={c}
-                  matchedPersonId={matchMap.get(c.id)}
-                  onPromote={(bullets) => handlePromote(c, bullets)}
-                  onMerge={(pid) => handleMerge(c, pid)}
-                  onDismiss={() => handleDismiss(c)}
-                />
-              </div>
-            ))
+            candidates.map((c) => {
+              const matchedId = matchMap.get(c.id);
+              return (
+                <div key={c.id} className={cn(busyId === c.id && 'opacity-60')}>
+                  <ImportCandidateRowComponent
+                    candidate={c}
+                    matchedPersonId={matchedId}
+                    busy={busyId === c.id}
+                    onReview={() => setReviewingId(c.id)}
+                    onPromote={() => (matchedId ? handleMerge(c, matchedId) : handlePromote(c))}
+                    onDismiss={() => handleDismiss(c)}
+                  />
+                </div>
+              );
+            })
           )}
         </div>
       </motion.div>
+
+      <ImportCandidateReviewSheet
+        candidate={reviewingCandidate}
+        matchedPersonId={reviewingCandidate ? matchMap.get(reviewingCandidate.id) : undefined}
+        busy={!!reviewingCandidate && busyId === reviewingCandidate.id}
+        onClose={() => setReviewingId(null)}
+        onPromote={(overrides) => reviewingCandidate && handlePromote(reviewingCandidate, overrides)}
+        onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
+        onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
+      />
     </AnimatePresence>
   );
 }

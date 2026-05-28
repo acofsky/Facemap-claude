@@ -13,6 +13,7 @@ import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { isNativeIOS } from '@/lib/ios-contacts';
 import { ImportCandidateRow as ImportCandidateRowComponent } from '@/components/import/ImportCandidateRow';
+import { ImportCandidateReviewSheet } from '@/components/import/ImportCandidateReviewSheet';
 import { LinkedInHowToModal } from '@/components/import/LinkedInHowToModal';
 import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal';
 import { RankResultModal } from '@/components/import/RankResultModal';
@@ -30,6 +31,7 @@ import {
 } from '@/lib/import/storage';
 import { rankCandidates } from '@/lib/import/rank';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
+import type { Person } from '@/lib/store';
 import type { CandidateDraft, ImportCandidateRow, ImportSource } from '@/lib/import/types';
 
 const TOP_N = 20;
@@ -66,6 +68,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rankModal, setRankModal] = useState<{ kind: 'failed' | 'no-matches' } | null>(null);
   // Lets the user click "Browse all anyway" in the no-matches modal so the
   // review screen still renders the (low-scoring) candidates as-is.
@@ -188,11 +191,26 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     setRanking(true);
     setShowLowScores(false);
     try {
+      // Pre-flight token refresh. iOS WebView can let the access token
+      // expire while the user reads the previous step; if the very first
+      // Supabase call triggers a token refresh that fails, gotrue clears
+      // the session and bounces the user to AuthPage with a stale toast
+      // still visible. Refreshing here gives us a clean failure mode.
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        // The auth listener in use-auth.tsx will already be sending the
+        // user back to login. Swallow our own error path so we don't
+        // also throw a confusing toast on top.
+        setRanking(false);
+        return;
+      }
       const merged = mergeDrafts(drafts);
       const sourcesUsed = Array.from(selectedSources);
       const session = await createImportSession({ filterText, sources: sourcesUsed });
       const inserted = await insertCandidates(session.id, merged);
 
+      const filterUsed = filterText.trim();
       let rankSucceeded = true;
       try {
         await rankCandidates(filterText, inserted);
@@ -208,19 +226,18 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       setStep('review');
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
 
+      // The error/no-matches modal only makes sense when the user actually
+      // gave the AI something to match against. Without a filter, ranking
+      // is just a soft sort + bullet generator — silently falling back is
+      // the right call.
+      if (!filterUsed) return;
       if (!rankSucceeded) {
         setRankModal({ kind: 'failed' });
         return;
       }
-      // Only flag "no matches" when the user actually provided a filter —
-      // a blank filter means there was nothing to match against in the
-      // first place.
-      const filterUsed = filterText.trim();
-      if (filterUsed) {
-        const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
-        if (top < NO_MATCH_THRESHOLD) {
-          setRankModal({ kind: 'no-matches' });
-        }
+      const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
+      if (top < NO_MATCH_THRESHOLD) {
+        setRankModal({ kind: 'no-matches' });
       }
     } catch (e) {
       toast.error(friendlyError(e, 'Could not start the import. Try again.'));
@@ -261,17 +278,15 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const visibleCandidates = useMemo(() => aliveCandidates.slice(0, TOP_N), [aliveCandidates]);
   const drawerCandidates = useMemo(() => aliveCandidates.slice(TOP_N), [aliveCandidates]);
 
-  const handlePromote = async (c: ImportCandidateRow, bullets: string[]) => {
+  const handlePromote = async (c: ImportCandidateRow, overrides?: Partial<Person>) => {
     setReviewBusyId(c.id);
     try {
-      const withEditedBullets: ImportCandidateRow = {
-        ...c,
-        ai_bullets: bullets as unknown as ImportCandidateRow['ai_bullets'],
-      };
-      await promoteCandidate(withEditedBullets);
+      await promoteCandidate(c, overrides ? { fieldOverrides: overrides } : undefined);
       setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      // Close the review sheet if it was open for this candidate.
+      setReviewingId((cur) => (cur === c.id ? null : cur));
     } catch (e) {
       toast.error(friendlyError(e, 'Could not add that person.'));
     } finally {
@@ -287,6 +302,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['persons', personId] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setReviewingId((cur) => (cur === c.id ? null : cur));
       toast.success('Merged into existing person.');
     } catch (e) {
       toast.error(friendlyError(e, 'Could not merge.'));
@@ -301,6 +317,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       await dismissCandidate(c.id);
       setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, dismissed: true } : x)));
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setReviewingId((cur) => (cur === c.id ? null : cur));
     } catch (e) {
       toast.error(friendlyError(e, 'Could not dismiss.'));
     } finally {
@@ -343,6 +360,11 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     if (failed) parts.push(`${failed} failed`);
     toast.success(parts.join(' · ') || 'Done');
   };
+
+  const reviewingCandidate = useMemo(
+    () => candidates.find((c) => c.id === reviewingId) || null,
+    [candidates, reviewingId],
+  );
 
   const handleRestart = () => {
     haptics.medium();
@@ -434,6 +456,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             matchMap={matchMap}
             reviewBusyId={reviewBusyId}
             bulkAdding={bulkAdding}
+            onReview={(c) => setReviewingId(c.id)}
             onPromote={handlePromote}
             onMerge={handleMerge}
             onDismiss={handleDismiss}
@@ -452,12 +475,23 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
           candidates={drawerCandidates}
           matchMap={matchMap}
           reviewBusyId={reviewBusyId}
+          onReview={(c) => setReviewingId(c.id)}
           onPromote={handlePromote}
           onMerge={handleMerge}
           onDismiss={handleDismiss}
           onClose={() => setDrawerOpen(false)}
         />
       )}
+
+      <ImportCandidateReviewSheet
+        candidate={reviewingCandidate}
+        matchedPersonId={reviewingCandidate ? matchMap.get(reviewingCandidate.id) : undefined}
+        busy={!!reviewingCandidate && reviewBusyId === reviewingCandidate.id}
+        onClose={() => setReviewingId(null)}
+        onPromote={(overrides) => reviewingCandidate && handlePromote(reviewingCandidate, overrides)}
+        onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
+        onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
+      />
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />
       <SpreadsheetHowToModal open={spreadsheetHowTo} onClose={() => setSpreadsheetHowTo(false)} />
@@ -872,6 +906,7 @@ function ReviewStep({
   matchMap,
   reviewBusyId,
   bulkAdding,
+  onReview,
   onPromote,
   onMerge,
   onDismiss,
@@ -887,7 +922,8 @@ function ReviewStep({
   matchMap: Map<string, string>;
   reviewBusyId: string | null;
   bulkAdding: boolean;
-  onPromote: (c: ImportCandidateRow, bullets: string[]) => Promise<void> | void;
+  onReview: (c: ImportCandidateRow) => void;
+  onPromote: (c: ImportCandidateRow) => Promise<void> | void;
   onMerge: (c: ImportCandidateRow, personId: string) => Promise<void> | void;
   onDismiss: (c: ImportCandidateRow) => Promise<void> | void;
   onOpenDrawer: () => void;
@@ -946,17 +982,21 @@ function ReviewStep({
         </div>
       ) : (
         <div className="space-y-2.5 mt-2">
-          {visibleCandidates.map((c) => (
-            <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
-              <ImportCandidateRowComponent
-                candidate={c}
-                matchedPersonId={matchMap.get(c.id)}
-                onPromote={(bullets) => onPromote(c, bullets)}
-                onMerge={(pid) => onMerge(c, pid)}
-                onDismiss={() => onDismiss(c)}
-              />
-            </div>
-          ))}
+          {visibleCandidates.map((c) => {
+            const matchedId = matchMap.get(c.id);
+            return (
+              <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
+                <ImportCandidateRowComponent
+                  candidate={c}
+                  matchedPersonId={matchedId}
+                  busy={reviewBusyId === c.id}
+                  onReview={() => onReview(c)}
+                  onPromote={() => (matchedId ? onMerge(c, matchedId) : onPromote(c))}
+                  onDismiss={() => onDismiss(c)}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -984,6 +1024,7 @@ function ImportDrawerSheet({
   candidates,
   matchMap,
   reviewBusyId,
+  onReview,
   onPromote,
   onMerge,
   onDismiss,
@@ -992,7 +1033,8 @@ function ImportDrawerSheet({
   candidates: ImportCandidateRow[];
   matchMap: Map<string, string>;
   reviewBusyId: string | null;
-  onPromote: (c: ImportCandidateRow, bullets: string[]) => Promise<void> | void;
+  onReview: (c: ImportCandidateRow) => void;
+  onPromote: (c: ImportCandidateRow) => Promise<void> | void;
   onMerge: (c: ImportCandidateRow, personId: string) => Promise<void> | void;
   onDismiss: (c: ImportCandidateRow) => Promise<void> | void;
   onClose: () => void;
@@ -1031,17 +1073,21 @@ function ImportDrawerSheet({
           <p className="text-[12px] text-[hsl(var(--foreground)/0.6)]">
             {candidates.length} more pulled. Lower AI relevance to your filter — review and add any you want.
           </p>
-          {candidates.map((c) => (
-            <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
-              <ImportCandidateRowComponent
-                candidate={c}
-                matchedPersonId={matchMap.get(c.id)}
-                onPromote={(bullets) => onPromote(c, bullets)}
-                onMerge={(pid) => onMerge(c, pid)}
-                onDismiss={() => onDismiss(c)}
-              />
-            </div>
-          ))}
+          {candidates.map((c) => {
+            const matchedId = matchMap.get(c.id);
+            return (
+              <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
+                <ImportCandidateRowComponent
+                  candidate={c}
+                  matchedPersonId={matchedId}
+                  busy={reviewBusyId === c.id}
+                  onReview={() => onReview(c)}
+                  onPromote={() => (matchedId ? onMerge(c, matchedId) : onPromote(c))}
+                  onDismiss={() => onDismiss(c)}
+                />
+              </div>
+            );
+          })}
         </div>
       </motion.div>
     </AnimatePresence>

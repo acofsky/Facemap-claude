@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ChevronDown, Loader2, Pencil, Plus, Users, X } from 'lucide-react';
+import { Loader2, Pencil, Plus, Users, X } from 'lucide-react';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -9,68 +8,68 @@ import type { ImportCandidateRow as ImportCandidate } from '@/lib/import/types';
 interface ImportCandidateRowProps {
   candidate: ImportCandidate;
   matchedPersonId?: string;
-  onPromote: (bullets: string[]) => Promise<void> | void;
+  busy?: boolean;
+  /** Click the row body, the name, or the pencil icon. */
+  onReview: () => void;
+  /** Quick action — promotes (or merges, when matched) with the source's
+   *  defaults, no per-field editing. */
+  onPromote: () => void;
   onDismiss: () => void;
-  onMerge?: (personId: string) => Promise<void> | void;
 }
 
 /**
- * Compact list row for the review step. Name + meta on top, three small
- * action icons on the right (edit, add, dismiss). Tapping edit expands a
- * collapsible drawer with the editable AI bullets + rationale; the row
- * stays slim by default so the user can scan a screenful of candidates at
- * once before deciding what to keep.
+ * Compact list row. Body click opens the full review sheet. The +/×
+ * icons stay on the row for quick triage; the pencil also opens the
+ * full sheet so the user has an explicit "edit" affordance even though
+ * tapping the row works too.
  */
 export function ImportCandidateRow({
   candidate,
   matchedPersonId,
+  busy,
+  onReview,
   onPromote,
   onDismiss,
-  onMerge,
 }: ImportCandidateRowProps) {
-  const initialBullets = ((candidate.ai_bullets as string[] | null) || []).join('\n');
-  const [bulletsText, setBulletsText] = useState(initialBullets);
-  const [expanded, setExpanded] = useState(false);
-  const [busy, setBusy] = useState<'promote' | 'merge' | null>(null);
-
   const meta: string[] = [];
   if (candidate.title) meta.push(candidate.title);
   if (candidate.company) meta.push(candidate.company);
   if (meta.length === 0 && candidate.email) meta.push(candidate.email);
 
-  const handlePromote = async () => {
-    setBusy('promote');
-    haptics.medium();
-    try {
-      const bullets = bulletsText
-        .split('\n')
-        .map((s) => s.replace(/^\s*[•\-*]\s*/, '').trim())
-        .filter(Boolean);
-      if (matchedPersonId && onMerge) {
-        setBusy('merge');
-        await onMerge(matchedPersonId);
-      } else {
-        await onPromote(bullets);
-      }
-    } finally {
-      setBusy(null);
-    }
+  const handleReview = () => {
+    haptics.selection();
+    onReview();
   };
 
-  const handleDismiss = () => {
+  const handlePromote = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    haptics.medium();
+    onPromote();
+  };
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
     haptics.light();
     onDismiss();
   };
 
-  const toggleExpanded = () => {
-    haptics.selection();
-    setExpanded((v) => !v);
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleReview();
   };
 
   return (
-    <div className={cn('glass p-3', expanded && 'glass-warm')}>
+    <button
+      type="button"
+      onClick={handleReview}
+      className="glass p-3 w-full text-left active:bg-[hsl(0_0%_100%/0.04)] transition-colors"
+    >
       <div className="flex items-center gap-3">
-        <PersonAvatar name={candidate.name} photo={candidate.photo_path || undefined} size="sm" />
+        <PersonAvatar
+          name={candidate.name}
+          photo={candidate.photo_path || undefined}
+          size="sm"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-display text-[15px] text-foreground truncate leading-tight">
@@ -88,49 +87,35 @@ export function ImportCandidateRow({
           </div>
         </div>
         <button
-          onClick={toggleExpanded}
-          aria-label={expanded ? 'Collapse' : 'Edit bullets'}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.65)] active:scale-95 transition-transform"
+          type="button"
+          onClick={handleEdit}
+          disabled={busy}
+          aria-label="Review and edit"
+          className={cn(
+            'w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.65)] active:scale-95 transition-transform disabled:opacity-50',
+          )}
         >
-          {expanded ? <ChevronDown className="w-4 h-4" strokeWidth={1.75} /> : <Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />}
+          <Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />
         </button>
         <button
+          type="button"
           onClick={handlePromote}
-          disabled={!!busy}
+          disabled={busy}
           aria-label={matchedPersonId ? 'Merge in' : 'Add to People'}
           className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
         </button>
         <button
+          type="button"
           onClick={handleDismiss}
-          disabled={!!busy}
+          disabled={busy}
           aria-label="Dismiss"
           className="w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.55)] active:scale-95 transition-transform disabled:opacity-50"
         >
           <X className="w-4 h-4" strokeWidth={1.75} />
         </button>
       </div>
-
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-[hsl(0_0%_100%/0.08)]">
-          {candidate.ai_rationale && (
-            <p className="font-display-italic text-[11px] text-[hsl(var(--foreground)/0.55)] mb-2 leading-snug">
-              {candidate.ai_rationale}
-            </p>
-          )}
-          <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--foreground)/0.55)]">
-            About (editable)
-          </label>
-          <textarea
-            value={bulletsText}
-            onChange={(e) => setBulletsText(e.target.value)}
-            rows={Math.max(3, Math.min(6, bulletsText.split('\n').length))}
-            placeholder="One bullet per line"
-            className="glass-input w-full mt-1 p-2.5 text-[12px] leading-snug resize-none"
-          />
-        </div>
-      )}
-    </div>
+    </button>
   );
 }
