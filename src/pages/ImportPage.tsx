@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft, Calendar, Camera, Check, FileSpreadsheet, FileText, Image as ImageIcon,
-  Info, Loader2, Sparkles, Users, X,
+  Info, Loader2, Plus, RotateCcw, Sparkles, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,10 +12,10 @@ import { haptics } from '@/lib/haptics';
 import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { isNativeIOS } from '@/lib/ios-contacts';
-import { ImportCandidateCard } from '@/components/import/ImportCandidateCard';
+import { ImportCandidateRow as ImportCandidateRowComponent } from '@/components/import/ImportCandidateRow';
 import { LinkedInHowToModal } from '@/components/import/LinkedInHowToModal';
 import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal';
-import { sourceLabel } from '@/components/import/sourceLabels';
+import { RankResultModal } from '@/components/import/RankResultModal';
 import { gatherContactsCandidates } from '@/lib/import/sources/contacts-source';
 import { parseLinkedInCsv } from '@/lib/import/sources/linkedin-source';
 import { parseSpreadsheetFile, SpreadsheetParseError } from '@/lib/import/sources/spreadsheet-source';
@@ -33,36 +33,80 @@ import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote
 import type { CandidateDraft, ImportCandidateRow, ImportSource } from '@/lib/import/types';
 
 const TOP_N = 20;
+/** Candidates scoring below this with a filter set count as "no close matches". */
+const NO_MATCH_THRESHOLD = 0.35;
 
-type Step = 'pick' | 'gather' | 'filter' | 'review';
+// Order: source pick → filter → gather → review. Filter sits up front so the
+// user's stated goal is in mind during gather, and the AI rank step runs
+// invisibly as the wizard moves into review.
+type Step = 'pick' | 'filter' | 'gather' | 'review';
+
+const STEP_ORDER: Step[] = ['pick', 'filter', 'gather', 'review'];
 
 interface ImportPageProps {
   onClose: () => void;
   onSelectPerson?: (id: string) => void;
 }
 
-export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
+export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportPageProps) {
   const qc = useQueryClient();
-  const swipe = useSwipeBack(onClose);
   const { data: existingPeople = [] } = usePersons();
 
   const [step, setStep] = useState<Step>('pick');
   const [selectedSources, setSelectedSources] = useState<Set<ImportSource>>(new Set());
+  const [filterText, setFilterText] = useState('');
   const [drafts, setDrafts] = useState<CandidateDraft[]>([]);
   const [gathering, setGathering] = useState<ImportSource | null>(null);
   const [gatherProgress, setGatherProgress] = useState(0);
   const [completedSources, setCompletedSources] = useState<Set<ImportSource>>(new Set());
   const [linkedInHowTo, setLinkedInHowTo] = useState(false);
   const [spreadsheetHowTo, setSpreadsheetHowTo] = useState(false);
-  const [filterText, setFilterText] = useState('');
   const [ranking, setRanking] = useState(false);
   const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
+  const [bulkAdding, setBulkAdding] = useState(false);
+  const [rankModal, setRankModal] = useState<{ kind: 'failed' | 'no-matches' } | null>(null);
+  // Lets the user click "Browse all anyway" in the no-matches modal so the
+  // review screen still renders the (low-scoring) candidates as-is.
+  const [showLowScores, setShowLowScores] = useState(false);
 
   const linkedInRef = useRef<HTMLInputElement>(null);
   const spreadsheetRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  // ---- back navigation ----
+
+  const goBack = () => {
+    haptics.selection();
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx <= 0) {
+      onClose();
+      return;
+    }
+    // Review is a terminal screen: tapping back closes the wizard instead
+    // of unwinding through rank/gather/filter (those have side effects).
+    if (step === 'review') {
+      onClose();
+      return;
+    }
+    setStep(STEP_ORDER[idx - 1]);
+  };
+
+  const swipe = useSwipeBack(goBack);
+
+  // ---- step transitions ----
+
+  const goToFilter = () => {
+    if (selectedSources.size === 0) return;
+    haptics.medium();
+    setStep('filter');
+  };
+
+  const goToGather = () => {
+    haptics.medium();
+    setStep('gather');
+  };
 
   const toggleSource = (source: ImportSource) => {
     haptics.selection();
@@ -74,20 +118,13 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     });
   };
 
-  const handleGoToGather = () => {
-    haptics.medium();
-    setStep('gather');
-  };
-
   // ---- gather handlers ----
 
   const runContacts = async () => {
     setGathering('contacts');
     setGatherProgress(0);
     try {
-      const got = await gatherContactsCandidates({
-        onProgress: setGatherProgress,
-      });
+      const got = await gatherContactsCandidates({ onProgress: setGatherProgress });
       setDrafts((d) => [...d, ...got]);
       setCompletedSources((s) => new Set(s).add('contacts'));
       toast.success(`Pulled ${got.length} contacts`);
@@ -149,7 +186,6 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
         setDrafts((d) => [...d, ...got]);
         toast.success(`Found ${got.length} ${got.length === 1 ? 'person' : 'people'} in the photo`);
       }
-      // Photo OCR can be re-run with more photos — mark complete after first attempt
       setCompletedSources((s) => new Set(s).add('photo_ocr'));
     } catch (e) {
       toast.error(friendlyError(e, 'Could not read that photo.'));
@@ -158,53 +194,50 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     }
   };
 
-  const allSelectedDone = useMemo(
-    () =>
-      Array.from(selectedSources).every(
-        (s) => completedSources.has(s) || s === 'calendar',
-      ),
-    [selectedSources, completedSources],
-  );
-
-  const handleGoToFilter = () => {
-    if (drafts.length === 0) {
-      toast.error('Nothing to import yet — pull from at least one source.');
-      return;
-    }
-    haptics.medium();
-    setStep('filter');
-  };
-
-  // ---- filter + rank step ----
+  // ---- rank step (invisible — runs between gather and review) ----
 
   const handleRankAndReview = async () => {
+    if (drafts.length === 0) {
+      toast.error('Nothing pulled yet — run at least one source first.');
+      return;
+    }
     setRanking(true);
+    setShowLowScores(false);
     try {
-      // 1) collapse cross-source dupes
       const merged = mergeDrafts(drafts);
-      // 2) match against existing People (informational, doesn't block insert)
-      // (the matches map is regenerated in the review step against the live rows)
       const sourcesUsed = Array.from(selectedSources);
-      const session = await createImportSession({
-        filterText,
-        sources: sourcesUsed,
-      });
+      const session = await createImportSession({ filterText, sources: sourcesUsed });
       const inserted = await insertCandidates(session.id, merged);
-      // 3) ask the AI to rank
+
+      let rankSucceeded = true;
       try {
         await rankCandidates(filterText, inserted);
-        // Re-fetch to pick up the new scores. We refetch instead of
-        // splicing because the edge function writes the bullets/score
-        // directly to the DB rows.
-        const refreshed = await fetchSessionCandidates(session.id);
-        setCandidates(refreshed);
       } catch (rankErr) {
         console.warn('Ranking failed, falling back to insertion order', rankErr);
-        toast.error('Ranking failed — showing all candidates instead.');
-        setCandidates(inserted);
+        rankSucceeded = false;
       }
+
+      const refreshed = rankSucceeded
+        ? await fetchSessionCandidates(session.id)
+        : inserted;
+      setCandidates(refreshed);
       setStep('review');
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+
+      if (!rankSucceeded) {
+        setRankModal({ kind: 'failed' });
+        return;
+      }
+      // Only flag "no matches" when the user actually provided a filter —
+      // a blank filter means there was nothing to match against in the
+      // first place.
+      const filterUsed = filterText.trim();
+      if (filterUsed) {
+        const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
+        if (top < NO_MATCH_THRESHOLD) {
+          setRankModal({ kind: 'no-matches' });
+        }
+      }
     } catch (e) {
       toast.error(friendlyError(e, 'Could not start the import. Try again.'));
     } finally {
@@ -212,25 +245,16 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     }
   };
 
-  // ---- review step actions ----
-
-  const visibleCandidates = useMemo(() => {
-    const alive = candidates.filter((c) => !c.promoted && !c.dismissed);
-    return alive.slice(0, TOP_N);
-  }, [candidates]);
-  const drawerCandidates = useMemo(() => {
-    const alive = candidates.filter((c) => !c.promoted && !c.dismissed);
-    return alive.slice(TOP_N);
-  }, [candidates]);
+  // ---- review actions ----
 
   const matchMap = useMemo(() => {
-    const drafts = candidates.map((c) => ({
+    const draftsForMatch = candidates.map((c) => ({
       source: c.source as ImportSource,
       name: c.name,
       email: c.email || undefined,
       phone: c.phone || undefined,
     }));
-    const byIndex = findMatchesAgainstPeople(drafts, existingPeople);
+    const byIndex = findMatchesAgainstPeople(draftsForMatch, existingPeople);
     const byId = new Map<string, string>();
     candidates.forEach((c, i) => {
       const pid = byIndex.get(i);
@@ -239,12 +263,28 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     return byId;
   }, [candidates, existingPeople]);
 
+  // When the no-matches modal is up but the user hasn't clicked "Browse all
+  // anyway" yet, hide candidates that fall below the threshold so the page
+  // behind doesn't tease them.
+  const aliveCandidates = useMemo(() => {
+    let alive = candidates.filter((c) => !c.promoted && !c.dismissed);
+    if (rankModal?.kind === 'no-matches' && !showLowScores) {
+      alive = alive.filter((c) => (c.ai_relevance_score ?? 0) >= NO_MATCH_THRESHOLD);
+    }
+    return alive;
+  }, [candidates, rankModal, showLowScores]);
+
+  const visibleCandidates = useMemo(() => aliveCandidates.slice(0, TOP_N), [aliveCandidates]);
+  const drawerCandidates = useMemo(() => aliveCandidates.slice(TOP_N), [aliveCandidates]);
+
   const handlePromote = async (c: ImportCandidateRow, bullets: string[]) => {
     setReviewBusyId(c.id);
     try {
-      const withEditedBullets: ImportCandidateRow = { ...c, ai_bullets: bullets as unknown as ImportCandidateRow['ai_bullets'] };
+      const withEditedBullets: ImportCandidateRow = {
+        ...c,
+        ai_bullets: bullets as unknown as ImportCandidateRow['ai_bullets'],
+      };
       await promoteCandidate(withEditedBullets);
-      // optimistic remove
       setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
@@ -284,12 +324,60 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     }
   };
 
-  const aliveCount = candidates.filter((c) => !c.promoted && !c.dismissed).length;
+  // Add everyone shown on the review screen. Uses the AI's original
+  // bullets (any per-row edits live inside each row component and aren't
+  // hoisted here — the per-row + button is for users who want to tweak).
+  const handleAddEveryone = async () => {
+    if (visibleCandidates.length === 0) return;
+    haptics.medium();
+    setBulkAdding(true);
+    let promoted = 0;
+    let merged = 0;
+    let failed = 0;
+    for (const c of visibleCandidates) {
+      try {
+        const matchedId = matchMap.get(c.id);
+        if (matchedId) {
+          await mergeCandidateIntoPerson(c, matchedId);
+          merged++;
+        } else {
+          await promoteCandidate(c);
+          promoted++;
+        }
+        setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
+      } catch (e) {
+        console.error('Bulk add failed for', c.id, e);
+        failed++;
+      }
+    }
+    setBulkAdding(false);
+    qc.invalidateQueries({ queryKey: ['persons'] });
+    qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+    const parts: string[] = [];
+    if (promoted) parts.push(`${promoted} added`);
+    if (merged) parts.push(`${merged} merged`);
+    if (failed) parts.push(`${failed} failed`);
+    toast.success(parts.join(' · ') || 'Done');
+  };
+
+  const handleRestart = () => {
+    haptics.medium();
+    setRankModal(null);
+    setShowLowScores(false);
+    setCandidates([]);
+    setDrafts([]);
+    setCompletedSources(new Set());
+    setSelectedSources(new Set());
+    setGatherProgress(0);
+    setStep('pick');
+  };
+
+  const aliveCount = aliveCandidates.length;
   const promotedCount = candidates.filter((c) => c.promoted).length;
 
   return (
     <div
-      className="ambient-backdrop fixed inset-0 z-[55] overflow-y-auto safe-top safe-bottom flex flex-col"
+      className="ambient-backdrop fixed inset-0 z-[55] safe-top safe-bottom flex flex-col"
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -299,9 +387,9 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
     >
       <div className="sticky top-0 z-20 flex items-center justify-between px-3 pt-3 pb-2 backdrop-blur-xl bg-black/40">
         <button
-          onClick={onClose}
+          onClick={goBack}
           className="glass-pill !h-10 !w-10 !p-0 flex items-center justify-center"
-          aria-label="Close"
+          aria-label={step === 'pick' || step === 'review' ? 'Close' : 'Back'}
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
         </button>
@@ -314,7 +402,15 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
           <PickStep
             selectedSources={selectedSources}
             onToggle={toggleSource}
-            onContinue={handleGoToGather}
+            onContinue={goToFilter}
+          />
+        )}
+        {step === 'filter' && (
+          <FilterStep
+            filterText={filterText}
+            setFilterText={setFilterText}
+            sources={Array.from(selectedSources)}
+            onContinue={goToGather}
           />
         )}
         {step === 'gather' && (
@@ -324,24 +420,15 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
             gathering={gathering}
             gatherProgress={gatherProgress}
             draftsCount={drafts.length}
+            filterText={filterText}
             onRunContacts={runContacts}
             onPickLinkedIn={() => linkedInRef.current?.click()}
             onPickSpreadsheet={() => spreadsheetRef.current?.click()}
             onPickPhoto={() => photoRef.current?.click()}
             onShowLinkedInHowTo={() => setLinkedInHowTo(true)}
             onShowSpreadsheetHowTo={() => setSpreadsheetHowTo(true)}
-            onContinue={handleGoToFilter}
-            allDone={allSelectedDone}
-          />
-        )}
-        {step === 'filter' && (
-          <FilterStep
-            filterText={filterText}
-            setFilterText={setFilterText}
-            draftsCount={drafts.length}
+            onContinue={handleRankAndReview}
             ranking={ranking}
-            onRank={handleRankAndReview}
-            sources={Array.from(selectedSources)}
           />
         )}
         {step === 'review' && (
@@ -350,11 +437,13 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
             drawerCount={drawerCandidates.length}
             matchMap={matchMap}
             reviewBusyId={reviewBusyId}
+            bulkAdding={bulkAdding}
             onPromote={handlePromote}
             onMerge={handleMerge}
             onDismiss={handleDismiss}
             onOpenDrawer={() => setDrawerOpen(true)}
-            onSelectPerson={onSelectPerson}
+            onAddEveryone={handleAddEveryone}
+            onRestart={handleRestart}
             promotedCount={promotedCount}
             aliveCount={aliveCount}
             onDone={onClose}
@@ -376,6 +465,16 @@ export function ImportPage({ onClose, onSelectPerson }: ImportPageProps) {
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />
       <SpreadsheetHowToModal open={spreadsheetHowTo} onClose={() => setSpreadsheetHowTo(false)} />
+
+      <RankResultModal
+        open={!!rankModal}
+        kind={rankModal?.kind ?? null}
+        filterText={filterText}
+        onShowAll={() => { setShowLowScores(true); setRankModal(null); }}
+        onRestart={() => { setRankModal(null); handleRestart(); }}
+        onRetry={rankModal?.kind === 'failed' ? () => { setRankModal(null); setStep('gather'); } : undefined}
+        onClose={() => setRankModal(null)}
+      />
 
       <input
         ref={linkedInRef}
@@ -473,8 +572,7 @@ function PickStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-4 leading-relaxed">
-        Pull people from one or more sources. We'll ask you to describe who you're
-        looking for, then rank the results with AI.
+        Pick the sources to pull from. We'll ask you to describe who you're looking for next, then rank everything with AI.
       </p>
       <div className="space-y-3">
         {sources.map((s) => {
@@ -544,12 +642,66 @@ function PickStep({
   );
 }
 
+function FilterStep({
+  filterText,
+  setFilterText,
+  sources,
+  onContinue,
+}: {
+  filterText: string;
+  setFilterText: (s: string) => void;
+  sources: ImportSource[];
+  onContinue: () => void;
+}) {
+  const richSources = sources.some((s) => s === 'linkedin' || s === 'photo_ocr' || s === 'spreadsheet');
+  const onlyContacts = sources.length === 1 && sources[0] === 'contacts';
+
+  return (
+    <div className="px-5 pt-2">
+      <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
+        Who are you trying to import? Be specific — the AI uses this to rank everything we pull from your sources next.
+      </p>
+      <textarea
+        value={filterText}
+        onChange={(e) => setFilterText(e.target.value)}
+        rows={5}
+        placeholder={EXAMPLE_FILTER}
+        className="glass-input w-full p-3 text-[14px] leading-relaxed resize-none"
+        autoFocus
+      />
+
+      <div className="mt-3 flex items-start gap-2 text-[11px] text-[hsl(var(--foreground)/0.55)] leading-snug">
+        <Info className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.75} />
+        <span>
+          Filter accuracy depends on what each source provides.{' '}
+          {onlyContacts
+            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with a spreadsheet or LinkedIn.'
+            : richSources
+              ? 'Spreadsheet notes columns and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
+              : 'Some sources expose more fields than others.'}
+        </span>
+      </div>
+
+      <button
+        onClick={onContinue}
+        className="w-full h-[52px] mt-6 rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+      >
+        {filterText.trim() ? 'Continue' : 'Skip filter'}
+      </button>
+    </div>
+  );
+}
+
+const EXAMPLE_FILTER =
+  "e.g. People who could help with my finance career — investors, founders, senior PMs. Skip college friends and family.";
+
 function GatherStep({
   selectedSources,
   completedSources,
   gathering,
   gatherProgress,
   draftsCount,
+  filterText,
   onRunContacts,
   onPickLinkedIn,
   onPickSpreadsheet,
@@ -557,13 +709,14 @@ function GatherStep({
   onShowLinkedInHowTo,
   onShowSpreadsheetHowTo,
   onContinue,
-  allDone,
+  ranking,
 }: {
   selectedSources: Set<ImportSource>;
   completedSources: Set<ImportSource>;
   gathering: ImportSource | null;
   gatherProgress: number;
   draftsCount: number;
+  filterText: string;
   onRunContacts: () => void;
   onPickLinkedIn: () => void;
   onPickSpreadsheet: () => void;
@@ -571,12 +724,19 @@ function GatherStep({
   onShowLinkedInHowTo: () => void;
   onShowSpreadsheetHowTo: () => void;
   onContinue: () => void;
-  allDone: boolean;
+  ranking: boolean;
 }) {
+  const canContinue = draftsCount > 0 && !ranking && gathering === null;
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-4 leading-relaxed">
-        Run each source. Photo OCR can be re-run with multiple photos.
+        Run the sources you picked. You can continue with what you have whenever you're ready — no need to finish all of them.
+        {filterText && (
+          <>
+            {' '}Filter:{' '}
+            <span className="font-display-italic text-foreground">"{filterText.length > 60 ? filterText.slice(0, 60).trimEnd() + '…' : filterText}"</span>
+          </>
+        )}
       </p>
 
       <div className="space-y-3">
@@ -663,10 +823,22 @@ function GatherStep({
       <div className="mt-5">
         <button
           onClick={onContinue}
-          disabled={draftsCount === 0 || !allDone}
-          className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform disabled:opacity-40"
+          disabled={!canContinue}
+          className="w-full h-[52px] rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform disabled:opacity-40 inline-flex items-center justify-center gap-2"
         >
-          {draftsCount === 0 ? 'Pull from at least one source' : `Continue with ${draftsCount}`}
+          {ranking ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Ranking with AI…
+            </>
+          ) : draftsCount === 0 ? (
+            'Pull from at least one source'
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4" strokeWidth={1.75} />
+              {`Rank ${draftsCount} & review`}
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -728,84 +900,18 @@ function SourceCard({
   );
 }
 
-function FilterStep({
-  filterText,
-  setFilterText,
-  draftsCount,
-  ranking,
-  onRank,
-  sources,
-}: {
-  filterText: string;
-  setFilterText: (s: string) => void;
-  draftsCount: number;
-  ranking: boolean;
-  onRank: () => void;
-  sources: ImportSource[];
-}) {
-  const richSources = sources.some((s) => s === 'linkedin' || s === 'photo_ocr' || s === 'spreadsheet');
-  const onlyContacts = sources.length === 1 && sources[0] === 'contacts';
-
-  return (
-    <div className="px-5 pt-2">
-      <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        Who are you trying to import? Be specific — the AI uses this to rank the {draftsCount} stubs from your sources.
-      </p>
-      <textarea
-        value={filterText}
-        onChange={(e) => setFilterText(e.target.value)}
-        rows={5}
-        placeholder={EXAMPLE_FILTER}
-        className="glass-input w-full p-3 text-[14px] leading-relaxed resize-none"
-        autoFocus
-      />
-
-      <div className="mt-3 flex items-start gap-2 text-[11px] text-[hsl(var(--foreground)/0.55)] leading-snug">
-        <Info className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.75} />
-        <span>
-          Filter accuracy depends on what each source provides.{' '}
-          {onlyContacts
-            ? 'Contacts may only have names and phone numbers — the AI has less to work with than with a spreadsheet or LinkedIn.'
-            : richSources
-              ? 'Spreadsheet notes columns and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
-              : 'Some sources expose more fields than others.'}
-        </span>
-      </div>
-
-      <button
-        onClick={onRank}
-        disabled={ranking}
-        className="w-full h-[52px] mt-6 rounded-2xl bg-primary text-primary-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform disabled:opacity-50 inline-flex items-center justify-center gap-2"
-      >
-        {ranking ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Ranking with AI…
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-4 h-4" strokeWidth={1.75} />
-            {filterText.trim() ? 'Rank & review' : 'Skip filter, just review'}
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
-const EXAMPLE_FILTER =
-  "e.g. People who could help with my finance career — investors, founders, senior PMs. Skip college friends and family.";
-
 function ReviewStep({
   visibleCandidates,
   drawerCount,
   matchMap,
   reviewBusyId,
+  bulkAdding,
   onPromote,
   onMerge,
   onDismiss,
   onOpenDrawer,
-  onSelectPerson: _onSelectPerson,
+  onAddEveryone,
+  onRestart,
   promotedCount,
   aliveCount,
   onDone,
@@ -814,37 +920,69 @@ function ReviewStep({
   drawerCount: number;
   matchMap: Map<string, string>;
   reviewBusyId: string | null;
+  bulkAdding: boolean;
   onPromote: (c: ImportCandidateRow, bullets: string[]) => Promise<void> | void;
   onMerge: (c: ImportCandidateRow, personId: string) => Promise<void> | void;
   onDismiss: (c: ImportCandidateRow) => Promise<void> | void;
   onOpenDrawer: () => void;
-  onSelectPerson?: (id: string) => void;
+  onAddEveryone: () => Promise<void> | void;
+  onRestart: () => void;
   promotedCount: number;
   aliveCount: number;
   onDone: () => void;
 }) {
   return (
     <div className="px-5 pt-2">
-      <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-2 leading-relaxed">
-        AI-ranked top {Math.min(TOP_N, visibleCandidates.length)}. Edit bullets inline, then Add to People.
+      <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
+        AI-ranked top {Math.min(TOP_N, visibleCandidates.length)} of {aliveCount}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}
       </p>
+
+      {visibleCandidates.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={onAddEveryone}
+            disabled={bulkAdding}
+            className="flex-1 glass-pill h-11 inline-flex items-center justify-center gap-1.5 text-[13px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+          >
+            {bulkAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 text-primary" strokeWidth={2} />}
+            {bulkAdding ? 'Adding…' : `Add all ${visibleCandidates.length}`}
+          </button>
+          <button
+            onClick={onRestart}
+            disabled={bulkAdding}
+            className="glass-pill h-11 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+          >
+            <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+            Restart
+          </button>
+        </div>
+      )}
 
       {visibleCandidates.length === 0 ? (
         <div className="glass p-8 text-center mt-4">
           <p className="text-sm font-display-italic text-[hsl(var(--foreground)/0.6)]">
             {aliveCount === 0
               ? 'All caught up. Hit Done to head back.'
-              : 'Nothing in the top 20 right now.'}
+              : 'Nothing left to review at the top — open the drawer for more.'}
           </p>
+          {aliveCount === 0 && (
+            <button
+              onClick={onRestart}
+              className="mt-4 glass-pill h-10 px-4 inline-flex items-center justify-center gap-1.5 text-[13px] text-foreground"
+            >
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Restart import
+            </button>
+          )}
         </div>
       ) : (
-        <div className="space-y-3 mt-3">
+        <div className="space-y-2.5 mt-2">
           {visibleCandidates.map((c) => (
             <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
-              <ImportCandidateCard
+              <ImportCandidateRowComponent
                 candidate={c}
                 matchedPersonId={matchMap.get(c.id)}
                 onPromote={(bullets) => onPromote(c, bullets)}
@@ -923,13 +1061,13 @@ function ImportDrawerSheet({
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-3 safe-bottom">
+        <div className="flex-1 overflow-y-auto p-5 space-y-2.5 safe-bottom">
           <p className="text-[12px] text-[hsl(var(--foreground)/0.6)]">
             {candidates.length} more pulled. Lower AI relevance to your filter — review and add any you want.
           </p>
           {candidates.map((c) => (
             <div key={c.id} className={cn(reviewBusyId === c.id && 'opacity-60')}>
-              <ImportCandidateCard
+              <ImportCandidateRowComponent
                 candidate={c}
                 matchedPersonId={matchMap.get(c.id)}
                 onPromote={(bullets) => onPromote(c, bullets)}

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
-import { ImportCandidateCard } from './ImportCandidateCard';
+import { ImportCandidateRow as ImportCandidateRowComponent } from './ImportCandidateRow';
 import {
   fetchPendingCandidates,
   dismissCandidate,
@@ -144,7 +144,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
           ) : (
             candidates.map((c) => (
               <div key={c.id} className={cn(busyId === c.id && 'opacity-60')}>
-                <ImportCandidateCard
+                <ImportCandidateRowComponent
                   candidate={c}
                   matchedPersonId={matchMap.get(c.id)}
                   onPromote={(bullets) => handlePromote(c, bullets)}
