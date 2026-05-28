@@ -69,7 +69,12 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [rankModal, setRankModal] = useState<{ kind: 'failed' | 'no-matches' } | null>(null);
+  const [rankModal, setRankModal] = useState<{ kind: 'no-matches' } | null>(null);
+  // When the AI ranking call itself fails (network blip, edge function
+  // timeout, etc) we still show the candidates — but a slim banner on the
+  // review page tells the user why their scores look uniform and lets
+  // them retry without leaving the screen.
+  const [rankFailed, setRankFailed] = useState(false);
   // Lets the user click "Browse all anyway" in the no-matches modal so the
   // review screen still renders the (low-scoring) candidates as-is.
   const [showLowScores, setShowLowScores] = useState(false);
@@ -223,18 +228,17 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         ? await fetchSessionCandidates(session.id)
         : inserted;
       setCandidates(refreshed);
+      setRankFailed(!rankSucceeded);
       setStep('review');
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
 
-      // The error/no-matches modal only makes sense when the user actually
-      // gave the AI something to match against. Without a filter, ranking
-      // is just a soft sort + bullet generator — silently falling back is
-      // the right call.
-      if (!filterUsed) return;
-      if (!rankSucceeded) {
-        setRankModal({ kind: 'failed' });
-        return;
-      }
+      // The no-matches modal only makes sense when the user actually gave
+      // the AI a filter to match against AND ranking actually returned
+      // useful scores. Without a filter, ranking is just a soft sort +
+      // bullet generator. Without a successful rank, the scores are 0
+      // and a "no matches" modal would be misleading — that's what the
+      // inline banner is for.
+      if (!filterUsed || !rankSucceeded) return;
       const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
       if (top < NO_MATCH_THRESHOLD) {
         setRankModal({ kind: 'no-matches' });
@@ -369,6 +373,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const handleRestart = () => {
     haptics.medium();
     setRankModal(null);
+    setRankFailed(false);
     setShowLowScores(false);
     setCandidates([]);
     setDrafts([]);
@@ -376,6 +381,35 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     setSelectedSources(new Set());
     setGatherProgress(0);
     setStep('pick');
+  };
+
+  // Retry the rank pass against the candidates that are already in the
+  // DB. Cheaper than re-gathering — same candidate ids, just a fresh AI
+  // call. Surfaces as a small banner on the review screen when the
+  // initial pass failed.
+  const handleRetryRank = async () => {
+    if (candidates.length === 0) return;
+    setRanking(true);
+    try {
+      const sessionId = candidates[0]?.session_id;
+      if (!sessionId) return;
+      const alive = candidates.filter((c) => !c.promoted && !c.dismissed);
+      await rankCandidates(filterText, alive);
+      const refreshed = await fetchSessionCandidates(sessionId);
+      setCandidates(refreshed);
+      setRankFailed(false);
+      const filterUsed = filterText.trim();
+      if (filterUsed) {
+        const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
+        if (top < NO_MATCH_THRESHOLD) {
+          setRankModal({ kind: 'no-matches' });
+        }
+      }
+    } catch (e) {
+      console.warn('Retry rank failed', e);
+    } finally {
+      setRanking(false);
+    }
   };
 
   const aliveCount = aliveCandidates.length;
@@ -456,6 +490,9 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             matchMap={matchMap}
             reviewBusyId={reviewBusyId}
             bulkAdding={bulkAdding}
+            rankFailed={rankFailed}
+            ranking={ranking}
+            onRetryRank={handleRetryRank}
             onReview={(c) => setReviewingId(c.id)}
             onPromote={handlePromote}
             onMerge={handleMerge}
@@ -502,7 +539,6 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         filterText={filterText}
         onShowAll={() => { setShowLowScores(true); setRankModal(null); }}
         onRestart={() => { setRankModal(null); handleRestart(); }}
-        onRetry={rankModal?.kind === 'failed' ? () => { setRankModal(null); setStep('gather'); } : undefined}
         onClose={() => setRankModal(null)}
       />
 
@@ -906,6 +942,9 @@ function ReviewStep({
   matchMap,
   reviewBusyId,
   bulkAdding,
+  rankFailed,
+  ranking,
+  onRetryRank,
   onReview,
   onPromote,
   onMerge,
@@ -922,6 +961,9 @@ function ReviewStep({
   matchMap: Map<string, string>;
   reviewBusyId: string | null;
   bulkAdding: boolean;
+  rankFailed: boolean;
+  ranking: boolean;
+  onRetryRank: () => Promise<void> | void;
   onReview: (c: ImportCandidateRow) => void;
   onPromote: (c: ImportCandidateRow) => Promise<void> | void;
   onMerge: (c: ImportCandidateRow, personId: string) => Promise<void> | void;
@@ -936,11 +978,25 @@ function ReviewStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        AI-ranked top {Math.min(TOP_N, visibleCandidates.length)} of {aliveCount}.
+        {rankFailed ? `${aliveCount} pulled` : `AI-ranked top ${Math.min(TOP_N, visibleCandidates.length)} of ${aliveCount}`}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}
       </p>
+
+      {rankFailed && (
+        <button
+          onClick={onRetryRank}
+          disabled={ranking}
+          className="w-full glass-warm p-3 mb-3 flex items-center gap-2.5 text-[12px] text-foreground active:scale-[0.99] transition-transform disabled:opacity-60"
+        >
+          <RotateCcw className={cn('w-3.5 h-3.5 text-primary shrink-0', ranking && 'animate-spin')} strokeWidth={1.75} />
+          <span className="text-left flex-1 leading-snug">
+            <span className="font-semibold text-foreground">AI ranking didn't come back.</span>{' '}
+            Showing everyone in import order — tap to retry.
+          </span>
+        </button>
+      )}
 
       {visibleCandidates.length > 0 && (
         <div className="flex items-center gap-2 mb-3">

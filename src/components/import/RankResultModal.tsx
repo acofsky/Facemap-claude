@@ -1,23 +1,24 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, RotateCcw, Sparkles, X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 
 interface RankResultModalProps {
   open: boolean;
-  /** 'failed' = AI call errored; 'no-matches' = all scores below threshold; null = closed. */
-  kind: 'failed' | 'no-matches' | null;
+  /** 'no-matches' = all scores below threshold; null = closed. AI-call
+   *  failures no longer show a modal — they degrade to an inline banner
+   *  on the review screen with a retry button. */
+  kind: 'no-matches' | null;
   filterText: string;
   onShowAll: () => void;
   onRestart: () => void;
-  onRetry?: () => void;
   onClose: () => void;
 }
 
 /**
- * Displayed at the end of the rank step when either the AI call itself
- * failed or the filter excluded everyone we pulled. Replaces a toast so
- * the failure is unambiguous and the user gets a clear path forward
- * (retry, show everything anyway, or restart with different criteria).
+ * Displayed at the end of the rank step when the filter excluded
+ * everyone we pulled. The user gets a clear path forward (browse all
+ * anyway or restart with different criteria) instead of just dropping
+ * into an empty review screen and wondering what happened.
  */
 export function RankResultModal({
   open,
@@ -25,18 +26,14 @@ export function RankResultModal({
   filterText,
   onShowAll,
   onRestart,
-  onRetry,
   onClose,
 }: RankResultModalProps) {
   useScrollLock(open && !!kind);
 
-  const failed = kind === 'failed';
-  const title = failed ? "Couldn't rank with AI" : 'No close matches';
-  const body = failed
-    ? 'The AI ranking call didn’t come back. You can try again, or skip ranking and review every candidate as-is.'
-    : filterText
-      ? `Nothing in your imports clearly matches "${truncate(filterText, 80)}". You can still browse everything, restart with different criteria, or close and try a different source.`
-      : 'No candidates were ranked. You can browse everything, restart, or close.';
+  const title = 'No close matches';
+  const body = filterText
+    ? `Nothing in your imports clearly matches "${truncate(filterText, 80)}". You can still browse everything, restart with different criteria, or close and try a different source.`
+    : 'No candidates were ranked. You can browse everything, restart, or close.';
 
   return (
     <AnimatePresence>
@@ -62,8 +59,8 @@ export function RankResultModal({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${failed ? 'bg-[hsl(0_85%_55%_/_0.18)] text-primary' : 'bg-[hsl(0_0%_100%/0.08)] text-foreground'}`}>
-                  {failed ? <AlertCircle className="w-4 h-4" strokeWidth={1.75} /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-[hsl(0_0%_100%/0.08)] text-foreground">
+                  <Sparkles className="w-4 h-4" strokeWidth={1.75} />
                 </div>
                 <h3 className="font-display text-[18px] text-foreground tracking-[-0.02em] leading-tight">
                   {title}
@@ -81,18 +78,9 @@ export function RankResultModal({
               {body}
             </p>
             <div className="mt-4 space-y-2">
-              {failed && onRetry && (
-                <button
-                  onClick={onRetry}
-                  className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-1.5"
-                >
-                  <RotateCcw className="w-4 h-4" strokeWidth={1.75} />
-                  Try again
-                </button>
-              )}
               <button
                 onClick={onShowAll}
-                className={`w-full h-11 rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform ${failed && onRetry ? 'bg-[hsl(0_0%_100%/0.08)] text-foreground' : 'bg-primary text-primary-foreground'}`}
+                className="w-full h-11 rounded-2xl text-[14px] font-semibold active:scale-[0.98] transition-transform bg-primary text-primary-foreground"
               >
                 Browse all anyway
               </button>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
+import { haptics } from '@/lib/haptics';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ImportCandidateRow as ImportCandidateRowComponent } from './ImportCandidateRow';
 import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
 import {
@@ -33,6 +35,8 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
   const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState<'add' | 'clear' | null>(null);
+  const [confirmKind, setConfirmKind] = useState<'add' | 'clear' | null>(null);
   const { data: existingPeople = [] } = usePersons();
 
   useEffect(() => {
@@ -111,6 +115,61 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
     }
   };
 
+  const handleAddAll = async () => {
+    setConfirmKind(null);
+    setBulkBusy('add');
+    haptics.medium();
+    let promoted = 0;
+    let merged = 0;
+    let failed = 0;
+    for (const c of candidates) {
+      try {
+        const matchedId = matchMap.get(c.id);
+        if (matchedId) {
+          await mergeCandidateIntoPerson(c, matchedId);
+          merged++;
+        } else {
+          await promoteCandidate(c);
+          promoted++;
+        }
+      } catch (e) {
+        console.error('Bulk add failed for', c.id, e);
+        failed++;
+      }
+    }
+    setCandidates((cur) => cur.filter((c) => !candidates.find((x) => x.id === c.id)));
+    setCandidates([]);
+    qc.invalidateQueries({ queryKey: ['persons'] });
+    qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+    setBulkBusy(null);
+    const parts: string[] = [];
+    if (promoted) parts.push(`${promoted} added`);
+    if (merged) parts.push(`${merged} merged`);
+    if (failed) parts.push(`${failed} failed`);
+    toast.success(parts.join(' · ') || 'Done');
+  };
+
+  const handleClearAll = async () => {
+    setConfirmKind(null);
+    setBulkBusy('clear');
+    haptics.medium();
+    let dismissed = 0;
+    let failed = 0;
+    for (const c of candidates) {
+      try {
+        await dismissCandidate(c.id);
+        dismissed++;
+      } catch (e) {
+        console.error('Bulk dismiss failed for', c.id, e);
+        failed++;
+      }
+    }
+    setCandidates([]);
+    qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+    setBulkBusy(null);
+    toast.success(failed > 0 ? `${dismissed} cleared · ${failed} failed` : `${dismissed} cleared`);
+  };
+
   if (!open) return null;
 
   return (
@@ -143,6 +202,28 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
+
+        {!loading && candidates.length > 0 && (
+          <div className="px-5 pt-3 flex items-center gap-2">
+            <button
+              onClick={() => setConfirmKind('add')}
+              disabled={!!bulkBusy}
+              className="flex-1 glass-pill h-10 inline-flex items-center justify-center gap-1.5 text-[12px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {bulkBusy === 'add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-primary" strokeWidth={2} />}
+              {bulkBusy === 'add' ? 'Adding…' : `Add all ${candidates.length}`}
+            </button>
+            <button
+              onClick={() => setConfirmKind('clear')}
+              disabled={!!bulkBusy}
+              className="glass-pill h-10 px-3.5 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {bulkBusy === 'clear' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              Clear all
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-5 space-y-2.5 safe-bottom">
           {loading ? (
             <div className="flex justify-center py-10">
@@ -180,6 +261,26 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
         onPromote={(overrides) => reviewingCandidate && handlePromote(reviewingCandidate, overrides)}
         onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
         onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
+      />
+
+      <ConfirmDialog
+        open={confirmKind === 'add'}
+        title={`Add all ${candidates.length}?`}
+        description="Everyone pending will land in your People list. Matches against existing people are merged into their existing entry without overwriting fields."
+        confirmLabel="Add all"
+        cancelLabel="Not yet"
+        onConfirm={handleAddAll}
+        onCancel={() => setConfirmKind(null)}
+      />
+      <ConfirmDialog
+        open={confirmKind === 'clear'}
+        title={`Clear all ${candidates.length}?`}
+        description="These pending imports will be dismissed. You can re-import them later, but their AI bullets will be regenerated."
+        confirmLabel="Clear all"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleClearAll}
+        onCancel={() => setConfirmKind(null)}
       />
     </AnimatePresence>
   );
