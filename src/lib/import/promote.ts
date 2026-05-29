@@ -32,7 +32,7 @@ export async function promoteCandidate(
   const mapped = (c.raw as { mapped_fields?: MappedPersonFields } | null)?.mapped_fields || {};
   const about = composeAbout(c, overrides, mapped);
   const background = overrides?.fieldOverrides?.important_info
-    ?? composeBackground(c)
+    ?? composeBackground(c, mapped)
     ?? undefined;
 
   const person = await createPerson({
@@ -78,7 +78,7 @@ export async function mergeCandidateIntoPerson(
   };
 
   fillIfEmpty('misc_notes', composeAbout(c, undefined, mapped));
-  fillIfEmpty('important_info', composeBackground(c));
+  fillIfEmpty('important_info', composeBackground(c, mapped));
   fillIfEmpty('how_we_met', mapped.how_we_met);
   fillIfEmpty('where_when', mapped.where_when);
   fillIfEmpty('physical_description', mapped.physical_description);
@@ -132,13 +132,22 @@ function composeAbout(
     .join('\n');
 }
 
-function composeBackground(c: ImportCandidateRow): string | undefined {
+function composeBackground(c: ImportCandidateRow, mapped: MappedPersonFields): string | undefined {
   const lines: string[] = [];
   if (c.title || c.company) {
     lines.push([c.title, c.company].filter(Boolean).join(' at '));
   }
   if (c.email) lines.push(`Email: ${c.email}`);
   if (c.phone) lines.push(`Phone: ${c.phone}`);
+  // Source-mapped Background entries (Contacts URLs/birthday, spreadsheet
+  // Important column, etc.) get split on newlines so each line lands as
+  // its own bullet in the BulletDisplay component.
+  if (mapped.important_info) {
+    mapped.important_info.split('\n').forEach((raw) => {
+      const trimmed = raw.replace(/^\s*[•\-*]\s*/, '').trim();
+      if (trimmed) lines.push(trimmed);
+    });
+  }
   if (lines.length === 0) return undefined;
   return lines.map((l) => `• ${l}`).join('\n');
 }
