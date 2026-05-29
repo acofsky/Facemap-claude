@@ -20,12 +20,14 @@ interface RankResponse {
   ranked: Array<{ id: string; score: number; rationale: string; bullets: string[] }>;
 }
 
-// Smaller chunks keep Claude's per-call JSON output well under the edge
-// function's `max_tokens` ceiling. Previous value (60) was producing
-// truncated arrays for filter-mode runs, which silently degraded the
-// whole batch to neutral scores via parseRanked's fallback. ~25 keeps
-// per-call output under ~5000 tokens with comfortable headroom.
-const CHUNK_SIZE = 25;
+// 50 candidates per chunk balances two needs: each call's JSON output
+// stays well under the edge function's 16k max_tokens ceiling (~200
+// tokens per row × 50 = ~10k), AND each call gives the model enough
+// context to anchor absolute scores against a recognizable spread of
+// candidates instead of inventing "relative variety" inside small
+// chunks. Previous CHUNK_SIZE=25 was scoring too cagey because the AI
+// only saw a fifth of the contacts at once.
+const CHUNK_SIZE = 50;
 // Fan-out cap for parallel chunks. Anthropic's default tier accepts 50
 // concurrent requests; keeping the limit lower than that avoids stepping
 // on other AI features (briefs, photo-describe, voice-parse) that share

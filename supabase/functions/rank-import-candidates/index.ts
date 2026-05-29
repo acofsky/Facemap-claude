@@ -37,11 +37,29 @@ interface RankedCandidate {
 
 const SYSTEM_PROMPT = `You score imported contact stubs for relevance to a user's stated import goal, and draft 1-3 short bullets that would help the user remember each person.
 
-Rules:
-- Score is 0.0 to 1.0. Use the full range. If the user gave no filter, score by how well-formed and useful the stub is (more known fields = higher).
-- Bullets are short fragments (no leading bullet character), e.g. "Senior PM at Stripe", "Met via Calendar — 4 meetings", "LinkedIn connection". Never invent facts. Only restate what's in the candidate's data plus the source.
-- Rationale is a 6-12 word phrase explaining the score, e.g. "Senior tech role matches your finance career goal", "Common name with no other data".
-- Return STRICT JSON. No prose, no markdown fences. Match the requested shape exactly.`;
+SCORE ABSOLUTELY, NOT RELATIVELY. You see the candidates in chunks but the user wants a globally consistent score. A clear match should always score in the high band even if every other candidate in this chunk is also a clear match. Do not "spread" scores within a chunk for variety.
+
+When the user's filter mentions a career, industry, or domain (e.g. "finance career", "tech founders", "real estate investors"), aggressively recognize signals across all fields — including abbreviations and short firm names. Examples:
+- Finance: JP Morgan, Goldman Sachs, Morgan Stanley, Citi, BofA, Wells Fargo (investment banking); Blackstone, KKR, Apollo, Carlyle, TPG, Bain Capital (private equity); Citadel, Bridgewater, Two Sigma, Millennium, Point72 (hedge funds); Alvarez & Marsal / A&M, FTI Consulting / FTI, AlixPartners, Houlihan Lokey (restructuring / financial advisory); McKinsey, Bain, BCG (consulting, often feeds finance); titles like Analyst, Associate, VP, MD, Banker, Trader, Portfolio Manager, Partner.
+- Tech: Google, Meta, Apple, Microsoft, Amazon, Stripe, Airbnb, founder/CTO/PM/engineer titles, YC-flavored startups.
+- Real estate: REIT names, brokerage names, Partner / Principal at private real estate funds.
+- Email domain often reveals firm even if company field is empty (e.g. @jpmorgan.com → JP Morgan).
+
+Score bands — anchor your numbers here:
+- 0.85 to 0.95: Clear match. Works at a relevant firm or holds a relevant title, with high confidence. Reserve 1.0 for both/multiple signals.
+- 0.55 to 0.80: Plausible match. Adjacent industry, ambiguous role at a relevant firm, partial signal.
+- 0.25 to 0.50: Ambiguous or thin data. Generic role, no industry signal, only a name + phone.
+- 0.0 to 0.20: Clear non-match — context explicitly points away from the filter (e.g. "my grandma", high-school friend with retail job for a finance filter).
+
+If the user gave NO filter, score by how well-formed and useful the stub is (more populated fields = higher), still using the same bands.
+
+Bullet rules:
+- 1-3 short fragments, no leading bullet character. Examples: "Senior PM at Stripe", "Investment banking analyst at Goldman", "LinkedIn connection".
+- Never invent facts. Only restate what's in the candidate's data plus the source.
+
+Rationale: 6-12 word phrase explaining the score band you picked, naming the matching signal. Examples: "JP Morgan investment banking analyst, clear finance match", "Common name with phone but no role data".
+
+Return STRICT JSON. No prose, no markdown fences. Match the requested shape exactly.`;
 
 interface RequestBody {
   warm?: boolean;
