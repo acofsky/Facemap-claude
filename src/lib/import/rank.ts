@@ -20,14 +20,16 @@ interface RankResponse {
   ranked: Array<{ id: string; score: number; rationale: string; bullets: string[] }>;
 }
 
-// 50 candidates per chunk balances two needs: each call's JSON output
-// stays well under the edge function's 16k max_tokens ceiling (~200
-// tokens per row × 50 = ~10k), AND each call gives the model enough
-// context to anchor absolute scores against a recognizable spread of
-// candidates instead of inventing "relative variety" inside small
-// chunks. Previous CHUNK_SIZE=25 was scoring too cagey because the AI
-// only saw a fifth of the contacts at once.
-const CHUNK_SIZE = 50;
+// 25 candidates per chunk balances three constraints: per-call JSON
+// output fits well under the 16k max_tokens ceiling, the iOS WebView's
+// ~60-second fetch timeout doesn't bite (50 was too risky — at ~200
+// tokens output per row × 50 candidates × Haiku 4.5's streaming speed,
+// chunks routinely passed the 60s mark and got silently dropped by
+// Promise.allSettled, leaving whole chunks of contacts unranked), and
+// the system prompt's "score absolutely, not relatively" instruction
+// works fine at this batch size — we don't need huge anchor sets per
+// call as long as the model honors the absolute bands.
+const CHUNK_SIZE = 25;
 // Fan-out cap for parallel chunks. Anthropic's default tier accepts 50
 // concurrent requests; keeping the limit lower than that avoids stepping
 // on other AI features (briefs, photo-describe, voice-parse) that share
@@ -52,6 +54,7 @@ export async function rankCandidates(
   }
 
   const all: RankResponse['ranked'] = [];
+  let failedChunks = 0;
   // Run chunks in waves so we never hold more than MAX_CONCURRENT_CHUNKS
   // in flight at once. Each wave waits for its chunks to settle before
   // the next wave kicks off — failures in one wave don't cascade.
@@ -62,9 +65,22 @@ export async function rankCandidates(
       if (r.status === 'fulfilled') {
         all.push(...r.value);
       } else {
+        failedChunks++;
         console.warn('Rank chunk failed', w + idx, r.reason);
       }
     });
+  }
+  // Surface ANY chunk failure to the caller. Partial failures used to be
+  // silently swallowed — Promise.allSettled would catch the rejection,
+  // log it, and let the wave continue. The candidates in the failed
+  // chunk would end up with null ai_relevance_score, sorting to the
+  // bottom of the list, and the user would see "AI worked!" because
+  // some chunks succeeded — but their highest-signal contacts had
+  // vanished into the bottom. Better: throw so the failure banner
+  // fires and the user can retry. If retries keep failing, the issue
+  // surfaces immediately instead of degrading silently.
+  if (failedChunks > 0) {
+    throw new Error(`${failedChunks}/${chunks.length} ranking chunks failed`);
   }
   return all;
 }
