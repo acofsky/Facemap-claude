@@ -34,7 +34,9 @@ import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote
 import type { Person } from '@/lib/store';
 import type { CandidateDraft, ImportCandidateRow, ImportSource } from '@/lib/import/types';
 
-const TOP_N = 20;
+const TOP_N_OPTIONS = [5, 10, 20, 50] as const;
+type TopN = (typeof TOP_N_OPTIONS)[number];
+const DEFAULT_TOP_N: TopN = 20;
 /** Candidates scoring below this with a filter set count as "no close matches". */
 const NO_MATCH_THRESHOLD = 0.35;
 
@@ -57,6 +59,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [step, setStep] = useState<Step>('pick');
   const [selectedSources, setSelectedSources] = useState<Set<ImportSource>>(new Set());
   const [filterText, setFilterText] = useState('');
+  const [topN, setTopN] = useState<TopN>(DEFAULT_TOP_N);
   const [drafts, setDrafts] = useState<CandidateDraft[]>([]);
   const [gathering, setGathering] = useState<ImportSource | null>(null);
   const [gatherProgress, setGatherProgress] = useState(0);
@@ -279,8 +282,8 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     return alive;
   }, [candidates, rankModal, showLowScores]);
 
-  const visibleCandidates = useMemo(() => aliveCandidates.slice(0, TOP_N), [aliveCandidates]);
-  const drawerCandidates = useMemo(() => aliveCandidates.slice(TOP_N), [aliveCandidates]);
+  const visibleCandidates = useMemo(() => aliveCandidates.slice(0, topN), [aliveCandidates, topN]);
+  const drawerCandidates = useMemo(() => aliveCandidates.slice(topN), [aliveCandidates, topN]);
 
   const handlePromote = async (c: ImportCandidateRow, overrides?: Partial<Person>) => {
     setReviewBusyId(c.id);
@@ -459,6 +462,8 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
           <FilterStep
             filterText={filterText}
             setFilterText={setFilterText}
+            topN={topN}
+            setTopN={setTopN}
             sources={Array.from(selectedSources)}
             onContinue={goToGather}
           />
@@ -489,6 +494,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             bulkAdding={bulkAdding}
             rankFailed={rankFailed}
             ranking={ranking}
+            topN={topN}
             onRetryRank={handleRetryRank}
             onReview={(c) => setReviewingId(c.id)}
             onPromote={handlePromote}
@@ -618,9 +624,9 @@ function PickStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-4 leading-relaxed">
-        Pick the sources to pull from. Next we'll ask who you're looking for,
-        then AI picks your best 20 to review first — every other contact is still
-        one tap away in the drawer.
+        Pick the sources to pull from. Next we'll ask who you're looking for and
+        how many top matches to surface — AI puts those at the front, every other
+        contact is still one tap away in the drawer.
       </p>
       <div className="space-y-3">
         {sources.map((s) => {
@@ -693,11 +699,15 @@ function PickStep({
 function FilterStep({
   filterText,
   setFilterText,
+  topN,
+  setTopN,
   sources,
   onContinue,
 }: {
   filterText: string;
   setFilterText: (s: string) => void;
+  topN: TopN;
+  setTopN: (n: TopN) => void;
   sources: ImportSource[];
   onContinue: () => void;
 }) {
@@ -708,7 +718,7 @@ function FilterStep({
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
         Who are you trying to import? Be specific — AI uses this to pick your best
-        20 from everything we pull next. The rest stay accessible in the drawer.
+        matches from everything we pull next. The rest stay accessible in the drawer.
       </p>
       <textarea
         value={filterText}
@@ -729,6 +739,31 @@ function FilterStep({
               ? 'File contents and LinkedIn titles give the AI a lot to work with; Contacts may only have phone numbers. We do our best with what each source has.'
               : 'Some sources expose more fields than others.'}
         </span>
+      </div>
+
+      <div className="mt-6">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--foreground)/0.55)] mb-1">
+          How many top matches to surface
+        </div>
+        <p className="text-[11px] text-[hsl(var(--foreground)/0.5)] leading-snug mb-2">
+          AI will review every imported contact and put its top picks at the front of the list. The rest still show in the "More imports" drawer.
+        </p>
+        <div className="flex items-center gap-1.5">
+          {TOP_N_OPTIONS.map((n) => (
+            <button
+              key={n}
+              onClick={() => { haptics.selection(); setTopN(n); }}
+              className={cn(
+                'glass-pill flex-1 h-10 text-[13px] font-medium active:scale-[0.97] transition-transform',
+                n === topN
+                  ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
+                  : 'text-[hsl(var(--foreground)/0.7)]',
+              )}
+            >
+              Top {n}
+            </button>
+          ))}
+        </div>
       </div>
 
       <button
@@ -944,6 +979,7 @@ function ReviewStep({
   bulkAdding,
   rankFailed,
   ranking,
+  topN,
   onRetryRank,
   onReview,
   onPromote,
@@ -963,6 +999,7 @@ function ReviewStep({
   bulkAdding: boolean;
   rankFailed: boolean;
   ranking: boolean;
+  topN: TopN;
   onRetryRank: () => Promise<void> | void;
   onReview: (c: ImportCandidateRow) => void;
   onPromote: (c: ImportCandidateRow) => Promise<void> | void;
@@ -978,7 +1015,7 @@ function ReviewStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        {rankFailed ? `${aliveCount} pulled` : `AI's top ${Math.min(TOP_N, visibleCandidates.length)} of ${aliveCount}`}.
+        {rankFailed ? `${aliveCount} pulled` : `AI's top ${Math.min(topN, visibleCandidates.length)} of ${aliveCount}`}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}

@@ -11,7 +11,10 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 // Hard cap so a runaway client can't blow our context window or our wallet.
-// Sources that yield more rows than this should batch on the client.
+// Sources that yield more rows than this should batch on the client. The
+// matching CHUNK_SIZE in src/lib/import/rank.ts must stay well under this
+// AND under what max_tokens can fit (roughly: each candidate's JSON output
+// is ~200 tokens, max_tokens=16k holds ~80 candidates comfortably).
 const MAX_CANDIDATES_PER_CALL = 80;
 
 interface Candidate {
@@ -106,7 +109,12 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 4096,
+        // Claude Haiku 4.5 max output is 64k; we set 16k as a generous
+        // ceiling that easily holds 80 candidates' worth of JSON
+        // (~200 tokens per row of {id, score, rationale, bullets[]}).
+        // The previous 4096 cap was truncating mid-output and burning
+        // the ranking pass into neutral fallbacks.
+        max_tokens: 16000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       }),
@@ -172,19 +180,41 @@ Every candidate id above must appear exactly once. Bullets array has 1 to 3 entr
 }
 
 function parseRanked(text: string, candidates: Candidate[]): RankedCandidate[] {
-  // Tolerate a stray ```json fence if the model produced one.
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  // Tolerate a stray ```json fence and any preamble the model prepends.
+  // First try a clean JSON.parse; if that fails, look for the longest
+  // {"ranked":[...]} substring we can find and try again. As a last
+  // resort, extract whatever complete {id,score,rationale,bullets}
+  // objects are visible in the text (handles output truncated mid-way
+  // through the array — partial ranking is still better than neutral).
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
 
-  let parsed: unknown;
+  let rankedRaw: unknown[] | null = null;
+
   try {
-    parsed = JSON.parse(cleaned);
-  } catch (e) {
-    console.warn("Failed to parse model JSON, falling back to neutral scores", e);
-    return candidates.map((c) => neutral(c));
+    const parsed = JSON.parse(cleaned);
+    const cand = (parsed as { ranked?: unknown[] })?.ranked;
+    if (Array.isArray(cand)) rankedRaw = cand;
+  } catch (_e) {
+    // Fall through to recovery.
   }
 
-  const rankedRaw = (parsed as { ranked?: unknown[] })?.ranked;
-  if (!Array.isArray(rankedRaw)) return candidates.map((c) => neutral(c));
+  if (!rankedRaw) {
+    const recovered = recoverPartialRanked(cleaned);
+    if (recovered.length > 0) {
+      console.warn(
+        `Model output unparseable, recovered ${recovered.length}/${candidates.length} candidates via per-object fallback`,
+      );
+      rankedRaw = recovered;
+    }
+  }
+
+  if (!rankedRaw) {
+    console.warn("Failed to parse model JSON, falling back to neutral scores");
+    return candidates.map((c) => neutral(c));
+  }
 
   const byId = new Map<string, RankedCandidate>();
   for (const r of rankedRaw) {
@@ -201,6 +231,50 @@ function parseRanked(text: string, candidates: Candidate[]): RankedCandidate[] {
   }
 
   return candidates.map((c) => byId.get(c.id) || neutral(c));
+}
+
+/**
+ * Last-resort JSON recovery — scan for individual {…} objects that look
+ * like ranked candidates and parse each in isolation. Survives output
+ * that got truncated mid-array (missing closing `]}`) and recovers as
+ * many candidates as Claude managed to emit before being cut off.
+ */
+function recoverPartialRanked(text: string): unknown[] {
+  const out: unknown[] = [];
+  // Match {...} blocks at brace depth 1 (i.e. inside the "ranked" array).
+  // Greedy stack-based scan rather than regex so nested braces don't trip
+  // us up (a rationale string could contain {).
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let prev = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\"" && prev !== "\\") inString = false;
+      prev = ch;
+      continue;
+    }
+    if (ch === "\"") { inString = true; prev = ch; continue; }
+    if (ch === "{") { if (depth === 1) start = i; depth++; }
+    else if (ch === "}") {
+      depth--;
+      if (depth === 1 && start !== -1) {
+        const fragment = text.slice(start, i + 1);
+        try {
+          const obj = JSON.parse(fragment);
+          if (obj && typeof obj === "object" && typeof (obj as { id?: unknown }).id === "string") {
+            out.push(obj);
+          }
+        } catch (_e) {
+          // Skip — partially malformed candidate, neutral fallback for this id.
+        }
+        start = -1;
+      }
+    }
+    prev = ch;
+  }
+  return out;
 }
 
 function neutral(c: Candidate): RankedCandidate {

@@ -20,58 +20,90 @@ interface RankResponse {
   ranked: Array<{ id: string; score: number; rationale: string; bullets: string[] }>;
 }
 
-// Matches the edge function's MAX_CANDIDATES_PER_CALL. Keep under or the
-// function 400s the whole batch.
-const CHUNK_SIZE = 60;
+// Smaller chunks keep Claude's per-call JSON output well under the edge
+// function's `max_tokens` ceiling. Previous value (60) was producing
+// truncated arrays for filter-mode runs, which silently degraded the
+// whole batch to neutral scores via parseRanked's fallback. ~25 keeps
+// per-call output under ~5000 tokens with comfortable headroom.
+const CHUNK_SIZE = 25;
+// Fan-out cap for parallel chunks. Anthropic's default tier accepts 50
+// concurrent requests; keeping the limit lower than that avoids stepping
+// on other AI features (briefs, photo-describe, voice-parse) that share
+// the same key.
+const MAX_CONCURRENT_CHUNKS = 4;
 
 /**
  * Send candidates to the rank-import-candidates edge function in chunks,
- * write the resulting scores/rationales/bullets back to the DB. Resolves
- * once every chunk has finished. Per-row DB update failures are tolerated
- * (logged and skipped) so a single bad write can't kill the whole pass.
+ * write the resulting scores/rationales/bullets back to the DB. Chunks
+ * fan out in parallel (capped) so a 200-contact import doesn't crawl
+ * through 8 sequential edge-function cold starts. Per-row DB update
+ * failures are tolerated (logged and skipped) so a single bad write
+ * can't kill the whole pass.
  */
 export async function rankCandidates(
   filterText: string,
   candidates: ImportCandidateRow[],
 ): Promise<RankResponse['ranked']> {
-  const all: RankResponse['ranked'] = [];
+  const chunks: ImportCandidateRow[][] = [];
   for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
-    const chunk = candidates.slice(i, i + CHUNK_SIZE);
-    const body: RankRequest = {
-      filter_text: filterText || undefined,
-      candidates: chunk.map((c) => ({
-        id: c.id,
-        source: c.source,
-        name: c.name,
-        email: c.email || undefined,
-        phone: c.phone || undefined,
-        company: c.company || undefined,
-        title: c.title || undefined,
-        context: candidateContext(c),
-      })),
-    };
-    const data = await invokeAI<RankResponse>(
-      'rank-import-candidates',
-      body as unknown as Record<string, unknown>,
-    );
-    const ranked = data.ranked || [];
-    const updates = await Promise.allSettled(
-      ranked.map((r) =>
-        updateCandidateRanking(r.id, {
-          score: r.score,
-          rationale: r.rationale,
-          bullets: r.bullets,
-        }),
-      ),
-    );
-    updates.forEach((u, idx) => {
-      if (u.status === 'rejected') {
-        console.warn('Failed to persist ranking for', ranked[idx]?.id, u.reason);
+    chunks.push(candidates.slice(i, i + CHUNK_SIZE));
+  }
+
+  const all: RankResponse['ranked'] = [];
+  // Run chunks in waves so we never hold more than MAX_CONCURRENT_CHUNKS
+  // in flight at once. Each wave waits for its chunks to settle before
+  // the next wave kicks off — failures in one wave don't cascade.
+  for (let w = 0; w < chunks.length; w += MAX_CONCURRENT_CHUNKS) {
+    const wave = chunks.slice(w, w + MAX_CONCURRENT_CHUNKS);
+    const results = await Promise.allSettled(wave.map((chunk) => runChunk(filterText, chunk)));
+    results.forEach((r, idx) => {
+      if (r.status === 'fulfilled') {
+        all.push(...r.value);
+      } else {
+        console.warn('Rank chunk failed', w + idx, r.reason);
       }
     });
-    all.push(...ranked);
   }
   return all;
+}
+
+async function runChunk(
+  filterText: string,
+  chunk: ImportCandidateRow[],
+): Promise<RankResponse['ranked']> {
+  const body: RankRequest = {
+    filter_text: filterText || undefined,
+    candidates: chunk.map((c) => ({
+      id: c.id,
+      source: c.source,
+      name: c.name,
+      email: c.email || undefined,
+      phone: c.phone || undefined,
+      company: c.company || undefined,
+      title: c.title || undefined,
+      context: candidateContext(c),
+    })),
+  };
+  const data = await invokeAI<RankResponse>(
+    'rank-import-candidates',
+    body as unknown as Record<string, unknown>,
+  );
+  const ranked = data.ranked || [];
+  const updates = await Promise.allSettled(
+    ranked.map((r) =>
+      updateCandidateRanking(r.id, {
+        score: r.score,
+        rationale: r.rationale,
+        bullets: r.bullets,
+      }),
+    ),
+  );
+  updates.forEach((u, idx) => {
+    if (u.status === 'rejected') {
+      console.warn('Failed to persist ranking for', ranked[idx]?.id, u.reason);
+    }
+  });
+  return ranked;
 }
 
 function candidateContext(c: ImportCandidateRow): string | undefined {
