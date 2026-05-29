@@ -75,7 +75,7 @@ If the cache is ever cleared (Codemagic UI → app → Cache → Clear), the nex
 
 ## Codemagic integration name
 
-In `codemagic.yaml`, both workflows reference `app_store_connect: MembrCodeMagicAPIKey`. **This must match the alias** the user gave the App Store Connect API key in Codemagic → Teams → Integrations. Don't rename casually.
+In `codemagic.yaml`, both workflows reference `app_store_connect: Newmembrcodemagicapikey`. **This must match the alias** the user gave the App Store Connect API key in Codemagic → Teams → Integrations. Don't rename casually. (The original alias was `MembrCodeMagicAPIKey`; it was renamed after the underlying Apple API key was rotated.)
 
 The actual Apple-side API key has **Admin** access — anything less can't auto-create certs/profiles.
 
@@ -162,7 +162,7 @@ To add/edit a migration or edge function: edit locally, commit, push, then trigg
 ## Apple ecosystem accounts
 
 - Apple Developer team: Adam Cofsky (`C59FSCZHFV`)
-- App Store Connect API key alias in Codemagic: `MembrCodeMagicAPIKey` (Admin access)
+- App Store Connect API key alias in Codemagic: `Newmembrcodemagicapikey` (Admin access)
 - TestFlight internal group: `LiveReload` (current internal builds land here; name is legacy)
 - TestFlight external group: `External Testers` (production builds land here when tagged)
 

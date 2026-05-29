@@ -84,7 +84,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 30
     integrations:
-      app_store_connect: MembrCodeMagicAPIKey
+      app_store_connect: Newmembrcodemagicapikey
     environment:
       <<: *env_versions
       vars:
@@ -123,7 +123,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: MembrCodeMagicAPIKey
+      app_store_connect: Newmembrcodemagicapikey
     environment:
       <<: *env_versions
       vars:
