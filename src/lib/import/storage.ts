@@ -94,16 +94,23 @@ export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
 }
 
 /**
- * Collect the iOS contact_ids that are currently sitting in import_candidates
- * (any state — pending, promoted, or dismissed). Used by the Contacts source
- * to skip contacts the user has already imported in a previous session
- * instead of silently re-pulling them and watching them get dedup'd later.
+ * Collect the iOS contact_ids that are LIVE in import_candidates — either
+ * already promoted to a Person or still waiting in pending review. Used
+ * by the Contacts source to skip those instead of silently re-pulling
+ * them and dedup'ing downstream.
+ *
+ * Dismissed candidates are intentionally NOT counted: when the user
+ * Clear-Alls their pending list, they want the option to re-pull the
+ * same contacts later and re-evaluate. Filtering them out here would
+ * leave Read Contacts forever returning zero new for everyone they'd
+ * ever dismissed.
  */
 export async function fetchKnownContactIds(): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('import_candidates')
-    .select('raw')
-    .eq('source', 'contacts');
+    .select('raw, promoted, dismissed')
+    .eq('source', 'contacts')
+    .or('promoted.eq.true,and(promoted.eq.false,dismissed.eq.false)');
   if (error) throw error;
   const ids = new Set<string>();
   for (const row of data || []) {
@@ -161,4 +168,25 @@ export async function dismissCandidate(candidateId: string): Promise<void> {
     .update({ dismissed: true })
     .eq('id', candidateId);
   if (error) throw error;
+}
+
+/**
+ * Dismiss every still-pending candidate for the current user in one SQL
+ * UPDATE. RLS confines the scope to the caller's own rows so we don't
+ * need to spell out user_id here. Returns the count of rows touched.
+ *
+ * The previous Clear-all path iterated client-side with one round trip
+ * per row — at 1.5k pending candidates that was 1500 sequential PATCH
+ * requests, which both took 90+ seconds and silently maxed out at the
+ * default fetch-limit of 1000 rows on the prior `fetchPendingCandidates`
+ * call. Switching to a single update fixes both.
+ */
+export async function dismissAllPending(): Promise<number> {
+  const { error, count } = await supabase
+    .from('import_candidates')
+    .update({ dismissed: true }, { count: 'exact' })
+    .eq('promoted', false)
+    .eq('dismissed', false);
+  if (error) throw error;
+  return count ?? 0;
 }

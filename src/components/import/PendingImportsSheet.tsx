@@ -12,7 +12,9 @@ import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
 import {
   fetchPendingCandidates,
   dismissCandidate,
+  dismissAllPending,
 } from '@/lib/import/storage';
+import { InfoModal } from '@/components/InfoModal';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import { usePersons } from '@/hooks/use-data';
@@ -37,6 +39,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState<'add' | 'clear' | null>(null);
   const [confirmKind, setConfirmKind] = useState<'add' | 'clear' | null>(null);
+  const [resultModal, setResultModal] = useState<{ kind: 'add' | 'clear'; counts: { added: number; merged: number; failed: number; cleared: number } } | null>(null);
   const { data: existingPeople = [] } = usePersons();
 
   useEffect(() => {
@@ -119,55 +122,55 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
     setConfirmKind(null);
     setBulkBusy('add');
     haptics.medium();
-    let promoted = 0;
+    // Parallelize in waves of 6 so a thousand-row bulk add doesn't take
+    // forever (used to be one sequential round trip per row). 6 keeps us
+    // well under Supabase's connection cap while cutting wall time ~6x.
+    const WAVE = 6;
+    let added = 0;
     let merged = 0;
     let failed = 0;
-    for (const c of candidates) {
-      try {
+    for (let i = 0; i < candidates.length; i += WAVE) {
+      const wave = candidates.slice(i, i + WAVE);
+      const results = await Promise.allSettled(wave.map(async (c) => {
         const matchedId = matchMap.get(c.id);
         if (matchedId) {
           await mergeCandidateIntoPerson(c, matchedId);
-          merged++;
-        } else {
-          await promoteCandidate(c);
-          promoted++;
+          return 'merged';
         }
-      } catch (e) {
-        console.error('Bulk add failed for', c.id, e);
-        failed++;
+        await promoteCandidate(c);
+        return 'added';
+      }));
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          if (r.value === 'added') added++;
+          else merged++;
+        } else {
+          failed++;
+        }
       }
     }
-    setCandidates((cur) => cur.filter((c) => !candidates.find((x) => x.id === c.id)));
     setCandidates([]);
     qc.invalidateQueries({ queryKey: ['persons'] });
     qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
     setBulkBusy(null);
-    const parts: string[] = [];
-    if (promoted) parts.push(`${promoted} added`);
-    if (merged) parts.push(`${merged} merged`);
-    if (failed) parts.push(`${failed} failed`);
-    toast.success(parts.join(' · ') || 'Done');
+    setResultModal({ kind: 'add', counts: { added, merged, failed, cleared: 0 } });
   };
 
   const handleClearAll = async () => {
     setConfirmKind(null);
     setBulkBusy('clear');
     haptics.medium();
-    let dismissed = 0;
-    let failed = 0;
-    for (const c of candidates) {
-      try {
-        await dismissCandidate(c.id);
-        dismissed++;
-      } catch (e) {
-        console.error('Bulk dismiss failed for', c.id, e);
-        failed++;
-      }
+    try {
+      // Single SQL update via RLS, not a 1.5k-row client-side loop.
+      const cleared = await dismissAllPending();
+      setCandidates([]);
+      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setResultModal({ kind: 'clear', counts: { added: 0, merged: 0, failed: 0, cleared } });
+    } catch (e) {
+      toast.error(friendlyError(e, "Couldn't clear pending imports."));
+    } finally {
+      setBulkBusy(null);
     }
-    setCandidates([]);
-    qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-    setBulkBusy(null);
-    toast.success(failed > 0 ? `${dismissed} cleared · ${failed} failed` : `${dismissed} cleared`);
   };
 
   if (!open) return null;
@@ -279,9 +282,45 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
         confirmLabel="Clear all"
         cancelLabel="Keep"
         destructive
+        loading={bulkBusy === 'clear'}
+        loadingLabel="Clearing"
         onConfirm={handleClearAll}
         onCancel={() => setConfirmKind(null)}
       />
+
+      <InfoModal
+        open={!!resultModal}
+        title={resultModal?.kind === 'clear' ? 'Pending imports cleared' : 'Bulk add complete'}
+        onClose={() => setResultModal(null)}
+      >
+        {resultModal?.kind === 'clear' ? (
+          <p>
+            <span className="text-foreground">{resultModal.counts.cleared}</span>{' '}
+            pending import{resultModal.counts.cleared === 1 ? '' : 's'} dismissed.
+            You can re-pull from any source any time.
+          </p>
+        ) : resultModal ? (
+          <>
+            {resultModal.counts.added > 0 && (
+              <p>
+                <span className="text-foreground">{resultModal.counts.added}</span> new{' '}
+                {resultModal.counts.added === 1 ? 'person' : 'people'} added.
+              </p>
+            )}
+            {resultModal.counts.merged > 0 && (
+              <p>
+                <span className="text-foreground">{resultModal.counts.merged}</span>{' '}
+                merged into existing People (filled empty fields, didn't overwrite).
+              </p>
+            )}
+            {resultModal.counts.failed > 0 && (
+              <p className="text-[hsl(var(--foreground)/0.55)]">
+                {resultModal.counts.failed} couldn't be added — likely a network issue. Retry from the pending list if needed.
+              </p>
+            )}
+          </>
+        ) : null}
+      </InfoModal>
     </AnimatePresence>
   );
 }

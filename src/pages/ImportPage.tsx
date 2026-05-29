@@ -387,6 +387,17 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     toast.success(parts.join(' · ') || 'Done');
   };
 
+  // How many drafts each source contributed this session — used to label
+  // the source card "0 new" when it ran successfully but yielded nothing,
+  // instead of misleading the user with a green "✓ Done".
+  const perSourceDraftCounts = useMemo(() => {
+    const m = new Map<ImportSource, number>();
+    for (const d of drafts) {
+      m.set(d.source, (m.get(d.source) || 0) + 1);
+    }
+    return m;
+  }, [drafts]);
+
   const reviewingCandidate = useMemo(
     () => candidates.find((c) => c.id === reviewingId) || null,
     [candidates, reviewingId],
@@ -491,6 +502,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
           <GatherStep
             selectedSources={selectedSources}
             completedSources={completedSources}
+            perSourceDraftCounts={perSourceDraftCounts}
             gathering={gathering}
             gatherProgress={gatherProgress}
             draftsCount={drafts.length}
@@ -829,6 +841,7 @@ const EXAMPLE_FILTER =
 function GatherStep({
   selectedSources,
   completedSources,
+  perSourceDraftCounts,
   gathering,
   gatherProgress,
   draftsCount,
@@ -843,6 +856,7 @@ function GatherStep({
 }: {
   selectedSources: Set<ImportSource>;
   completedSources: Set<ImportSource>;
+  perSourceDraftCounts: Map<ImportSource, number>;
   gathering: ImportSource | null;
   gatherProgress: number;
   draftsCount: number;
@@ -855,6 +869,12 @@ function GatherStep({
   onContinue: () => void;
   ranking: boolean;
 }) {
+  // For each completed source, was it productive or did it yield zero new?
+  // Used to swap the green "Done" pill for a muted "0 new" so the user
+  // doesn't read "✓ Done" and assume everything pulled when in fact the
+  // source returned nothing.
+  const ranEmpty = (s: ImportSource) =>
+    completedSources.has(s) && (perSourceDraftCounts.get(s) ?? 0) === 0;
   const canContinue = draftsCount > 0 && !ranking && gathering === null;
   return (
     <div className="px-5 pt-2">
@@ -874,9 +894,14 @@ function GatherStep({
             title="iOS Contacts"
             description="Grant permission, then we'll read everyone."
             busy={gathering === 'contacts'}
-            done={completedSources.has('contacts')}
+            done={completedSources.has('contacts') && !ranEmpty('contacts')}
+            ranEmpty={ranEmpty('contacts')}
             progress={gathering === 'contacts' ? gatherProgress : undefined}
-            ctaLabel={completedSources.has('contacts') ? 'Done' : 'Read contacts'}
+            ctaLabel={
+              completedSources.has('contacts')
+                ? (ranEmpty('contacts') ? 'Run again' : 'Done')
+                : 'Read contacts'
+            }
             onClick={onRunContacts}
           />
         )}
@@ -896,7 +921,8 @@ function GatherStep({
               </>
             }
             busy={gathering === 'linkedin'}
-            done={completedSources.has('linkedin')}
+            done={completedSources.has('linkedin') && !ranEmpty('linkedin')}
+            ranEmpty={ranEmpty('linkedin')}
             ctaLabel={completedSources.has('linkedin') ? 'Pick another' : 'Choose CSV'}
             onClick={onPickLinkedIn}
             icon={FileText}
@@ -918,7 +944,8 @@ function GatherStep({
               </>
             }
             busy={gathering === 'spreadsheet'}
-            done={completedSources.has('spreadsheet')}
+            done={completedSources.has('spreadsheet') && !ranEmpty('spreadsheet')}
+            ranEmpty={ranEmpty('spreadsheet')}
             ctaLabel={completedSources.has('spreadsheet') ? 'Add another file' : 'Choose file'}
             onClick={onPickFile}
             icon={Files}
@@ -968,6 +995,7 @@ function SourceCard({
   description,
   busy,
   done,
+  ranEmpty,
   progress,
   ctaLabel,
   onClick,
@@ -977,6 +1005,10 @@ function SourceCard({
   description: React.ReactNode;
   busy: boolean;
   done: boolean;
+  /** Source has been run successfully but yielded zero new candidates.
+   *  Renders a muted neutral state instead of the green "✓ Done" so the
+   *  user doesn't read "Done" and assume content was pulled. */
+  ranEmpty?: boolean;
   progress?: number;
   ctaLabel: string;
   onClick: () => void;
@@ -991,7 +1023,14 @@ function SourceCard({
           </div>
         ) : null}
         <div className="flex-1 min-w-0">
-          <div className="font-display text-[15px] text-foreground">{title}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[15px] text-foreground">{title}</span>
+            {ranEmpty && (
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[hsl(0_0%_100%/0.08)] text-[hsl(var(--foreground)/0.6)]">
+                0 new
+              </span>
+            )}
+          </div>
           <div className="text-[12px] text-[hsl(var(--foreground)/0.6)] mt-0.5 leading-snug">
             {description}
           </div>

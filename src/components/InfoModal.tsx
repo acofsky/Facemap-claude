@@ -25,7 +25,7 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/70"
+            className="fixed inset-0 z-[80] bg-black/70"
             onClick={onClose}
           />
           <motion.div
@@ -35,7 +35,7 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
             animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
             exit={{ opacity: 0, scale: 0.94, x: '-50%', y: '-50%' }}
             transition={{ type: 'spring', damping: 24, stiffness: 360 }}
-            className="glass fixed left-1/2 top-1/2 z-[61] w-[min(86vw,360px)] p-5"
+            className="glass fixed left-1/2 top-1/2 z-[81] w-[min(86vw,360px)] p-5"
             style={{ background: 'rgba(20, 14, 14, 0.92)' }}
             onClick={(e) => e.stopPropagation()}
           >
