@@ -417,7 +417,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
 
   return (
     <div
-      className="ambient-backdrop fixed inset-0 z-[55] safe-top safe-bottom flex flex-col"
+      className="flex flex-col min-h-screen safe-top"
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -425,20 +425,17 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       }}
       {...swipe.bind}
     >
-      {/* Notch cover — matches the gradient the detail pages use so the
-          status-bar region reads as solid black instead of letting the
-          warm ambient backdrop bleed up there. Pointer-none so the
-          header swipe still wins. */}
+      {/* Nav bar — sits below the notch overlay (Index.tsx) with the same
+          fade-to-page gradient PersonEditPage uses, so the header bleeds
+          into content instead of presenting a hard edge. */}
       <div
-        aria-hidden="true"
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
         style={{
-          height: 'calc(env(safe-area-inset-top) + 24px)',
+          top: 'env(safe-area-inset-top)',
           background:
-            'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+            'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
         }}
-      />
-      <div className="sticky top-0 z-20 flex items-center justify-between px-3 pt-3 pb-2 backdrop-blur-xl bg-black/40">
+      >
         <button
           onClick={goBack}
           className="glass-pill !h-10 !w-10 !p-0 flex items-center justify-center"
@@ -450,7 +447,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         <span className="w-10" />
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-8">
+      <div className="flex-1 pb-8 safe-bottom">
         {step === 'pick' && (
           <PickStep
             selectedSources={selectedSources}
@@ -621,7 +618,9 @@ function PickStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-4 leading-relaxed">
-        Pick the sources to pull from. We'll ask you to describe who you're looking for next, then rank everything with AI.
+        Pick the sources to pull from. Next we'll ask who you're looking for,
+        then AI picks your best 20 to review first — every other contact is still
+        one tap away in the drawer.
       </p>
       <div className="space-y-3">
         {sources.map((s) => {
@@ -708,7 +707,8 @@ function FilterStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        Who are you trying to import? Be specific — the AI uses this to rank everything we pull from your sources next.
+        Who are you trying to import? Be specific — AI uses this to pick your best
+        20 from everything we pull next. The rest stay accessible in the drawer.
       </p>
       <textarea
         value={filterText}
@@ -865,14 +865,14 @@ function GatherStep({
           {ranking ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Ranking with AI…
+              Finding your best matches…
             </>
           ) : draftsCount === 0 ? (
             'Pull from at least one source'
           ) : (
             <>
               <Sparkles className="w-4 h-4" strokeWidth={1.75} />
-              {`Rank ${draftsCount} & review`}
+              {`Find best matches from ${draftsCount}`}
             </>
           )}
         </button>
@@ -978,7 +978,7 @@ function ReviewStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        {rankFailed ? `${aliveCount} pulled` : `AI-ranked top ${Math.min(TOP_N, visibleCandidates.length)} of ${aliveCount}`}.
+        {rankFailed ? `${aliveCount} pulled` : `AI's top ${Math.min(TOP_N, visibleCandidates.length)} of ${aliveCount}`}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}
@@ -992,7 +992,7 @@ function ReviewStep({
         >
           <RotateCcw className={cn('w-3.5 h-3.5 text-primary shrink-0', ranking && 'animate-spin')} strokeWidth={1.75} />
           <span className="text-left flex-1 leading-snug">
-            <span className="font-semibold text-foreground">AI ranking didn't come back.</span>{' '}
+            <span className="font-semibold text-foreground">AI couldn't surface best matches.</span>{' '}
             Showing everyone in import order — tap to retry.
           </span>
         </button>

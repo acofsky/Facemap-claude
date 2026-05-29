@@ -47,6 +47,33 @@ const Index = () => {
     return () => unsubscribe?.();
   }, []);
 
+  // Smart Import takes over the viewport when open — same wrapper as the
+  // detail pages so the safe-area gradient and edge-swipe-back behave
+  // identically. Routing this above selectedPersonId so the new-Person
+  // route fires after we close the wizard.
+  if (importOpen) {
+    return (
+      <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+          style={{
+            height: 'calc(env(safe-area-inset-top) + 24px)',
+            background:
+              'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+          }}
+        />
+        <ImportPage
+          onClose={() => setImportOpen(false)}
+          onSelectPerson={(id) => {
+            setImportOpen(false);
+            setSelectedPersonId(id);
+          }}
+        />
+      </div>
+    );
+  }
+
   // Detail pages are exclusive — fullscreen overlays that suspend the tab UI.
   if (selectedPersonId) {
     return (
@@ -140,15 +167,6 @@ const Index = () => {
           <QuickAddSheet variant="end-of-day" onClose={() => setEodSheetOpen(false)} />
         )}
       </AnimatePresence>
-      {importOpen && (
-        <ImportPage
-          onClose={() => setImportOpen(false)}
-          onSelectPerson={(id) => {
-            setImportOpen(false);
-            setSelectedPersonId(id);
-          }}
-        />
-      )}
     </>
   );
 };

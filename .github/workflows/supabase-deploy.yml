@@ -51,3 +51,4 @@ jobs:
           supabase functions deploy recall-search
           supabase functions deploy delete-account
           supabase functions deploy parse-voice-input
+          supabase functions deploy rank-import-candidates

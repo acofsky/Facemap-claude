@@ -18,7 +18,7 @@ export function SpreadsheetHowToModal({ open, onClose }: SpreadsheetHowToModalPr
         We'll route it automatically:
       </p>
       <ul className="list-disc list-inside text-[12px] space-y-1">
-        <li><span className="text-foreground">CSV / TSV / Excel (.xlsx):</span> first row should be column headers, each row after is one person. We auto-detect Name, Email, Phone, Company, Title; every other column (Notes, "Last conversation," etc.) flows into the AI ranker as context.</li>
+        <li><span className="text-foreground">CSV / TSV / Excel (.xlsx):</span> first row should be column headers, each row after is one person. We auto-detect Name, Email, Phone, Company, Title; every other column (Notes, "Last conversation," etc.) becomes context AI uses to pick your best matches.</li>
         <li><span className="text-foreground">Photo:</span> AI reads visible names from badges, captions, slides. No face recognition — only people whose name is written somewhere in the frame.</li>
         <li><span className="text-foreground">PDF:</span> coming soon.</li>
       </ul>
