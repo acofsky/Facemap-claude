@@ -93,6 +93,26 @@ export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
   return data || [];
 }
 
+/**
+ * Collect the iOS contact_ids that are currently sitting in import_candidates
+ * (any state — pending, promoted, or dismissed). Used by the Contacts source
+ * to skip contacts the user has already imported in a previous session
+ * instead of silently re-pulling them and watching them get dedup'd later.
+ */
+export async function fetchKnownContactIds(): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('import_candidates')
+    .select('raw')
+    .eq('source', 'contacts');
+  if (error) throw error;
+  const ids = new Set<string>();
+  for (const row of data || []) {
+    const cid = (row.raw as { contact_id?: unknown } | null)?.contact_id;
+    if (typeof cid === 'string' && cid) ids.add(cid);
+  }
+  return ids;
+}
+
 export async function fetchSessionCandidates(sessionId: string): Promise<ImportCandidateRow[]> {
   const { data, error } = await supabase
     .from('import_candidates')

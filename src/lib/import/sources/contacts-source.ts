@@ -1,7 +1,13 @@
 import { Contacts, type ContactPayload } from '@capacitor-community/contacts';
 import { supabase } from '@/integrations/supabase/client';
 import { isNativeIOS } from '@/lib/ios-contacts';
+import { fetchKnownContactIds } from '../storage';
 import type { CandidateDraft, MappedPersonFields } from '../types';
+
+export interface ContactsGatherStats {
+  totalRead: number;
+  alreadyKnown: number;
+}
 
 /**
  * Read every contact the user grants permission to and turn them into
@@ -15,7 +21,7 @@ import type { CandidateDraft, MappedPersonFields } from '../types';
  */
 export async function gatherContactsCandidates(opts?: {
   onProgress?: (loaded: number) => void;
-}): Promise<CandidateDraft[]> {
+}): Promise<{ drafts: CandidateDraft[]; stats: ContactsGatherStats }> {
   if (!isNativeIOS()) {
     throw new Error('Contacts import is only available in the iOS app.');
   }
@@ -42,10 +48,20 @@ export async function gatherContactsCandidates(opts?: {
   });
 
   const contacts = (result?.contacts || []) as ContactPayload[];
+  // Contacts the user has already pulled in a previous session (still
+  // pending, promoted, or dismissed). Skipping these is what saves the
+  // "Pulled 0 contacts" mystery toast — the user already imported them,
+  // we shouldn't silently re-add or quietly drop.
+  const knownContactIds = await fetchKnownContactIds().catch(() => new Set<string>());
   const drafts: CandidateDraft[] = [];
+  let alreadyKnown = 0;
 
   for (let i = 0; i < contacts.length; i++) {
     const c = contacts[i];
+    if (c.contactId && knownContactIds.has(c.contactId)) {
+      alreadyKnown++;
+      continue;
+    }
     const name =
       c.name?.display ||
       [c.name?.given, c.name?.middle, c.name?.family].filter(Boolean).join(' ') ||
@@ -119,7 +135,13 @@ export async function gatherContactsCandidates(opts?: {
   }
 
   opts?.onProgress?.(drafts.length);
-  return drafts;
+  return {
+    drafts,
+    stats: {
+      totalRead: contacts.length,
+      alreadyKnown,
+    },
+  };
 }
 
 function formatBirthday(b: ContactPayload['birthday']): string | undefined {

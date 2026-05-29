@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { isNativeIOS } from '@/lib/ios-contacts';
 import { ImportCandidateRow as ImportCandidateRowComponent } from '@/components/import/ImportCandidateRow';
 import { ImportCandidateReviewSheet } from '@/components/import/ImportCandidateReviewSheet';
+import { InfoModal } from '@/components/InfoModal';
 import { LinkedInHowToModal } from '@/components/import/LinkedInHowToModal';
 import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal';
 import { RankResultModal } from '@/components/import/RankResultModal';
@@ -72,6 +73,9 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [contactsResultModal, setContactsResultModal] = useState<
+    { totalRead: number; alreadyKnown: number } | null
+  >(null);
   const [rankModal, setRankModal] = useState<{ kind: 'no-matches' } | null>(null);
   // When the AI ranking call itself fails (network blip, edge function
   // timeout, etc) we still show the candidates — but a slim banner on the
@@ -134,10 +138,25 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     setGathering('contacts');
     setGatherProgress(0);
     try {
-      const got = await gatherContactsCandidates({ onProgress: setGatherProgress });
+      const { drafts: got, stats } = await gatherContactsCandidates({ onProgress: setGatherProgress });
       setDrafts((d) => [...d, ...got]);
       setCompletedSources((s) => new Set(s).add('contacts'));
-      toast.success(`Pulled ${got.length} contacts`);
+
+      // 0 new can happen two ways: nothing in iOS Contacts at all, or
+      // everything was already imported in a previous session. Toasts
+      // are too easy to miss when there's actual context to convey, so
+      // surface this as an InfoModal explaining what happened.
+      if (got.length === 0) {
+        setContactsResultModal({
+          totalRead: stats.totalRead,
+          alreadyKnown: stats.alreadyKnown,
+        });
+      } else {
+        const skipNote = stats.alreadyKnown > 0
+          ? ` · ${stats.alreadyKnown} already imported`
+          : '';
+        toast.success(`Pulled ${got.length} contacts${skipNote}`);
+      }
     } catch (e) {
       if ((e as Error).message === 'PERMISSION_DENIED') {
         toast.error('Contacts permission denied. Open Settings → Membr → Contacts.');
@@ -534,6 +553,34 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       />
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />
+
+      <InfoModal
+        open={!!contactsResultModal}
+        title={
+          (contactsResultModal?.totalRead ?? 0) === 0
+            ? 'No contacts found'
+            : 'Already imported'
+        }
+        onClose={() => setContactsResultModal(null)}
+      >
+        {(contactsResultModal?.totalRead ?? 0) === 0 ? (
+          <p>
+            iOS didn't return any contacts. If your Contacts app has people in
+            it, check <span className="text-foreground">Settings → Membr → Contacts</span> — if
+            you granted "Limited" access, no contacts were selected.
+          </p>
+        ) : (
+          <>
+            <p>
+              All {contactsResultModal?.totalRead} of your iOS contacts were already
+              pulled in a previous import. Nothing new to add this time.
+            </p>
+            <p className="text-[12px] text-[hsl(var(--foreground)/0.55)]">
+              Existing imports are still waiting on the People page → "Pending imports".
+            </p>
+          </>
+        )}
+      </InfoModal>
       <SpreadsheetHowToModal open={spreadsheetHowTo} onClose={() => setSpreadsheetHowTo(false)} />
 
       <RankResultModal

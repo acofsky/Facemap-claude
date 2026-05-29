@@ -50,7 +50,7 @@ export function ConfirmDialog({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/70"
+            className="fixed inset-0 z-[80] bg-black/70"
             onClick={loading ? undefined : onCancel}
           />
           <motion.div
@@ -65,7 +65,7 @@ export function ConfirmDialog({
             animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
             exit={{ opacity: 0, scale: 0.94, x: '-50%', y: '-50%' }}
             transition={{ type: 'spring', damping: 24, stiffness: 360 }}
-            className="fixed left-1/2 top-1/2 z-[61] w-[min(86vw,360px)] rounded-xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-5"
+            className="fixed left-1/2 top-1/2 z-[81] w-[min(86vw,360px)] rounded-xl bg-surface-2 border border-[hsl(0_0%_100%/0.12)] p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-xl text-foreground tracking-[-0.02em]">
