@@ -68,17 +68,21 @@ export async function rankCandidates(
       }
     });
   }
-  // Surface ANY chunk failure to the caller. Partial failures used to be
-  // silently swallowed — Promise.allSettled would catch the rejection,
-  // log it, and let the wave continue. The candidates in the failed
-  // chunk would end up with null ai_relevance_score, sorting to the
-  // bottom of the list, and the user would see "AI worked!" because
-  // some chunks succeeded — but their highest-signal contacts had
-  // vanished into the bottom. Better: throw so the failure banner
-  // fires and the user can retry. If retries keep failing, the issue
-  // surfaces immediately instead of degrading silently.
+  // Tolerate partial failures. The previous commit threw if ANY chunk
+  // failed, which sounded clean but in practice meant 1 timeout out of
+  // 10 chunks tanked the whole batch's results — even though 9 chunks
+  // worth of contacts had been ranked perfectly. iOS WebView fetches
+  // sometimes give up on slow chunks before Haiku 4.5 finishes
+  // streaming, which presents as an isolated rejection inside an
+  // otherwise-healthy run. The successful chunks' candidates keep
+  // their real scores and surface at the top; failed chunks' candidates
+  // keep null score and sort to the bottom (orderBy nullsFirst:false).
+  // Only throw if absolutely nothing came back — that's a real outage.
+  if (failedChunks > 0 && all.length === 0) {
+    throw new Error(`All ${chunks.length} ranking chunks failed`);
+  }
   if (failedChunks > 0) {
-    throw new Error(`${failedChunks}/${chunks.length} ranking chunks failed`);
+    console.warn(`${failedChunks}/${chunks.length} rank chunks failed; ${all.length} candidates have real scores, the rest sort unranked at the bottom`);
   }
   return all;
 }
