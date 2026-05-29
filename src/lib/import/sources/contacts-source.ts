@@ -37,6 +37,7 @@ export async function gatherContactsCandidates(opts?: {
       note: true,
       urls: true,
       birthday: true,
+      postalAddresses: true,
     },
   });
 
@@ -51,15 +52,29 @@ export async function gatherContactsCandidates(opts?: {
       '';
     if (!name.trim()) continue;
 
-    const email = c.emails?.[0]?.address || undefined;
-    const phone = c.phones?.[0]?.number || undefined;
+    const phones = (c.phones || [])
+      .map((p) => ({ number: (p?.number || '').trim(), label: friendlyLabel(p?.label, p?.type) }))
+      .filter((p) => p.number);
+    const emails = (c.emails || [])
+      .map((e) => ({ address: (e?.address || '').trim(), label: friendlyLabel(e?.label, e?.type) }))
+      .filter((e) => e.address);
+    const urls = (c.urls || [])
+      .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+      .map((u) => u.trim());
+    const addresses = (c.postalAddresses || [])
+      .map((a) => ({ label: friendlyLabel(a?.label, a?.type), formatted: formatAddress(a) }))
+      .filter((a) => a.formatted);
+
     const company = c.organization?.company || undefined;
     const title = c.organization?.jobTitle || undefined;
     const note = (c.note || '').trim();
-    const urls = (c.urls || [])
-      .map((u) => (u?.url || '').trim())
-      .filter(Boolean);
     const birthday = formatBirthday(c.birthday);
+
+    // First phone + email become the structured columns (used by dedupe
+    // against existing People). Everything past the first lives in
+    // Background, prefixed with its label so the user can tell them apart.
+    const phone = phones[0]?.number;
+    const email = emails[0]?.address;
 
     let photoPath: string | undefined;
     const b64 = c.image?.base64String;
@@ -67,13 +82,23 @@ export async function gatherContactsCandidates(opts?: {
       photoPath = await uploadContactsPhoto(b64).catch(() => undefined);
     }
 
-    // Promote-time field mapping. Note → About; URLs + birthday tack
-    // onto Background so they're visible but don't crowd About.
+    // Promote-time field mapping. Note → About; everything structured
+    // that isn't already covered by a top-level column gets tacked onto
+    // Background so it's visible without crowding About.
     const mappedFields: MappedPersonFields = {};
     if (note) mappedFields.misc_notes = note;
     const backgroundParts: string[] = [];
     if (birthday) backgroundParts.push(`Birthday: ${birthday}`);
+    phones.slice(1).forEach((p) => {
+      backgroundParts.push(p.label ? `${p.label}: ${p.number}` : `Phone: ${p.number}`);
+    });
+    emails.slice(1).forEach((e) => {
+      backgroundParts.push(e.label ? `${e.label} email: ${e.address}` : `Email: ${e.address}`);
+    });
     urls.forEach((u) => backgroundParts.push(`URL: ${u}`));
+    addresses.forEach((a) => {
+      backgroundParts.push(a.label ? `${a.label} address: ${a.formatted}` : `Address: ${a.formatted}`);
+    });
     if (backgroundParts.length > 0) {
       mappedFields.important_info = backgroundParts.join('\n');
     }
@@ -103,6 +128,33 @@ function formatBirthday(b: ContactPayload['birthday']): string | undefined {
   const day = b.day ? String(b.day).padStart(2, '0') : null;
   if (!month || !day) return undefined;
   return b.year ? `${b.year}-${month}-${day}` : `${month}-${day}`;
+}
+
+function formatAddress(a: NonNullable<ContactPayload['postalAddresses']>[number] | undefined): string {
+  if (!a) return '';
+  const parts = [
+    a.street,
+    a.neighborhood,
+    [a.city, a.region].filter(Boolean).join(', '),
+    a.postcode,
+    a.country,
+  ]
+    .map((p) => (p || '').trim())
+    .filter(Boolean);
+  return parts.join(', ');
+}
+
+/** Normalize a contact field label ("Mobile", "Work", "Home") for display. */
+function friendlyLabel(
+  label: string | null | undefined,
+  type: string | null | undefined,
+): string | undefined {
+  const raw = (label || type || '').trim();
+  if (!raw) return undefined;
+  // Capacitor returns iOS's CNLabel constants like "_$!<Work>!$_" or
+  // "_$!<Mobile>!$_" verbatim. Strip the wrapper and title-case.
+  const cleaned = raw.replace(/^_\$!<|>!\$_$/g, '').replace(/[_]/g, ' ').trim();
+  return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase() : undefined;
 }
 
 async function uploadContactsPhoto(base64: string): Promise<string | undefined> {
