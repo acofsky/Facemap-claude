@@ -83,34 +83,41 @@ export async function updateCandidateRanking(
 }
 
 export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
+  // Supabase's default fetch cap is 1000 rows. With users testing imports
+  // multiple times against large Contacts books, 1k is easy to exceed,
+  // and the truncated list would silently hide entries from the pending
+  // sheet (and from any bulk action that iterated client-side). Explicit
+  // higher limit; the API still pages further if needed.
   const { data, error } = await supabase
     .from('import_candidates')
     .select('*')
     .eq('promoted', false)
     .eq('dismissed', false)
-    .order('ai_relevance_score', { ascending: false, nullsFirst: false });
+    .order('ai_relevance_score', { ascending: false, nullsFirst: false })
+    .limit(5000);
   if (error) throw error;
   return data || [];
 }
 
 /**
- * Collect the iOS contact_ids that are LIVE in import_candidates — either
- * already promoted to a Person or still waiting in pending review. Used
- * by the Contacts source to skip those instead of silently re-pulling
- * them and dedup'ing downstream.
+ * Collect the iOS contact_ids that should be skipped on the next Read
+ * Contacts pass — either already promoted to a Person, or still waiting
+ * in pending review. Dismissed candidates are intentionally re-importable
+ * (when the user runs Clear All they want the chance to re-evaluate).
  *
- * Dismissed candidates are intentionally NOT counted: when the user
- * Clear-Alls their pending list, they want the option to re-pull the
- * same contacts later and re-evaluate. Filtering them out here would
- * leave Read Contacts forever returning zero new for everyone they'd
- * ever dismissed.
+ * Single-condition filter `dismissed = false` covers both wanted states
+ * (promoted-and-not-dismissed, plus pending) without the PostgREST
+ * `or(...,and(...))` syntax that the previous version used. The nested
+ * form is supported but easy to get wrong, and getting it wrong silently
+ * turns every contact into "already known" — which is the bug we're
+ * here to fix.
  */
 export async function fetchKnownContactIds(): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('import_candidates')
-    .select('raw, promoted, dismissed')
+    .select('raw')
     .eq('source', 'contacts')
-    .or('promoted.eq.true,and(promoted.eq.false,dismissed.eq.false)');
+    .eq('dismissed', false);
   if (error) throw error;
   const ids = new Set<string>();
   for (const row of data || []) {
