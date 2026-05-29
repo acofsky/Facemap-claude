@@ -82,6 +82,12 @@ serve(async (req) => {
     const filterText = (reqBody.filter_text || "").trim();
     const candidates = Array.isArray(reqBody.candidates) ? reqBody.candidates : [];
 
+    // Diagnostic — every successful request logs a one-liner so the
+    // Supabase function logs show actual traffic. Without this the only
+    // visible events are boot/shutdown and we can't tell whether the
+    // function ran at all when the client reports a failure.
+    console.log(`rank request: ${candidates.length} candidates, filter="${filterText.slice(0, 60)}"`);
+
     if (candidates.length === 0) {
       return new Response(JSON.stringify({ ranked: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -159,6 +165,8 @@ serve(async (req) => {
       .trim();
 
     const ranked = parseRanked(text, candidates);
+    const neutralCount = ranked.filter((r) => r.score === 0.5 && r.rationale === "").length;
+    console.log(`rank complete: ${ranked.length} ranked, ${neutralCount} fell back to neutral`);
 
     return new Response(JSON.stringify({ ranked }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

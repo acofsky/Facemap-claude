@@ -20,16 +20,14 @@ interface RankResponse {
   ranked: Array<{ id: string; score: number; rationale: string; bullets: string[] }>;
 }
 
-// 25 candidates per chunk balances three constraints: per-call JSON
-// output fits well under the 16k max_tokens ceiling, the iOS WebView's
-// ~60-second fetch timeout doesn't bite (50 was too risky — at ~200
-// tokens output per row × 50 candidates × Haiku 4.5's streaming speed,
-// chunks routinely passed the 60s mark and got silently dropped by
-// Promise.allSettled, leaving whole chunks of contacts unranked), and
-// the system prompt's "score absolutely, not relatively" instruction
-// works fine at this batch size — we don't need huge anchor sets per
-// call as long as the model honors the absolute bands.
-const CHUNK_SIZE = 25;
+// 15 candidates per chunk. CHUNK_SIZE=25 was still producing failures
+// in the field — at ~300 output tokens per row (the richer prompt
+// produces longer rationales) × 25 = ~7.5k tokens, Haiku 4.5's
+// streaming runtime was hitting the iOS WebView's ~60s fetch ceiling
+// on some chunks. Halving to 15 keeps each request under ~30s in the
+// worst case, well clear of any timeout. More smaller chunks is fine
+// since they run in parallel waves of MAX_CONCURRENT_CHUNKS anyway.
+const CHUNK_SIZE = 15;
 // Fan-out cap for parallel chunks. Anthropic's default tier accepts 50
 // concurrent requests; keeping the limit lower than that avoids stepping
 // on other AI features (briefs, photo-describe, voice-parse) that share
