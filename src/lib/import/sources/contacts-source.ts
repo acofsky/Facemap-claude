@@ -14,10 +14,9 @@ export interface ContactsGatherStats {
  * CandidateDrafts. Photos (if present) are uploaded to the person-photos
  * bucket under the user's folder so the draft can carry a persistent path.
  *
- * Notes from iOS Contacts' free-form `note` field carry the highest signal
- * for "who is this person to me" (it's where users typically jot how they
- * met, what they talked about, etc.). We map that straight onto
- * Person.misc_notes so it surfaces in About after promote.
+ * NOTE: The iOS Contacts `note` field is deliberately NOT projected — see
+ * the inline comment on the projection block below. Apple's per-app
+ * entitlement for that key is a separate request to Apple.
  */
 export async function gatherContactsCandidates(opts?: {
   onProgress?: (loaded: number) => void;
@@ -37,13 +36,17 @@ export async function gatherContactsCandidates(opts?: {
       emails: true,
       organization: true,
       image: true,
-      // Free-form note field — where iOS Contacts puts everything that
-      // doesn't fit anywhere else, including how-met and conversation
-      // history. Worth more for ranking than name+phone combined.
-      note: true,
       urls: true,
       birthday: true,
       postalAddresses: true,
+      // `note: true` is intentionally OFF. iOS 13+ gates CNContactNoteKey
+      // behind the `com.apple.developer.contacts.notes` entitlement;
+      // requesting it without the entitlement makes CNContactStore throw
+      // CNError.policyViolation, which the plugin (Contacts.swift:97-99)
+      // silently catches — the user sees "0 contacts" with no obvious
+      // cause. To enable: request the entitlement at
+      // https://developer.apple.com/contact/request/contact-notes/, add
+      // it to ios/App/App/App.entitlements, then flip this flag.
     },
   });
 
@@ -83,7 +86,6 @@ export async function gatherContactsCandidates(opts?: {
 
     const company = c.organization?.company || undefined;
     const title = c.organization?.jobTitle || undefined;
-    const note = (c.note || '').trim();
     const birthday = formatBirthday(c.birthday);
 
     // First phone + email become the structured columns (used by dedupe
@@ -98,11 +100,10 @@ export async function gatherContactsCandidates(opts?: {
       photoPath = await uploadContactsPhoto(b64).catch(() => undefined);
     }
 
-    // Promote-time field mapping. Note → About; everything structured
-    // that isn't already covered by a top-level column gets tacked onto
-    // Background so it's visible without crowding About.
+    // Promote-time field mapping. Everything structured that isn't already
+    // covered by a top-level column gets tacked onto Background so it's
+    // visible without crowding About.
     const mappedFields: MappedPersonFields = {};
-    if (note) mappedFields.misc_notes = note;
     const backgroundParts: string[] = [];
     if (birthday) backgroundParts.push(`Birthday: ${birthday}`);
     phones.slice(1).forEach((p) => {
