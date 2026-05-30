@@ -46,6 +46,7 @@ export async function promoteCandidate(
     important_info: background,
     how_we_met: overrides?.fieldOverrides?.how_we_met ?? mapped.how_we_met ?? undefined,
     where_when: overrides?.fieldOverrides?.where_when ?? mapped.where_when ?? undefined,
+    date_met: overrides?.fieldOverrides?.date_met ?? undefined,
     physical_description:
       overrides?.fieldOverrides?.physical_description
       ?? mapped.physical_description ?? undefined,

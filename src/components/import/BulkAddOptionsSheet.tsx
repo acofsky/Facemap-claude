@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, X } from 'lucide-react';
 import { MembershipChips } from '@/components/MembershipChips';
+import { CircleSheet } from '@/components/CircleSheet';
+import { EventSheet } from '@/components/EventSheet';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { useCircles, useEvents } from '@/hooks/use-data';
 
@@ -31,6 +33,8 @@ export function BulkAddOptionsSheet({
   const { data: events = [] } = useEvents({ includeArchived: false });
   const [circleIds, setCircleIds] = useState<string[]>([]);
   const [eventIds, setEventIds] = useState<string[]>([]);
+  const [createCircleOpen, setCreateCircleOpen] = useState(false);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
 
   if (!open) return null;
 
@@ -76,20 +80,33 @@ export function BulkAddOptionsSheet({
             Matches against existing People still merge into their existing entry;
             the selected memberships get added on top of whatever they already have.
           </p>
-          {circles.length === 0 && events.length === 0 ? (
-            <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.5)] mt-4">
-              No Circles or Events yet. Create one from the Network tab if you want to use this.
-            </p>
-          ) : (
-            <MembershipChips
-              circles={circles}
-              events={events}
-              selectedCircleIds={circleIds}
-              selectedEventIds={eventIds}
-              onCircleChange={setCircleIds}
-              onEventChange={setEventIds}
-            />
-          )}
+          <MembershipChips
+            circles={circles}
+            events={events}
+            selectedCircleIds={circleIds}
+            selectedEventIds={eventIds}
+            onCircleChange={setCircleIds}
+            onEventChange={setEventIds}
+            emptyMessage="No Circles or Events yet — create your first one below."
+          />
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setCreateCircleOpen(true)}
+              className="glass-pill !h-8 !px-3 text-[12px] text-[hsl(var(--foreground)/0.7)] inline-flex items-center gap-1 active:scale-[0.96] transition-transform"
+            >
+              <Plus className="w-3 h-3" strokeWidth={2} />
+              New Circle
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateEventOpen(true)}
+              className="glass-pill !h-8 !px-3 text-[12px] text-[hsl(var(--foreground)/0.7)] inline-flex items-center gap-1 active:scale-[0.96] transition-transform"
+            >
+              <Plus className="w-3 h-3" strokeWidth={2} />
+              New Event
+            </button>
+          </div>
         </div>
         <div className="px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom flex items-center gap-2">
           <button
@@ -109,6 +126,25 @@ export function BulkAddOptionsSheet({
           </button>
         </div>
       </motion.div>
+
+      {createCircleOpen && (
+        <CircleSheet
+          onClose={(result) => {
+            setCreateCircleOpen(false);
+            // Auto-select the newly created circle in the bulk picker
+            // so the user doesn't have to find and tap it again after
+            // dismissing the create sheet.
+            if (result && 'id' in result) {
+              setCircleIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
+            }
+          }}
+        />
+      )}
+      {createEventOpen && (
+        <EventSheet
+          onClose={() => setCreateEventOpen(false)}
+        />
+      )}
     </AnimatePresence>
   );
 }

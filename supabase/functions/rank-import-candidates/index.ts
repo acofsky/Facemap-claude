@@ -339,11 +339,19 @@ function recoverPartialRanked(text: string): unknown[] {
   return out;
 }
 
-function neutral(c: Candidate): RankedCandidate {
+function neutral(_c: Candidate): RankedCandidate {
   return {
-    id: c.id,
-    score: 0.5,
-    rationale: "",
-    bullets: [c.name].filter(Boolean),
+    id: _c.id,
+    // 0.0 (not 0.5) so unscored candidates sort to the bottom rather
+    // than mid-pack — the previous 0.5 was treating "we have no info"
+    // as "definitely middle", which let candidates with NO real AI
+    // signal sneak into the top N alongside genuine matches.
+    score: 0.0,
+    rationale: "Unscored — AI didn't classify this candidate",
+    // Empty bullets so the About field on a promoted Person stays
+    // empty (well, with just the "Imported from X" provenance line).
+    // Was previously [c.name], which made the literal name show up
+    // as a bullet on every silently-failed candidate.
+    bullets: [],
   };
 }

@@ -109,11 +109,27 @@ export async function deletePerson(id: string): Promise<void> {
   // historical migrations, so a bare delete on `persons` can fail when the
   // person is in any circle, event, meeting, or connection. Match the
   // pattern already used in deleteCircle().
+  //
+  // Also un-mark any import_candidates that point at this person — they
+  // were marked promoted=true when this Person was created, and the
+  // Contacts dedupe in smart import treats promoted candidates as
+  // "already imported" and skips re-pulling them. Without this step,
+  // deleting a person from Membr leaves the contact stuck off-limits
+  // for re-import — the user has to dismiss-and-restart instead of
+  // just re-pulling.
   await Promise.all([
     supabase.from('person_circles').delete().eq('person_id', id),
     supabase.from('person_events').delete().eq('person_id', id),
     supabase.from('meetings').delete().eq('person_id', id),
     supabase.from('connections').delete().or(`person_a_id.eq.${id},person_b_id.eq.${id}`),
+    // Mark the candidate dismissed (not pending) so it falls out of the
+    // Contacts dedupe set AND doesn't re-surface in the Pending Imports
+    // drawer. Re-running Read Contacts after the person is deleted will
+    // pull this contact fresh as a brand-new candidate.
+    supabase
+      .from('import_candidates')
+      .update({ promoted: false, dismissed: true, promoted_person_id: null })
+      .eq('promoted_person_id', id),
   ]);
   const { error } = await supabase.from('persons').delete().eq('id', id);
   if (error) throw error;

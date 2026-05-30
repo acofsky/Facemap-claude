@@ -20,7 +20,7 @@ import { PersonEditPage } from '@/pages/PersonEditPage';
 import {
   ArrowLeft, CalendarPlus, Info, Loader2, MapPin, Pencil, Sparkles, Trash2,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 import { friendlyError } from '@/lib/errors';
@@ -163,7 +163,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
           </div>
         )}
 
-        {(person.how_we_met || person.where_when) && (
+        {(person.how_we_met || person.where_when || person.date_met) && (
           <div className="text-center mt-3 space-y-0.5 max-w-xs">
             {person.how_we_met && (
               <p className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.65)] leading-snug">{person.how_we_met}</p>
@@ -171,6 +171,18 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
             {person.where_when && (
               <p className="text-[13px] text-muted-text inline-flex items-center gap-1 leading-snug">
                 <MapPin className="w-3 h-3" strokeWidth={1.75} /> {person.where_when}
+              </p>
+            )}
+            {person.date_met && (
+              <p className="text-[12px] text-[hsl(var(--foreground)/0.55)] inline-flex items-center gap-1 leading-snug">
+                <CalendarPlus className="w-3 h-3" strokeWidth={1.75} /> Met{' '}
+                {(() => {
+                  try {
+                    return format(parseISO(person.date_met), 'MMM d, yyyy');
+                  } catch {
+                    return person.date_met;
+                  }
+                })()}
               </p>
             )}
           </div>
