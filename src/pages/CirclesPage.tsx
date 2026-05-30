@@ -6,6 +6,7 @@ import {
   useArchiveEvent, useDeleteCircle, useDeleteEvent,
 } from '@/hooks/use-data';
 import { CircleSheet } from '@/components/CircleSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EventSheet } from '@/components/EventSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CircleTileSkeleton, EventTileSkeleton } from '@/components/skeletons';
@@ -43,6 +44,13 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
   const archiveEvt = useArchiveEvent();
   const deleteCircle = useDeleteCircle();
   const deleteEvent = useDeleteEvent();
+  // Destructive-action confirmation state. Native window.confirm() was
+  // too easy to dismiss-by-reflex on iOS — a stray tap could delete a
+  // circle. Routing through the in-app ConfirmDialog (which uses the
+  // standard destructive variant with explicit Keep/Delete buttons)
+  // forces a deliberate confirmation.
+  const [deleteCircleConfirm, setDeleteCircleConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [deleteEventConfirm, setDeleteEventConfirm] = useState<{ id: string; name: string } | null>(null);
   const createCircle = useCreateCircle();
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -324,10 +332,9 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
                   destructive
                   label="Delete"
                   onClick={async () => {
+                    const c = circles.find((x) => x.id === tileMenu.id);
                     setTileMenu(null);
-                    if (confirm('Delete this Circle? People will not be removed from Membr.')) {
-                      await deleteCircle.mutateAsync(tileMenu.id);
-                    }
+                    if (c) setDeleteCircleConfirm({ id: c.id, name: c.name });
                   }}
                 />
               </>
@@ -355,10 +362,9 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
                   destructive
                   label="Delete"
                   onClick={async () => {
+                    const evt = events.find((x) => x.id === tileMenu.id) || archivedEvents.find((x) => x.id === tileMenu.id);
                     setTileMenu(null);
-                    if (confirm('Delete this Event? Members stay in your Membr.')) {
-                      await deleteEvent.mutateAsync(tileMenu.id);
-                    }
+                    if (evt) setDeleteEventConfirm({ id: evt.id, name: evt.name });
                   }}
                 />
               </>
@@ -366,6 +372,40 @@ export function CirclesPage({ onSelectCircle, onSelectEvent, embedded = false }:
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteCircleConfirm}
+        title={deleteCircleConfirm ? `Delete "${deleteCircleConfirm.name}"?` : ''}
+        description="The circle is removed and its people lose this grouping — but the people themselves stay in your Membr."
+        confirmLabel="Delete circle"
+        cancelLabel="Keep"
+        destructive
+        loading={deleteCircle.isPending}
+        loadingLabel="Deleting"
+        onConfirm={async () => {
+          if (!deleteCircleConfirm) return;
+          await deleteCircle.mutateAsync(deleteCircleConfirm.id);
+          setDeleteCircleConfirm(null);
+        }}
+        onCancel={() => setDeleteCircleConfirm(null)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteEventConfirm}
+        title={deleteEventConfirm ? `Delete "${deleteEventConfirm.name}"?` : ''}
+        description="The event is removed and its attendees lose this grouping — but the people themselves stay in your Membr."
+        confirmLabel="Delete event"
+        cancelLabel="Keep"
+        destructive
+        loading={deleteEvent.isPending}
+        loadingLabel="Deleting"
+        onConfirm={async () => {
+          if (!deleteEventConfirm) return;
+          await deleteEvent.mutateAsync(deleteEventConfirm.id);
+          setDeleteEventConfirm(null);
+        }}
+        onCancel={() => setDeleteEventConfirm(null)}
+      />
     </div>
   );
 }

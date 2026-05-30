@@ -134,6 +134,12 @@ function canMergeWithoutConflict(a: CandidateDraft, b: CandidateDraft): boolean 
   const ae = emailLocal(a.email);
   const be = emailLocal(b.email);
   if (ae && be && ae !== be) return false;
+  // Different photos on same-name candidates is a strong "different
+  // people" signal — coincidental name+phone collisions happen, but
+  // two different photo uploads pointing at the same person almost
+  // never do. Refusing to merge prevents one candidate's photo from
+  // accidentally landing on the other's promoted Person.
+  if (a.photoPath && b.photoPath && a.photoPath !== b.photoPath) return false;
   return true;
 }
 
