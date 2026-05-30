@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, X } from 'lucide-react';
 import { MembershipChips } from '@/components/MembershipChips';
@@ -132,23 +133,31 @@ export function BulkAddOptionsSheet({
         </div>
       </motion.div>
 
-      {createCircleOpen && (
-        <CircleSheet
-          onClose={(result) => {
-            setCreateCircleOpen(false);
-            // Auto-select the newly created circle in the bulk picker
-            // so the user doesn't have to find and tap it again after
-            // dismissing the create sheet.
-            if (result && 'id' in result) {
-              setCircleIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
-            }
-          }}
-        />
+      {/* Portal the create sheets to <body> at z-80 so they stack ABOVE
+          this bulk sheet (z-71) — otherwise the bulk sheet sits on top and
+          the keyboard covers the create sheet's name input. Portaling also
+          frees their position:fixed from this transformed motion.div. */}
+      {createCircleOpen && createPortal(
+        <div className="relative z-[80]">
+          <CircleSheet
+            onClose={(result) => {
+              setCreateCircleOpen(false);
+              // Auto-select the newly created circle in the bulk picker
+              // so the user doesn't have to find and tap it again after
+              // dismissing the create sheet.
+              if (result && 'id' in result) {
+                setCircleIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
+              }
+            }}
+          />
+        </div>,
+        document.body,
       )}
-      {createEventOpen && (
-        <EventSheet
-          onClose={() => setCreateEventOpen(false)}
-        />
+      {createEventOpen && createPortal(
+        <div className="relative z-[80]">
+          <EventSheet onClose={() => setCreateEventOpen(false)} />
+        </div>,
+        document.body,
       )}
     </AnimatePresence>
   );

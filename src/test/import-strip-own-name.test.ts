@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripOwnName } from '@/lib/import/promote';
+import { stripOwnName, bulletDuplicatesStructured } from '@/lib/import/promote';
 
 describe('stripOwnName', () => {
   it('strips a leading self-name with " at " separator', () => {
@@ -41,5 +41,37 @@ describe('stripOwnName', () => {
     expect(stripOwnName('  Analyst at FTI  ', '')).toBe('Analyst at FTI');
     expect(stripOwnName('Analyst at FTI', null)).toBe('Analyst at FTI');
     expect(stripOwnName('Analyst at FTI', undefined)).toBe('Analyst at FTI');
+  });
+});
+
+describe('bulletDuplicatesStructured', () => {
+  it('flags a bullet that equals the company (ignoring case/punctuation)', () => {
+    expect(bulletDuplicatesStructured('M3 Consulting', { company: 'M3 Consulting' })).toBe(true);
+    expect(bulletDuplicatesStructured('m3 consulting', { company: 'M3 Consulting' })).toBe(true);
+    expect(bulletDuplicatesStructured('Alvarez & Marsal', { company: 'Alvarez & Marsal' })).toBe(true);
+  });
+
+  it('flags a bullet that equals the title', () => {
+    expect(bulletDuplicatesStructured('Managing Director', { title: 'Managing Director' })).toBe(true);
+  });
+
+  it('flags a bullet that equals "title at company"', () => {
+    expect(
+      bulletDuplicatesStructured('Analyst at FTI', { title: 'Analyst', company: 'FTI' }),
+    ).toBe(true);
+  });
+
+  it('does NOT flag a bullet with extra substance beyond the company', () => {
+    expect(
+      bulletDuplicatesStructured('Restructuring advisor at M3 Consulting', { company: 'M3 Consulting' }),
+    ).toBe(false);
+  });
+
+  it('does NOT flag when there is no structured company/title', () => {
+    expect(bulletDuplicatesStructured('M3 Consulting', {})).toBe(false);
+  });
+
+  it('does NOT flag an unrelated fact', () => {
+    expect(bulletDuplicatesStructured('Met at Berlin trip', { company: 'M3 Consulting' })).toBe(false);
   });
 });

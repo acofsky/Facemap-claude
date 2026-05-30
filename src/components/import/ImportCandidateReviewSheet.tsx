@@ -12,7 +12,7 @@ import { useCircles, useEvents } from '@/hooks/use-data';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { sourceLabel } from './sourceLabels';
-import { stripOwnName } from '@/lib/import/promote';
+import { stripOwnName, bulletDuplicatesStructured } from '@/lib/import/promote';
 import type { ImportCandidateRow, MappedPersonFields } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
 
@@ -109,12 +109,14 @@ function SheetBody({
   const initialAbout = useMemo(() => {
     if (mapped.misc_notes) return mapped.misc_notes;
     // Strip any leading self-name the model slipped into a bullet so the
-    // editable About doesn't show "[their own name] at [firm]".
+    // editable About doesn't show "[their own name] at [firm]", and drop
+    // bullets that merely restate the company/title shown in Background.
     const bullets = ((candidate.ai_bullets as string[] | null) || [])
       .map((b) => stripOwnName(b, candidate.name))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((b) => !bulletDuplicatesStructured(b, candidate));
     return bullets.join('\n');
-  }, [candidate.ai_bullets, candidate.name, mapped.misc_notes]);
+  }, [candidate, mapped.misc_notes]);
   const initialBackground = useMemo(() => {
     if (mapped.important_info) return mapped.important_info;
     const lines: string[] = [];

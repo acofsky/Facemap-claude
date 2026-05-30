@@ -181,6 +181,32 @@ export function stripOwnName(bullet: string, name: string | null | undefined): s
   return b;
 }
 
+/**
+ * True when an AI bullet merely restates structured data that already
+ * lands in the Background field (the candidate's company, title, or
+ * "title at company"). Those facts belong in Background, so echoing them
+ * in About is pure duplication — e.g. a contact whose only signal is
+ * company "M3 Consulting" would otherwise show "M3 Consulting" in BOTH
+ * About and Background. Domain-agnostic: compares normalized text, so it
+ * works for any field value, not any particular industry.
+ */
+export function bulletDuplicatesStructured(
+  bullet: string,
+  c: { company?: string | null; title?: string | null },
+): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const b = norm(bullet);
+  if (!b) return false;
+  const company = c.company ? norm(c.company) : '';
+  const title = c.title ? norm(c.title) : '';
+  const titleAtCompany = c.title && c.company ? norm(`${c.title} at ${c.company}`) : '';
+  return (
+    (!!company && b === company) ||
+    (!!title && b === title) ||
+    (!!titleAtCompany && b === titleAtCompany)
+  );
+}
+
 function composeAbout(
   c: ImportCandidateRow,
   overrides: PromoteOverrides | undefined,
@@ -201,10 +227,14 @@ function composeAbout(
   } else {
     // 3) fall back to AI-generated bullets when no mapped notes exist.
     // Strip any leading self-name the model slipped in so the saved
-    // About doesn't read "[their own name] at [firm]".
+    // About doesn't read "[their own name] at [firm]", and drop any bullet
+    // that just restates the company/title already headed to Background —
+    // otherwise a contact whose only signal is their company shows it in
+    // both fields.
     const aiBullets = ((c.ai_bullets as string[] | null) || [])
       .map((b) => stripOwnName(b, c.name))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((b) => !bulletDuplicatesStructured(b, c));
     aboutParts.push(...aiBullets);
   }
   aboutParts.push(`Imported from ${sourceLabel(c.source)}`);
