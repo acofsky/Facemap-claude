@@ -3,11 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { BulletTextarea } from '@/components/BulletTextarea';
+import { MembershipChips } from '@/components/MembershipChips';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { useCircles, useEvents } from '@/hooks/use-data';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
-import { isValidTone } from '@/lib/store';
 import { sourceLabel } from './sourceLabels';
 import type { ImportCandidateRow, MappedPersonFields } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
@@ -275,55 +275,15 @@ function SheetBody({
             <p className="text-[11px] text-[hsl(var(--foreground)/0.55)] mb-2 leading-snug">
               Drop them into any existing circles or events. Create new ones from the Network tab.
             </p>
-            {circles.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {circles.map((c) => {
-                  const on = circleIds.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setCircleIds((cur) =>
-                        on ? cur.filter((id) => id !== c.id) : [...cur, c.id],
-                      )}
-                      className={cn(
-                        'glass-pill !h-8 !px-3 text-[12px] active:scale-[0.96] transition-transform',
-                        on
-                          ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
-                          : 'text-[hsl(var(--foreground)/0.7)]',
-                      )}
-                    >
-                      {c.emoji ? `${c.emoji} ` : ''}{c.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {events.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {events.map((e) => {
-                  const on = eventIds.includes(e.id);
-                  const tone = isValidTone(e.tone) ? e.tone : 'red';
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => setEventIds((cur) =>
-                        on ? cur.filter((id) => id !== e.id) : [...cur, e.id],
-                      )}
-                      className={cn(
-                        'glass-pill !h-8 !px-3 text-[12px] active:scale-[0.96] transition-transform',
-                        on && tone !== 'red'
-                          ? `tile-${tone} text-white !border-transparent`
-                          : on
-                            ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
-                            : 'text-[hsl(var(--foreground)/0.7)]',
-                      )}
-                    >
-                      {e.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <MembershipChips
+              circles={circles}
+              events={events}
+              selectedCircleIds={circleIds}
+              selectedEventIds={eventIds}
+              onCircleChange={setCircleIds}
+              onEventChange={setEventIds}
+              compact
+            />
           </FieldLabel>
         )}
       </div>

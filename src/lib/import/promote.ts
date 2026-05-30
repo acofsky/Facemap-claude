@@ -74,10 +74,16 @@ export async function promoteCandidate(
  * Merge a candidate into an EXISTING person — pulls in bullets/photo
  * without overwriting fields the user has already filled. Used when the
  * dedupe check matches an incoming stub against someone already in People.
+ *
+ * When `extraCircleIds` / `extraEventIds` are provided (typically from a
+ * bulk-add path), those memberships are ADDED on top of the existing
+ * person's current memberships rather than replacing them. Per-row
+ * additions are idempotent on the join tables.
  */
 export async function mergeCandidateIntoPerson(
   c: ImportCandidateRow,
   personId: string,
+  extra?: { circleIds?: string[]; eventIds?: string[] },
 ): Promise<void> {
   const mapped = (c.raw as { mapped_fields?: MappedPersonFields } | null)?.mapped_fields || {};
   const { data: existing, error: fetchErr } = await supabase
@@ -106,6 +112,39 @@ export async function mergeCandidateIntoPerson(
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from('persons').update(updates).eq('id', personId);
     if (error) throw error;
+  }
+  // Bulk-add can pass a set of circles/events that should apply to
+  // everyone in the batch, including merged matches. Add (not set) so
+  // the existing person's memberships are preserved.
+  if (extra?.circleIds && extra.circleIds.length > 0) {
+    await Promise.all(
+      extra.circleIds.map((cid) =>
+        supabase
+          .from('person_circles')
+          .upsert({ person_id: personId, circle_id: cid }, { onConflict: 'person_id,circle_id' })
+          .then(({ error }) => {
+            if (error) console.warn('Failed to add to circle', cid, error);
+          }),
+      ),
+    );
+  }
+  if (extra?.eventIds && extra.eventIds.length > 0) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await Promise.all(
+        extra.eventIds.map((eid) =>
+          supabase
+            .from('person_events')
+            .upsert(
+              { person_id: personId, event_id: eid, user_id: user.id },
+              { onConflict: 'person_id,event_id' },
+            )
+            .then(({ error }) => {
+              if (error) console.warn('Failed to add to event', eid, error);
+            }),
+        ),
+      );
+    }
   }
   await markCandidatePromoted(c.id, personId);
 }

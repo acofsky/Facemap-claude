@@ -12,6 +12,7 @@ import { haptics } from '@/lib/haptics';
 import { friendlyError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import { isNativeIOS } from '@/lib/ios-contacts';
+import { BulkAddOptionsSheet } from '@/components/import/BulkAddOptionsSheet';
 import { ImportCandidateRow as ImportCandidateRowComponent } from '@/components/import/ImportCandidateRow';
 import { ImportCandidateReviewSheet } from '@/components/import/ImportCandidateReviewSheet';
 import { InfoModal } from '@/components/InfoModal';
@@ -72,6 +73,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [bulkOptionsOpen, setBulkOptionsOpen] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [contactsResultModal, setContactsResultModal] = useState<
     { totalRead: number; alreadyKnown: number } | null
@@ -377,7 +379,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   // Add everyone shown on the review screen. Uses the AI's original
   // bullets (any per-row edits live inside each row component and aren't
   // hoisted here — the per-row + button is for users who want to tweak).
-  const handleAddEveryone = async () => {
+  const handleAddEveryone = async (opts: { circleIds: string[]; eventIds: string[] }) => {
     if (visibleCandidates.length === 0) return;
     haptics.medium();
     setBulkAdding(true);
@@ -388,10 +390,16 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       try {
         const matchedId = matchMap.get(c.id);
         if (matchedId) {
-          await mergeCandidateIntoPerson(c, matchedId);
+          await mergeCandidateIntoPerson(c, matchedId, {
+            circleIds: opts.circleIds,
+            eventIds: opts.eventIds,
+          });
           merged++;
         } else {
-          await promoteCandidate(c);
+          await promoteCandidate(c, {
+            circleIds: opts.circleIds,
+            eventIds: opts.eventIds,
+          });
           promoted++;
         }
         setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
@@ -401,7 +409,10 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       }
     }
     setBulkAdding(false);
+    setBulkOptionsOpen(false);
     qc.invalidateQueries({ queryKey: ['persons'] });
+    qc.invalidateQueries({ queryKey: ['person_circles'] });
+    qc.invalidateQueries({ queryKey: ['person_events'] });
     qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
     const parts: string[] = [];
     if (promoted) parts.push(`${promoted} added`);
@@ -555,7 +566,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             onMerge={handleMerge}
             onDismiss={handleDismiss}
             onOpenDrawer={() => setDrawerOpen(true)}
-            onAddEveryone={handleAddEveryone}
+            onAddEveryone={() => setBulkOptionsOpen(true)}
             onRestart={handleRestart}
             promotedCount={promotedCount}
             aliveCount={aliveCount}
@@ -585,6 +596,14 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         onPromote={(payload) => reviewingCandidate && handlePromote(reviewingCandidate, payload)}
         onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
         onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
+      />
+
+      <BulkAddOptionsSheet
+        open={bulkOptionsOpen}
+        candidateCount={visibleCandidates.length}
+        busy={bulkAdding}
+        onClose={() => !bulkAdding && setBulkOptionsOpen(false)}
+        onConfirm={handleAddEveryone}
       />
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />

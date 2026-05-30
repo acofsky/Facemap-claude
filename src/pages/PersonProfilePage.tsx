@@ -13,6 +13,7 @@ import { BulletDisplay } from '@/components/BulletTextarea';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InfoModal } from '@/components/InfoModal';
+import { PersonMembershipsSheet } from '@/components/PersonMembershipsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonHeaderSkeleton, PersonRowSkeleton } from '@/components/skeletons';
 import { PersonEditPage } from '@/pages/PersonEditPage';
@@ -47,6 +48,7 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [membershipsOpen, setMembershipsOpen] = useState(false);
   const deletePersonMut = useDeletePerson();
 
   const personConnections = useMemo(
@@ -300,13 +302,28 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         </>
       )}
 
-      {/* Circles — kept at the bottom (above Encounters) to mirror the
-          edit screen's field order. */}
-      {personCircleObjects.length > 0 && (
-        <>
-          <SectionLabel>Circles</SectionLabel>
-          <div className="px-5 mb-6">
-            <div className="glass p-4 flex flex-wrap gap-1.5">
+      {/* Circles & Events — always render so the Edit affordance is
+          available even when the person has no memberships yet. */}
+      <div className="px-5 mb-2 flex items-center justify-between">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text">
+          Circles &amp; Events
+        </h2>
+        <button
+          onClick={() => setMembershipsOpen(true)}
+          aria-label="Edit memberships"
+          className="text-[12px] font-medium text-primary px-2 py-1 -mr-2 active:opacity-60 transition-opacity"
+        >
+          Edit
+        </button>
+      </div>
+      <div className="px-5 mb-6">
+        <div className="glass p-4 flex flex-wrap gap-1.5">
+          {personCircleObjects.length === 0 && personEventObjects.length === 0 ? (
+            <span className="text-[13px] font-display-italic text-[hsl(var(--foreground)/0.5)]">
+              No circles or events yet. Tap Edit to add.
+            </span>
+          ) : (
+            <>
               {personCircleObjects.map((c) => (
                 <span
                   key={c.id}
@@ -315,10 +332,25 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
                   {c.emoji ? `${c.emoji} ` : ''}{c.name}
                 </span>
               ))}
-            </div>
-          </div>
-        </>
-      )}
+              {personEventObjects.map((e) => {
+                const tone = isValidTone(e.tone) ? e.tone : 'red';
+                return (
+                  <span
+                    key={e.id}
+                    className={cn(
+                      'inline-flex items-center px-2 py-0.5 rounded-sm border text-[12px] font-medium text-white/95',
+                      `tile-${tone}`,
+                    )}
+                    style={{ borderColor: 'hsl(0 0% 100% / 0.18)' }}
+                  >
+                    {e.name}
+                  </span>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Encounters */}
       <div id="encounters-anchor" />
@@ -387,6 +419,14 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
           <MeetingBriefModal personId={personId} personName={person.name || 'Person'} onClose={() => setBriefOpen(false)} />
         )}
       </AnimatePresence>
+
+      <PersonMembershipsSheet
+        open={membershipsOpen}
+        personId={personId}
+        initialCircleIds={person.circleIds || []}
+        initialEventIds={person.eventIds || []}
+        onClose={() => setMembershipsOpen(false)}
+      />
     </div>
   );
 }
