@@ -11,7 +11,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PendingImportsSheet } from '@/components/import/PendingImportsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonRowSkeleton } from '@/components/skeletons';
-import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles, Info, Upload, Trash2, X } from 'lucide-react';
+import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles, Info, Upload, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
 import { haptics } from '@/lib/haptics';
@@ -234,7 +234,7 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
               className="glass-input w-full h-11 pl-10 pr-3 text-sm"
             />
           </div>
-          {embedded && sortMenu}
+          {embedded && !selectionMode && sortMenu}
           {!selectionMode && people.length > 0 && (
             <button
               onClick={() => enterSelectionMode()}
@@ -242,6 +242,16 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
               className="glass-pill !h-11 !px-3 inline-flex items-center justify-center text-[13px] font-medium text-foreground active:scale-95 transition-transform"
             >
               Select
+            </button>
+          )}
+          {selectionMode && (
+            <button
+              onClick={exitSelectionMode}
+              disabled={bulkDeleting}
+              aria-label="Cancel selection"
+              className="glass-pill !h-11 !px-3 inline-flex items-center justify-center text-[13px] font-medium text-foreground active:scale-95 transition-transform disabled:opacity-50"
+            >
+              Cancel
             </button>
           )}
         </div>
@@ -419,21 +429,17 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
 
       {selectionMode && (
         <div
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-4 pb-3 pt-3 safe-bottom"
+          // z-[55] floats above the AppLayout tab bar (z-50). Position
+          // anchored above the tab bar via the same env(safe-area-inset-bottom)
+          // offset + ~76px (tab bar height) so the bar sits cleanly
+          // visible instead of getting hidden under the nav.
+          className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-[55] px-4 pt-3 pb-1"
           style={{
-            background:
-              'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.85) 100%)',
+            bottom: 'calc(env(safe-area-inset-bottom) + 76px)',
           }}
         >
           <div className="glass flex items-center gap-2 p-2">
-            <button
-              onClick={exitSelectionMode}
-              disabled={bulkDeleting}
-              className="glass-pill !h-10 !px-3 inline-flex items-center justify-center text-[13px] text-[hsl(var(--foreground)/0.7)] disabled:opacity-50"
-            >
-              <X className="w-4 h-4" strokeWidth={1.75} />
-            </button>
-            <div className="flex-1 text-center text-[13px] text-foreground">
+            <div className="flex-1 px-2 text-[13px] text-foreground">
               {selectedIds.size === 0
                 ? 'Tap rows to select'
                 : `${selectedIds.size} selected`}

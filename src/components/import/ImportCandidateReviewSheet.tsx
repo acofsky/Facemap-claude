@@ -240,8 +240,12 @@ function SheetBody({
             onChange={(e) => setDateMet(e.target.value)}
             // appearance-none + block + min-w-0 keep iOS WebKit's native
             // date widget from punching out of the container's width and
-            // creating a phantom horizontal scrollbar on the form.
-            className="glass-input block w-full min-w-0 h-11 px-3.5 text-sm appearance-none"
+            // creating a phantom horizontal scrollbar on the form. Using
+            // padding (py-3) rather than a fixed h-11 lets the date text
+            // sit vertically centered inside the box — iOS's native
+            // date input ignores line-height so a fixed-height container
+            // pinned the text up against the top edge.
+            className="glass-input block w-full min-w-0 px-3.5 py-3 text-sm appearance-none"
           />
         </FieldLabel>
 

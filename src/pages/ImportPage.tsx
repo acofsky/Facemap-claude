@@ -41,6 +41,19 @@ type TopN = (typeof TOP_N_OPTIONS)[number];
 const DEFAULT_TOP_N: TopN = 20;
 /** Candidates scoring below this with a filter set count as "no close matches". */
 const NO_MATCH_THRESHOLD = 0.35;
+/**
+ * When the user gave a real filter, only candidates that the AI scored
+ * at or above this threshold qualify for the curated top-N slice. The
+ * rest go straight to the "More imports" drawer regardless of how
+ * many qualified — so when there are only 7 genuine matches out of
+ * 400 contacts, the user sees 7 top-of-list candidates, not 7 strong
+ * + 13 weak ones the model just had to dredge up to fill a quota.
+ *
+ * 0.55 maps to "plausible match" in the system prompt's score bands.
+ * Anything below that is "ambiguous / sparse" or "clear non-match,"
+ * which the user (correctly) doesn't want surfaced as a "best match".
+ */
+const TOP_QUALITY_THRESHOLD = 0.55;
 
 // Order: source pick → filter → gather → review. Filter sits up front so the
 // user's stated goal is in mind during gather, and the AI rank step runs
@@ -317,8 +330,22 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     return alive;
   }, [candidates, rankModal, showLowScores]);
 
-  const visibleCandidates = useMemo(() => aliveCandidates.slice(0, topN), [aliveCandidates, topN]);
-  const drawerCandidates = useMemo(() => aliveCandidates.slice(topN), [aliveCandidates, topN]);
+  // Quality gating: when the user provided a real filter, only
+  // genuinely-qualifying candidates land in the curated top-N. Without
+  // a filter, "everyone the AI saw" is the natural slice — no quality
+  // floor since the AI has no goal to measure against.
+  const filterActive = !!filterText.trim();
+  const visibleCandidates = useMemo(() => {
+    if (!filterActive) return aliveCandidates.slice(0, topN);
+    const qualified = aliveCandidates.filter(
+      (c) => (c.ai_relevance_score ?? 0) >= TOP_QUALITY_THRESHOLD,
+    );
+    return qualified.slice(0, topN);
+  }, [aliveCandidates, topN, filterActive]);
+  const drawerCandidates = useMemo(() => {
+    const visibleIds = new Set(visibleCandidates.map((c) => c.id));
+    return aliveCandidates.filter((c) => !visibleIds.has(c.id));
+  }, [aliveCandidates, visibleCandidates]);
 
   const handlePromote = async (
     c: ImportCandidateRow,
@@ -1143,7 +1170,13 @@ function ReviewStep({
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
-        {rankFailed ? `${aliveCount} pulled` : `AI's top ${Math.min(topN, visibleCandidates.length)} of ${aliveCount}`}.
+        {rankFailed
+          ? `${aliveCount} pulled`
+          : visibleCandidates.length === 0
+            ? `0 strong matches out of ${aliveCount} — see the drawer for the rest`
+            : visibleCandidates.length < topN
+              ? `${visibleCandidates.length} strong matches of ${aliveCount} — fewer than ${topN} cleared the bar`
+              : `AI's top ${visibleCandidates.length} of ${aliveCount}`}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}

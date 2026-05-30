@@ -343,10 +343,12 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               type="date"
               value={dateMet}
               onChange={(e) => setDateMet(e.target.value)}
-              // See the corresponding comment on the import review sheet
-              // — iOS WebKit's native date widget needs these to honor
-              // the container's width.
-              className={cn(fieldInputClass, 'block min-w-0 appearance-none')}
+              // iOS WebKit's native date widget ignores line-height, so a
+              // fixed-height (h-11) container floats the text up. Drop the
+              // height and use vertical padding instead so the text sits
+              // centered. appearance-none + min-w-0 keep the widget from
+              // overflowing the container horizontally.
+              className="glass-input block w-full min-w-0 px-3.5 py-3 text-base appearance-none"
             />
           </Field>
 

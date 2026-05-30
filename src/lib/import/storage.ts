@@ -101,28 +101,46 @@ export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
 
 /**
  * Collect the iOS contact_ids that should be skipped on the next Read
- * Contacts pass — either already promoted to a Person, or still waiting
- * in pending review. Dismissed candidates are intentionally re-importable
- * (when the user runs Clear All they want the chance to re-evaluate).
+ * Contacts pass — either a pending candidate OR a promoted candidate
+ * whose linked Person row still exists. Orphan promoted candidates
+ * (Person was deleted but the import_candidates row's promoted flag
+ * was never cleared — common for data created before the deletePerson
+ * cascade-cleanup landed) DO NOT count as known, so the contact can
+ * be re-pulled fresh.
  *
- * Single-condition filter `dismissed = false` covers both wanted states
- * (promoted-and-not-dismissed, plus pending) without the PostgREST
- * `or(...,and(...))` syntax that the previous version used. The nested
- * form is supported but easy to get wrong, and getting it wrong silently
- * turns every contact into "already known" — which is the bug we're
- * here to fix.
+ * Dismissed candidates are intentionally re-importable so a Clear All
+ * doesn't lock anyone out forever.
  */
 export async function fetchKnownContactIds(): Promise<Set<string>> {
-  const { data, error } = await supabase
-    .from('import_candidates')
-    .select('raw')
-    .eq('source', 'contacts')
-    .eq('dismissed', false);
-  if (error) throw error;
+  const [candResult, personResult] = await Promise.all([
+    supabase
+      .from('import_candidates')
+      .select('raw, promoted, promoted_person_id')
+      .eq('source', 'contacts')
+      .eq('dismissed', false),
+    supabase.from('persons').select('id'),
+  ]);
+  if (candResult.error) throw candResult.error;
+  if (personResult.error) throw personResult.error;
+
+  const livePersonIds = new Set((personResult.data || []).map((p) => p.id));
   const ids = new Set<string>();
-  for (const row of data || []) {
+  for (const row of candResult.data || []) {
     const cid = (row.raw as { contact_id?: unknown } | null)?.contact_id;
-    if (typeof cid === 'string' && cid) ids.add(cid);
+    if (typeof cid !== 'string' || !cid) continue;
+
+    if (!row.promoted) {
+      // Pending candidate — always counts as known so re-running Read
+      // Contacts doesn't multiply pending entries.
+      ids.add(cid);
+      continue;
+    }
+    // Promoted — only counts if the linked person still exists.
+    if (row.promoted_person_id && livePersonIds.has(row.promoted_person_id)) {
+      ids.add(cid);
+    }
+    // Orphan (linked person was deleted but this row never got cleaned
+    // up): intentionally NOT added so the contact re-imports fresh.
   }
   return ids;
 }
