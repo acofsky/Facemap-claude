@@ -262,6 +262,16 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         return;
       }
       const merged = mergeDrafts(drafts);
+      // If mergeDrafts collapsed near-duplicates from a single source
+      // (same name + matching phone/email), surface the collapse so
+      // the user understands why the review header count differs from
+      // the gather toast.
+      const collapsed = drafts.length - merged.length;
+      if (collapsed > 0) {
+        toast.success(
+          `Merging ${collapsed} duplicate${collapsed === 1 ? '' : 's'} — ${merged.length} unique to review`,
+        );
+      }
       const sourcesUsed = Array.from(selectedSources);
       const session = await createImportSession({ filterText, sources: sourcesUsed });
       const inserted = await insertCandidates(session.id, merged);
