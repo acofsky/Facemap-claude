@@ -35,29 +35,48 @@ interface RankedCandidate {
   bullets: string[];
 }
 
-const SYSTEM_PROMPT = `You score imported contact stubs for relevance to a user's stated import goal, and draft 1-3 short bullets that would help the user remember each person.
+const SYSTEM_PROMPT = `You score imported contact stubs against a user's import goal AND draft factual memory bullets the user will save on each person's profile.
 
-SCORE ABSOLUTELY, NOT RELATIVELY. You see the candidates in chunks but the user wants a globally consistent score. A clear match should always score in the high band even if every other candidate in this chunk is also a clear match. Do not "spread" scores within a chunk for variety.
+The two outputs you produce per candidate serve DIFFERENT purposes — keep them strictly separate:
 
-When the user's filter mentions a career, industry, or domain (e.g. "finance career", "tech founders", "real estate investors"), aggressively recognize signals across all fields — including abbreviations and short firm names. Examples:
-- Finance: JP Morgan, Goldman Sachs, Morgan Stanley, Citi, BofA, Wells Fargo (investment banking); Blackstone, KKR, Apollo, Carlyle, TPG, Bain Capital (private equity); Citadel, Bridgewater, Two Sigma, Millennium, Point72 (hedge funds); Alvarez & Marsal / A&M, FTI Consulting / FTI, AlixPartners, Houlihan Lokey (restructuring / financial advisory); McKinsey, Bain, BCG (consulting, often feeds finance); titles like Analyst, Associate, VP, MD, Banker, Trader, Portfolio Manager, Partner.
-- Tech: Google, Meta, Apple, Microsoft, Amazon, Stripe, Airbnb, founder/CTO/PM/engineer titles, YC-flavored startups.
-- Real estate: REIT names, brokerage names, Partner / Principal at private real estate funds.
-- Email domain often reveals firm even if company field is empty (e.g. @jpmorgan.com → JP Morgan).
+* \`bullets\`: factual fragments the user will see saved on the person's profile. These are memory aids — like resume bullets or self-written notes. NEVER include your scoring reasoning, analysis, comparison to the user's filter, or phrases like "matches your goal," "signal of X," "indicates Y," "adjacent to Z," "suggests Q." If the candidate has nothing factual worth remembering (just name + phone with no role / firm / context), return an EMPTY bullets array. Do NOT pad. 0 to 3 bullets per candidate.
+
+* \`rationale\`: 6 to 15 words explaining your score. THIS is where reasoning goes — what signal you matched and how strongly. The user sees it, but it's framed as the score's justification, not as profile content.
+
+CRITICAL — keep candidates ISOLATED. Each candidate's bullets and rationale reference ONLY that candidate's own data. If two candidates work at the same firm or know each other, NEVER copy one candidate's name / email / specific details into another candidate's output.
+
+SCORE ABSOLUTELY, not relative to others in this chunk. The same data produces the same score regardless of what other candidates appear alongside it.
+
+When the user's filter mentions a specific career, industry, organization, or domain, recognize the relevant signals using your training — company names that fit, role titles that fit, email domains that fit, context that fits. Be strict: only score in the high band when the match is genuine, not vaguely adjacent. Apply the same recognition principle to ANY domain the user names (medicine, law, art, academia, sports, real estate, gaming, you name it) — your training knows the equivalent firms / titles / signals for each. If the user's filter is open-ended ("interesting people," "anyone I should remember"), score by stub completeness instead.
 
 Score bands — anchor your numbers here:
-- 0.85 to 0.95: Clear match. Works at a relevant firm or holds a relevant title, with high confidence. Reserve 1.0 for both/multiple signals.
-- 0.55 to 0.80: Plausible match. Adjacent industry, ambiguous role at a relevant firm, partial signal.
-- 0.25 to 0.50: Ambiguous or thin data. Generic role, no industry signal, only a name + phone.
-- 0.0 to 0.20: Clear non-match — context explicitly points away from the filter (e.g. "my grandma", high-school friend with retail job for a finance filter).
+- 0.85 to 1.0: Clear, unambiguous match. Multiple matching signals.
+- 0.55 to 0.80: Plausible match. Adjacent domain, partial signal, ambiguous role at a relevant org.
+- 0.25 to 0.50: Ambiguous or sparse data. Generic role, no domain signal, name + phone only.
+- 0.0 to 0.20: Clear non-match. Context explicitly points away from filter.
 
-If the user gave NO filter, score by how well-formed and useful the stub is (more populated fields = higher), still using the same bands.
+Bullets — GOOD examples (factual restatements of the candidate's own data):
+- "Analyst at JP Morgan"
+- "VP of Sales at Stripe"
+- "Iron View Capital partner"
+- "Dance Theatre of Harlem"
+- "LinkedIn connection March 2024"
 
-Bullet rules:
-- 1-3 short fragments, no leading bullet character. Examples: "Senior PM at Stripe", "Investment banking analyst at Goldman", "LinkedIn connection".
-- Never invent facts. Only restate what's in the candidate's data plus the source.
+Bullets — BAD examples (reasoning disguised as facts — NEVER do these):
+- "Finance career signal via work contact" ← reasoning belongs in rationale
+- "Work email at pwpartners.com suggests partnership firm" ← speculation about meaning
+- "Ally Financial, adjacent finance but not A&M/FTI class" ← comparing to filter
+- "Just email provided" ← absence is not a memory aid
+- "Strong match for your goal" ← never reference the filter in bullets
+- "Likely works in PE based on email" ← speculation, not fact
+- Mentioning any OTHER candidate's name or details
 
-Rationale: 6-12 word phrase explaining the score band you picked, naming the matching signal. Examples: "JP Morgan investment banking analyst, clear finance match", "Common name with phone but no role data".
+Rationale — GOOD examples (reasoning lives here):
+- "Senior PM at Stripe, clear tech match"
+- "Common name with phone but no role data"
+- "Ally Financial, adjacent finance but not restructuring focus"
+- "No relevant signal — generic stored contact"
+- "Dance Theatre of Harlem in company field, direct match"
 
 Return STRICT JSON. No prose, no markdown fences. Match the requested shape exactly.`;
 
@@ -184,25 +203,32 @@ function buildUserMessage(filterText: string, candidates: Candidate[]): string {
     ? `The user's import goal:\n"""${filterText}"""\n`
     : `The user did not specify a filter — score by stub quality.\n`;
 
+  // Each candidate gets its own visually-separated block so the model
+  // can't accidentally bleed data across rows. Critical for preventing
+  // the "candidate A's bullet quotes candidate B's name" failure mode.
   const lines = candidates.map((c, i) => {
-    const parts: string[] = [`#${i + 1} id=${c.id} source=${c.source}`];
+    const parts: string[] = [
+      `========== Candidate #${i + 1} ==========`,
+      `id: ${c.id}`,
+      `source: ${c.source}`,
+    ];
     if (c.name) parts.push(`name: ${c.name}`);
     if (c.company) parts.push(`company: ${c.company}`);
     if (c.title) parts.push(`title: ${c.title}`);
     if (c.email) parts.push(`email: ${c.email}`);
     if (c.phone) parts.push(`phone: ${c.phone}`);
     if (c.context) parts.push(`context: ${c.context}`);
-    return parts.join("\n  ");
+    return parts.join("\n");
   });
 
   return `${goal}
-Score and bullet-summarize each candidate below.
+Score each candidate below independently. Each candidate's output references only that candidate's own data — never quote another candidate's name, email, or details.
 
 ${lines.join("\n\n")}
 
-Return JSON in this exact shape (no prose, no markdown fences):
-{"ranked":[{"id":"<candidate id>","score":0.0,"rationale":"<6-12 words>","bullets":["...","..."]}, ...]}
-Every candidate id above must appear exactly once. Bullets array has 1 to 3 entries.`;
+Return STRICT JSON in this exact shape (no prose, no markdown fences):
+{"ranked":[{"id":"<candidate id>","score":0.0,"rationale":"<6-15 words>","bullets":["..."]}, ...]}
+Every candidate id above must appear exactly once. Bullets is an array of 0 to 3 factual fragments (empty array allowed when nothing factual is worth saving).`;
 }
 
 function parseRanked(text: string, candidates: Candidate[]): RankedCandidate[] {
