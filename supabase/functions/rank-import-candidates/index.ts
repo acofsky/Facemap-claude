@@ -41,6 +41,8 @@ The two outputs you produce per candidate serve DIFFERENT purposes — keep them
 
 * \`bullets\`: factual fragments the user will see saved on the person's profile. These are memory aids — like resume bullets or self-written notes. NEVER include your scoring reasoning, analysis, comparison to the user's filter, or phrases like "matches your goal," "signal of X," "indicates Y," "adjacent to Z," "suggests Q." If the candidate has nothing factual worth remembering (just name + phone with no role / firm / context), return an EMPTY bullets array. Do NOT pad. 0 to 3 bullets per candidate.
 
+CRITICAL — NEVER put the candidate's own name in a bullet. The bullets are saved ON that person's profile, so leading a bullet with their name ("Max Dawson at FTI", "Will Rizzo — analyst") is redundant at best and, when you misremember which candidate you're on, writes the WRONG name onto someone's profile. State only the fact: write "Restructuring advisor at FTI" or just "FTI" — NOT "[name] at FTI". The name belongs to the row, not the bullet.
+
 * \`rationale\`: 6 to 15 words explaining your score. THIS is where reasoning goes — what signal you matched and how strongly. The user sees it, but it's framed as the score's justification, not as profile content.
 
 CRITICAL — keep candidates ISOLATED. Each candidate's bullets and rationale reference ONLY that candidate's own data. If two candidates work at the same firm or know each other, NEVER copy one candidate's name / email / specific details into another candidate's output.
@@ -84,6 +86,8 @@ Bullets — GOOD examples (factual restatements of the candidate's own data):
 - "LinkedIn connection March 2024"
 
 Bullets — BAD examples (reasoning disguised as facts — NEVER do these):
+- "Max Dawson at FTI" ← NEVER lead with the candidate's own name; write "FTI restructuring advisor" instead
+- "Will Rizzo — analyst at Alvarez & Marsal" ← same: drop the name, write "Analyst at Alvarez & Marsal"
 - "Finance career signal via work contact" ← reasoning belongs in rationale
 - "Work email at pwpartners.com suggests partnership firm" ← speculation about meaning
 - "Ally Financial, adjacent finance but not A&M/FTI class" ← comparing to filter

@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { BulletTextarea } from '@/components/BulletTextarea';
 import { MembershipChips } from '@/components/MembershipChips';
+import { CircleSheet } from '@/components/CircleSheet';
+import { EventSheet } from '@/components/EventSheet';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { useCircles, useEvents } from '@/hooks/use-data';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { sourceLabel } from './sourceLabels';
+import { stripOwnName } from '@/lib/import/promote';
 import type { ImportCandidateRow, MappedPersonFields } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
 
@@ -104,11 +108,13 @@ function SheetBody({
   // field when there were no mapped notes. Everything is editable.
   const initialAbout = useMemo(() => {
     if (mapped.misc_notes) return mapped.misc_notes;
+    // Strip any leading self-name the model slipped into a bullet so the
+    // editable About doesn't show "[their own name] at [firm]".
     const bullets = ((candidate.ai_bullets as string[] | null) || [])
-      .map((b) => b.trim())
+      .map((b) => stripOwnName(b, candidate.name))
       .filter(Boolean);
     return bullets.join('\n');
-  }, [candidate.ai_bullets, mapped.misc_notes]);
+  }, [candidate.ai_bullets, candidate.name, mapped.misc_notes]);
   const initialBackground = useMemo(() => {
     if (mapped.important_info) return mapped.important_info;
     const lines: string[] = [];
@@ -130,6 +136,8 @@ function SheetBody({
   const [known, setKnown] = useState(mapped.known_people_notes || '');
   const [circleIds, setCircleIds] = useState<string[]>([]);
   const [eventIds, setEventIds] = useState<string[]>([]);
+  const [createCircleOpen, setCreateCircleOpen] = useState(false);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
 
   const { data: circles = [] } = useCircles();
   const { data: events = [] } = useEvents({ includeArchived: false });
@@ -277,11 +285,11 @@ function SheetBody({
           />
         </FieldLabel>
 
-        {(circles.length > 0 || events.length > 0) && (
-          <FieldLabel label="Circles & Events">
-            <p className="text-[11px] text-[hsl(var(--foreground)/0.55)] mb-2 leading-snug">
-              Drop them into any existing circles or events. Create new ones from the Network tab.
-            </p>
+        <FieldLabel label="Circles & Events">
+          <p className="text-[11px] text-[hsl(var(--foreground)/0.55)] mb-2 leading-snug">
+            Drop them into any existing circles or events, or spin up a new one right here.
+          </p>
+          {(circles.length > 0 || events.length > 0) && (
             <MembershipChips
               circles={circles}
               events={events}
@@ -291,9 +299,55 @@ function SheetBody({
               onEventChange={setEventIds}
               compact
             />
-          </FieldLabel>
-        )}
+          )}
+          <div className="flex flex-wrap gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => setCreateCircleOpen(true)}
+              className="glass-pill !h-8 !px-3 text-[12px] text-[hsl(var(--foreground)/0.7)] inline-flex items-center gap-1 active:scale-[0.96] transition-transform"
+            >
+              <Plus className="w-3 h-3" strokeWidth={2} />
+              New Circle
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateEventOpen(true)}
+              className="glass-pill !h-8 !px-3 text-[12px] text-[hsl(var(--foreground)/0.7)] inline-flex items-center gap-1 active:scale-[0.96] transition-transform"
+            >
+              <Plus className="w-3 h-3" strokeWidth={2} />
+              New Event
+            </button>
+          </div>
+        </FieldLabel>
       </div>
+
+      {/* Portal the create sheets to <body> so their position:fixed
+          overlays anchor to the viewport, not to this framer-motion sheet
+          (a transformed ancestor would otherwise become their containing
+          block and mis-place them). They also need to sit above this
+          sheet's z-76, so CircleSheet/EventSheet's own stacking is bumped
+          via the wrapper below. */}
+      {createCircleOpen && createPortal(
+        <div className="relative z-[80]">
+          <CircleSheet
+            onClose={(result) => {
+              setCreateCircleOpen(false);
+              // Auto-select the freshly created circle so the user doesn't
+              // have to hunt for it after the create sheet dismisses.
+              if (result && 'id' in result) {
+                setCircleIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
+              }
+            }}
+          />
+        </div>,
+        document.body,
+      )}
+      {createEventOpen && createPortal(
+        <div className="relative z-[80]">
+          <EventSheet onClose={() => setCreateEventOpen(false)} />
+        </div>,
+        document.body,
+      )}
 
       <div className="px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom flex items-center gap-2">
         <button

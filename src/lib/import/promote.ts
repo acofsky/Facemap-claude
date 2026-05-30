@@ -154,6 +154,33 @@ export async function mergeCandidateIntoPerson(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Strip the candidate's OWN name off the front of an AI bullet. The model
+ * is told not to lead bullets with the person's name, but it occasionally
+ * does ("Will Rizzo at Alvarez & Marsal"), which reads as a redundant name
+ * repeat once the bullet is saved on that person's profile. We only strip
+ * when the bullet starts with THIS candidate's name (plus a trailing
+ * separator like " at ", " — ", ", "), so we never touch a legitimate
+ * mention of someone else ("Knows John Smith"). If nothing meaningful is
+ * left after the name, the bullet is dropped (return '').
+ */
+export function stripOwnName(bullet: string, name: string | null | undefined): string {
+  const b = bullet.trim();
+  const n = (name || '').trim();
+  if (!n) return b;
+  if (b.toLowerCase().startsWith(n.toLowerCase())) {
+    // Remove the name, then a leading separator (" at ", " — ", " - ",
+    // " – ", ",", ":") if present.
+    let rest = b.slice(n.length).replace(/^\s*(?:[—–\-:,]|\bat\b)\s*/i, '').trim();
+    // A bare leftover like "at" or punctuation isn't a fact — drop it.
+    if (!rest || /^[—–\-:,.]+$/.test(rest)) return '';
+    // Re-capitalize a lone firm/role fragment for tidiness.
+    rest = rest.charAt(0).toUpperCase() + rest.slice(1);
+    return rest;
+  }
+  return b;
+}
+
 function composeAbout(
   c: ImportCandidateRow,
   overrides: PromoteOverrides | undefined,
@@ -172,9 +199,11 @@ function composeAbout(
   if (mapped.misc_notes) {
     aboutParts.push(mapped.misc_notes.trim());
   } else {
-    // 3) fall back to AI-generated bullets when no mapped notes exist
+    // 3) fall back to AI-generated bullets when no mapped notes exist.
+    // Strip any leading self-name the model slipped in so the saved
+    // About doesn't read "[their own name] at [firm]".
     const aiBullets = ((c.ai_bullets as string[] | null) || [])
-      .map((b) => b.trim())
+      .map((b) => stripOwnName(b, c.name))
       .filter(Boolean);
     aboutParts.push(...aiBullets);
   }
