@@ -138,6 +138,20 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     setGathering('contacts');
     setGatherProgress(0);
     try {
+      // Refresh the auth session before any Supabase calls in the
+      // contacts source. iOS WebView can let the access token expire
+      // between mount and tap; the contacts source calls Supabase to
+      // fetch known IDs and to upload contact photos, and if the
+      // first one triggers an internal refresh that fails, gotrue
+      // clears the session and bounces the user to the login screen
+      // mid-gather. Doing the refresh ourselves up front gives us a
+      // clean failure mode — same pattern as handleRankAndReview.
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        setGathering(null);
+        return;
+      }
       const { drafts: got, stats } = await gatherContactsCandidates({ onProgress: setGatherProgress });
       setDrafts((d) => [...d, ...got]);
       setCompletedSources((s) => new Set(s).add('contacts'));
@@ -304,12 +318,21 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const visibleCandidates = useMemo(() => aliveCandidates.slice(0, topN), [aliveCandidates, topN]);
   const drawerCandidates = useMemo(() => aliveCandidates.slice(topN), [aliveCandidates, topN]);
 
-  const handlePromote = async (c: ImportCandidateRow, overrides?: Partial<Person>) => {
+  const handlePromote = async (
+    c: ImportCandidateRow,
+    payload?: { fields?: Partial<Person>; circleIds?: string[]; eventIds?: string[] },
+  ) => {
     setReviewBusyId(c.id);
     try {
-      await promoteCandidate(c, overrides ? { fieldOverrides: overrides } : undefined);
+      await promoteCandidate(c, payload ? {
+        fieldOverrides: payload.fields,
+        circleIds: payload.circleIds,
+        eventIds: payload.eventIds,
+      } : undefined);
       setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       qc.invalidateQueries({ queryKey: ['persons'] });
+      qc.invalidateQueries({ queryKey: ['person_circles'] });
+      qc.invalidateQueries({ queryKey: ['person_events'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
       // Close the review sheet if it was open for this candidate.
       setReviewingId((cur) => (cur === c.id ? null : cur));
@@ -559,7 +582,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         matchedPersonId={reviewingCandidate ? matchMap.get(reviewingCandidate.id) : undefined}
         busy={!!reviewingCandidate && reviewBusyId === reviewingCandidate.id}
         onClose={() => setReviewingId(null)}
-        onPromote={(overrides) => reviewingCandidate && handlePromote(reviewingCandidate, overrides)}
+        onPromote={(payload) => reviewingCandidate && handlePromote(reviewingCandidate, payload)}
         onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
         onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
       />

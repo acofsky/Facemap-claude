@@ -4,18 +4,26 @@ import { Loader2, Plus, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { BulletTextarea } from '@/components/BulletTextarea';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
+import { useCircles, useEvents } from '@/hooks/use-data';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { isValidTone } from '@/lib/store';
 import { sourceLabel } from './sourceLabels';
 import type { ImportCandidateRow, MappedPersonFields } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
+
+export interface PromotePayload {
+  fields: Partial<Person>;
+  circleIds: string[];
+  eventIds: string[];
+}
 
 interface ImportCandidateReviewSheetProps {
   candidate: ImportCandidateRow | null;
   matchedPersonId?: string;
   busy?: boolean;
   onClose: () => void;
-  onPromote: (overrides: Partial<Person>) => Promise<void> | void;
+  onPromote: (payload: PromotePayload) => Promise<void> | void;
   onMerge?: (personId: string) => Promise<void> | void;
   onDismiss: () => void;
 }
@@ -115,10 +123,16 @@ function SheetBody({
   const [name, setName] = useState(candidate.name);
   const [howWeMet, setHowWeMet] = useState(mapped.how_we_met || '');
   const [whereWhen, setWhereWhen] = useState(mapped.where_when || '');
+  const [dateMet, setDateMet] = useState('');
   const [about, setAbout] = useState(initialAbout);
   const [background, setBackground] = useState(initialBackground);
   const [physical, setPhysical] = useState(mapped.physical_description || '');
   const [known, setKnown] = useState(mapped.known_people_notes || '');
+  const [circleIds, setCircleIds] = useState<string[]>([]);
+  const [eventIds, setEventIds] = useState<string[]>([]);
+
+  const { data: circles = [] } = useCircles();
+  const { data: events = [] } = useEvents({ includeArchived: false });
 
   const handlePromote = () => {
     haptics.medium();
@@ -128,13 +142,18 @@ function SheetBody({
       `Imported from ${sourceLabel(candidate.source)}`,
     );
     onPromote({
-      name: name.trim() || candidate.name,
-      how_we_met: howWeMet.trim() || null,
-      where_when: whereWhen.trim() || null,
-      misc_notes: aboutWithProvenance,
-      important_info: bulletize(background) || null,
-      physical_description: physical.trim() || null,
-      known_people_notes: known.trim() || null,
+      fields: {
+        name: name.trim() || candidate.name,
+        how_we_met: howWeMet.trim() || null,
+        where_when: whereWhen.trim() || null,
+        date_met: dateMet || null,
+        misc_notes: aboutWithProvenance,
+        important_info: bulletize(background) || null,
+        physical_description: physical.trim() || null,
+        known_people_notes: known.trim() || null,
+      },
+      circleIds,
+      eventIds,
     });
   };
 
@@ -214,6 +233,15 @@ function SheetBody({
           />
         </FieldLabel>
 
+        <FieldLabel label="Date met">
+          <input
+            type="date"
+            value={dateMet}
+            onChange={(e) => setDateMet(e.target.value)}
+            className="glass-input w-full h-11 px-3.5 text-sm"
+          />
+        </FieldLabel>
+
         <FieldLabel label="About">
           <BulletTextarea value={about} onChange={setAbout} rows={3} placeholder="Empty" />
         </FieldLabel>
@@ -241,6 +269,63 @@ function SheetBody({
             className="glass-input w-full px-3.5 py-2.5 text-sm resize-none"
           />
         </FieldLabel>
+
+        {(circles.length > 0 || events.length > 0) && (
+          <FieldLabel label="Circles & Events">
+            <p className="text-[11px] text-[hsl(var(--foreground)/0.55)] mb-2 leading-snug">
+              Drop them into any existing circles or events. Create new ones from the Network tab.
+            </p>
+            {circles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {circles.map((c) => {
+                  const on = circleIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setCircleIds((cur) =>
+                        on ? cur.filter((id) => id !== c.id) : [...cur, c.id],
+                      )}
+                      className={cn(
+                        'glass-pill !h-8 !px-3 text-[12px] active:scale-[0.96] transition-transform',
+                        on
+                          ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
+                          : 'text-[hsl(var(--foreground)/0.7)]',
+                      )}
+                    >
+                      {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {events.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {events.map((e) => {
+                  const on = eventIds.includes(e.id);
+                  const tone = isValidTone(e.tone) ? e.tone : 'red';
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setEventIds((cur) =>
+                        on ? cur.filter((id) => id !== e.id) : [...cur, e.id],
+                      )}
+                      className={cn(
+                        'glass-pill !h-8 !px-3 text-[12px] active:scale-[0.96] transition-transform',
+                        on && tone !== 'red'
+                          ? `tile-${tone} text-white !border-transparent`
+                          : on
+                            ? '!bg-[rgba(224,48,48,0.22)] !border-[rgba(224,48,48,0.40)] text-foreground'
+                            : 'text-[hsl(var(--foreground)/0.7)]',
+                      )}
+                    >
+                      {e.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </FieldLabel>
+        )}
       </div>
 
       <div className="px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom flex items-center gap-2">

@@ -47,13 +47,23 @@ CRITICAL — keep candidates ISOLATED. Each candidate's bullets and rationale re
 
 SCORE ABSOLUTELY, not relative to others in this chunk. The same data produces the same score regardless of what other candidates appear alongside it.
 
-When the user's filter mentions a specific career, industry, organization, or domain, recognize the relevant signals using your training — company names that fit, role titles that fit, email domains that fit, context that fits. Be strict: only score in the high band when the match is genuine, not vaguely adjacent. Apply the same recognition principle to ANY domain the user names (medicine, law, art, academia, sports, real estate, gaming, you name it) — your training knows the equivalent firms / titles / signals for each. If the user's filter is open-ended ("interesting people," "anyone I should remember"), score by stub completeness instead.
+CRITICAL — score MUST align with rationale signal strength. Your rationale is your reasoning trail; the score must match it.
+- If your rationale describes a clear, direct match → score 0.85 to 1.0.
+- If your rationale uses words like "adjacent", "partial", "ambiguous", or "weak signal" → score 0.40 to 0.65.
+- If your rationale says "no signal evident", "no role indicated", "not relevant", "no relevant data", or similar → score MUST be 0.0 to 0.20.
+- NEVER score a candidate in the high band (0.85+) if your own rationale says they don't match. NEVER score in the middle band (0.40+) if your rationale describes them as unrelated.
+
+CRITICAL — presence of data is not a positive signal. A populated company field, a non-empty email, or any other field having content does NOT, by itself, justify a score above 0.20. The content must actually MATCH the user's filter. "Has a company" is not a signal. "Works at Goldman Sachs" for a finance filter IS a signal.
+
+CRITICAL — rationale cannot be empty or trivial. Every candidate gets a real 6-15 word rationale explaining WHY the score is what it is. For clear matches, name the matching signal. For non-matches, explain what's missing or wrong (e.g., "No relevant signal — generic stored contact", "Company field unrelated to filter domain"). Empty rationale is forbidden — if you can't articulate why a score is justified, the candidate doesn't belong in the high or middle band.
+
+When the user's filter mentions a specific career, industry, organization, or domain, recognize the relevant signals using your training — company names that fit, role titles that fit, email domains that fit, context that fits. Apply the same recognition principle to ANY domain the user names (medicine, law, art, academia, sports, real estate, gaming, you name it) — your training knows the equivalent firms / titles / signals for each. If the user's filter is open-ended ("interesting people," "anyone I should remember"), score by stub completeness instead.
 
 Score bands — anchor your numbers here:
-- 0.85 to 1.0: Clear, unambiguous match. Multiple matching signals.
-- 0.55 to 0.80: Plausible match. Adjacent domain, partial signal, ambiguous role at a relevant org.
+- 0.85 to 1.0: Clear, unambiguous match. Multiple matching signals OR one very strong signal (e.g., directly works at a named firm in the filter).
+- 0.55 to 0.80: Plausible match. Adjacent domain, single weaker signal, partial signal at a relevant org.
 - 0.25 to 0.50: Ambiguous or sparse data. Generic role, no domain signal, name + phone only.
-- 0.0 to 0.20: Clear non-match. Context explicitly points away from filter.
+- 0.0 to 0.20: Clear non-match. Context explicitly points away from filter, OR data exists but doesn't match the filter (e.g. company field has an unrelated company), OR rationale identifies no relevant signal.
 
 Bullets — GOOD examples (factual restatements of the candidate's own data):
 - "Analyst at JP Morgan"

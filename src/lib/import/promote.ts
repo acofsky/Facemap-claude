@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { createPerson } from '@/lib/store';
+import { createPerson, setPersonCircles, setPersonEvents } from '@/lib/store';
 import type { Person } from '@/lib/store';
 import { markCandidatePromoted } from './storage';
 import type { ImportCandidateRow, MappedPersonFields } from './types';
@@ -11,6 +11,10 @@ interface PromoteOverrides {
   /** Other Person fields the caller wants to override directly — typically
    *  from the inline review sheet where the user edited the form. */
   fieldOverrides?: Partial<Person>;
+  /** Circle memberships to set on the new Person. */
+  circleIds?: string[];
+  /** Event memberships to set on the new Person. */
+  eventIds?: string[];
 }
 
 /**
@@ -49,6 +53,19 @@ export async function promoteCandidate(
       overrides?.fieldOverrides?.known_people_notes
       ?? mapped.known_people_notes ?? undefined,
   });
+  // Apply circle / event memberships if supplied. Done after createPerson
+  // so we have the new id; failures here log but don't roll back the
+  // promote — the Person row is still valid, just unaffiliated.
+  if (overrides?.circleIds && overrides.circleIds.length > 0) {
+    await setPersonCircles(person.id, overrides.circleIds).catch((e) => {
+      console.warn('Failed to assign circles on promote', e);
+    });
+  }
+  if (overrides?.eventIds && overrides.eventIds.length > 0) {
+    await setPersonEvents(person.id, overrides.eventIds).catch((e) => {
+      console.warn('Failed to assign events on promote', e);
+    });
+  }
   await markCandidatePromoted(c.id, person.id);
   return person;
 }

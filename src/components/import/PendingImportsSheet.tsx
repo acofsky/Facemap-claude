@@ -72,12 +72,21 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
     [candidates, reviewingId],
   );
 
-  const handlePromote = async (c: ImportCandidateRow, overrides?: Partial<Person>) => {
+  const handlePromote = async (
+    c: ImportCandidateRow,
+    payload?: { fields?: Partial<Person>; circleIds?: string[]; eventIds?: string[] },
+  ) => {
     setBusyId(c.id);
     try {
-      await promoteCandidate(c, overrides ? { fieldOverrides: overrides } : undefined);
+      await promoteCandidate(c, payload ? {
+        fieldOverrides: payload.fields,
+        circleIds: payload.circleIds,
+        eventIds: payload.eventIds,
+      } : undefined);
       setCandidates((cur) => cur.filter((x) => x.id !== c.id));
       qc.invalidateQueries({ queryKey: ['persons'] });
+      qc.invalidateQueries({ queryKey: ['person_circles'] });
+      qc.invalidateQueries({ queryKey: ['person_events'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
       setReviewingId((cur) => (cur === c.id ? null : cur));
     } catch (e) {
@@ -261,7 +270,7 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
         matchedPersonId={reviewingCandidate ? matchMap.get(reviewingCandidate.id) : undefined}
         busy={!!reviewingCandidate && busyId === reviewingCandidate.id}
         onClose={() => setReviewingId(null)}
-        onPromote={(overrides) => reviewingCandidate && handlePromote(reviewingCandidate, overrides)}
+        onPromote={(payload) => reviewingCandidate && handlePromote(reviewingCandidate, payload)}
         onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
         onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
       />

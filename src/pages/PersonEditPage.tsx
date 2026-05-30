@@ -52,6 +52,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       photos: person?.photos ?? [],
       how_we_met: person?.how_we_met ?? '',
       where_when: person?.where_when ?? '',
+      date_met: person?.date_met ?? '',
       misc_notes: person?.misc_notes ?? '',
       physical_description: person?.physical_description ?? '',
       physical_ai: person?.physical_description_ai_generated ?? false,
@@ -67,6 +68,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
   const [photos, setPhotos] = useState<string[]>(initial.photos);
   const [howWeMet, setHowWeMet] = useState(initial.how_we_met);
   const [whereWhen, setWhereWhen] = useState(initial.where_when);
+  const [dateMet, setDateMet] = useState(initial.date_met);
   const [miscNotes, setMiscNotes] = useState(initial.misc_notes);
   const [physical, setPhysical] = useState(initial.physical_description);
   // Track whether the current physical_description was AI-generated. Set
@@ -92,6 +94,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       JSON.stringify(photos) !== JSON.stringify(initial.photos) ||
       howWeMet !== initial.how_we_met ||
       whereWhen !== initial.where_when ||
+      dateMet !== initial.date_met ||
       miscNotes !== initial.misc_notes ||
       physical !== initial.physical_description ||
       important !== initial.important_info ||
@@ -125,6 +128,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
           photos,
           how_we_met: howWeMet || null,
           where_when: whereWhen || null,
+          date_met: dateMet || null,
           misc_notes: miscNotes || null,
           physical_description: physical || null,
           // A cleared description can't be AI-generated. Persist the flag
@@ -332,6 +336,15 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
                 className={cn(fieldInputClass, 'pl-9')}
               />
             </div>
+          </Field>
+
+          <Field label="Date met">
+            <input
+              type="date"
+              value={dateMet}
+              onChange={(e) => setDateMet(e.target.value)}
+              className={fieldInputClass}
+            />
           </Field>
 
           <Field label="About">
