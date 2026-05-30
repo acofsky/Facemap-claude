@@ -1,17 +1,20 @@
 import { useState, useMemo } from 'react';
-import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents } from '@/hooks/use-data';
+import { toast } from 'sonner';
+import { usePersons, useCircles, usePersonCircles, useEvents, usePersonEvents, useDeletePerson } from '@/hooks/use-data';
 import { usePendingImportsCount } from '@/hooks/use-pending-imports';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { SwipeRow } from '@/components/SwipeRow';
 import { LogEncounterModal } from '@/components/LogEncounterModal';
 import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { EnrichInfoModal } from '@/components/EnrichInfoModal';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PendingImportsSheet } from '@/components/import/PendingImportsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PersonRowSkeleton } from '@/components/skeletons';
-import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles, Info, Upload } from 'lucide-react';
+import { Search, ListFilter, ChevronRight, Check, CalendarPlus, Sparkles, Info, Upload, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidTone } from '@/lib/store';
+import { haptics } from '@/lib/haptics';
 
 interface PeoplePageProps {
   onSelectPerson: (id: string) => void;
@@ -38,6 +41,12 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
   const [briefFor, setBriefFor] = useState<{ id: string; name: string } | null>(null);
   const [enrichInfoOpen, setEnrichInfoOpen] = useState(false);
   const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const deletePersonMut = useDeletePerson();
 
   const { data: people = [], isLoading } = usePersons();
   const { data: circles = [] } = useCircles();
@@ -94,6 +103,57 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
     }
     return result;
   }, [people, search, filter, sortBy, personCircleMap, personEventMap]);
+
+  // Selection mode helpers — bulk-delete entry point. Long-press
+  // discovery for this is nice-to-have but the explicit "Select" pill
+  // on the header is the discoverable affordance.
+  const enterSelectionMode = (initialId?: string) => {
+    haptics.medium();
+    setSelectionMode(true);
+    setSelectedIds(initialId ? new Set([initialId]) : new Set());
+  };
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+  const toggleSelection = (id: string) => {
+    haptics.selection();
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    haptics.medium();
+    const ids = Array.from(selectedIds);
+    // Wave-parallel deletes — each deletePerson call cascades to
+    // person_circles / person_events / meetings / connections /
+    // import_candidates, so we don't want to fire 100 at once and
+    // overwhelm the Postgres pool. 6 at a time keeps it brisk
+    // without thrashing.
+    const WAVE = 6;
+    let deleted = 0;
+    let failed = 0;
+    for (let i = 0; i < ids.length; i += WAVE) {
+      const wave = ids.slice(i, i + WAVE);
+      const results = await Promise.allSettled(
+        wave.map((id) => deletePersonMut.mutateAsync(id)),
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') deleted++;
+        else failed++;
+      }
+    }
+    setBulkDeleting(false);
+    setBulkDeleteConfirmOpen(false);
+    exitSelectionMode();
+    toast.success(failed ? `${deleted} removed · ${failed} failed` : `${deleted} removed`);
+  };
 
   const sortMenu = (
     <div className="relative">
@@ -175,6 +235,15 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
             />
           </div>
           {embedded && sortMenu}
+          {!selectionMode && people.length > 0 && (
+            <button
+              onClick={() => enterSelectionMode()}
+              aria-label="Select people"
+              className="glass-pill !h-11 !px-3 inline-flex items-center justify-center text-[13px] font-medium text-foreground active:scale-95 transition-transform"
+            >
+              Select
+            </button>
+          )}
         </div>
       </div>
 
@@ -250,7 +319,7 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
           </div>
         </div>
       ) : (
-        <div className="px-5 space-y-2.5">
+        <div className={cn('px-5 space-y-2.5', selectionMode && 'pb-24')}>
           {filtered.map((p) => {
             const cIds = personCircleMap[p.id] || [];
             const cs = cIds.map((id) => circles.find((c) => c.id === id)).filter(Boolean);
@@ -260,7 +329,56 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
             const meta = cs.length > 0
               ? cs.map((c) => c!.name).join(' · ')
               : p.where_when || null;
-            return (
+            const selected = selectedIds.has(p.id);
+
+            const rowInner = (
+              <button
+                onClick={() => selectionMode ? toggleSelection(p.id) : onSelectPerson(p.id)}
+                className={cn(
+                  'glass-card-solid w-full flex items-center gap-3 p-3.5 text-left transition-colors',
+                  selectionMode && selected && '!bg-[rgba(224,48,48,0.18)] !border-[rgba(224,48,48,0.40)]',
+                )}
+              >
+                {selectionMode && (
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center',
+                      selected
+                        ? 'bg-primary border-primary'
+                        : 'border-[hsl(0_0%_100%/0.25)]',
+                    )}
+                  >
+                    {selected && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3} />}
+                  </div>
+                )}
+                <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-display text-[17px] text-foreground truncate leading-tight">
+                    {p.name}
+                  </div>
+                  {noteSnippet && (
+                    <div className="font-display-italic text-[12px] text-[hsl(var(--foreground)/0.65)] truncate leading-snug mt-0.5">
+                      {noteSnippet}
+                    </div>
+                  )}
+                  {meta && (
+                    <div className="text-[11px] text-[hsl(var(--foreground)/0.45)] truncate mt-0.5">
+                      {meta}
+                    </div>
+                  )}
+                </div>
+                {!selectionMode && (
+                  <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
+                )}
+              </button>
+            );
+
+            // Selection mode disables swipe actions — the row becomes
+            // a plain toggle-on-tap so the user doesn't accidentally
+            // fire Log/Brief while batch-picking.
+            return selectionMode ? (
+              <div key={p.id} className="rounded-2xl">{rowInner}</div>
+            ) : (
               <SwipeRow
                 key={p.id}
                 className="rounded-2xl"
@@ -281,28 +399,7 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
                   },
                 ]}
               >
-                <button
-                  onClick={() => onSelectPerson(p.id)}
-                  className="glass-card-solid w-full flex items-center gap-3 p-3.5 text-left"
-                >
-                  <PersonAvatar name={p.name} photo={p.photos[0]} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-display text-[17px] text-foreground truncate leading-tight">
-                      {p.name}
-                    </div>
-                    {noteSnippet && (
-                      <div className="font-display-italic text-[12px] text-[hsl(var(--foreground)/0.65)] truncate leading-snug mt-0.5">
-                        {noteSnippet}
-                      </div>
-                    )}
-                    {meta && (
-                      <div className="text-[11px] text-[hsl(var(--foreground)/0.45)] truncate mt-0.5">
-                        {meta}
-                      </div>
-                    )}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[hsl(var(--foreground)/0.45)] shrink-0" strokeWidth={1.75} />
-                </button>
+                {rowInner}
               </SwipeRow>
             );
           })}
@@ -319,6 +416,52 @@ export function PeoplePage({ onSelectPerson, embedded = false, onOpenImport }: P
       )}
       <EnrichInfoModal open={enrichInfoOpen} onClose={() => setEnrichInfoOpen(false)} />
       <PendingImportsSheet open={pendingDrawerOpen} onClose={() => setPendingDrawerOpen(false)} />
+
+      {selectionMode && (
+        <div
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-4 pb-3 pt-3 safe-bottom"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.85) 100%)',
+          }}
+        >
+          <div className="glass flex items-center gap-2 p-2">
+            <button
+              onClick={exitSelectionMode}
+              disabled={bulkDeleting}
+              className="glass-pill !h-10 !px-3 inline-flex items-center justify-center text-[13px] text-[hsl(var(--foreground)/0.7)] disabled:opacity-50"
+            >
+              <X className="w-4 h-4" strokeWidth={1.75} />
+            </button>
+            <div className="flex-1 text-center text-[13px] text-foreground">
+              {selectedIds.size === 0
+                ? 'Tap rows to select'
+                : `${selectedIds.size} selected`}
+            </div>
+            <button
+              onClick={() => setBulkDeleteConfirmOpen(true)}
+              disabled={selectedIds.size === 0 || bulkDeleting}
+              className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold inline-flex items-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-40"
+            >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        title={`Remove ${selectedIds.size} from Membr?`}
+        description={`This deletes ${selectedIds.size === 1 ? 'this person' : 'these people'} along with their encounters, circle/event memberships, and connections. This cannot be undone.`}
+        confirmLabel="Remove all"
+        cancelLabel="Keep"
+        destructive
+        loading={bulkDeleting}
+        loadingLabel="Removing"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteConfirmOpen(false)}
+      />
     </div>
   );
 }

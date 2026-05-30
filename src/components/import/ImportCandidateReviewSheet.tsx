@@ -197,7 +197,7 @@ function SheetBody({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-5 pt-3 pb-5 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pt-3 pb-5 space-y-4">
         {candidate.ai_rationale && (
           <div className="flex items-start gap-2 text-[12px] text-[hsl(var(--foreground)/0.65)] leading-snug">
             <Sparkles className="w-3 h-3 mt-0.5 shrink-0 text-primary" strokeWidth={1.75} />
@@ -238,7 +238,10 @@ function SheetBody({
             type="date"
             value={dateMet}
             onChange={(e) => setDateMet(e.target.value)}
-            className="glass-input w-full h-11 px-3.5 text-sm"
+            // appearance-none + block + min-w-0 keep iOS WebKit's native
+            // date widget from punching out of the container's width and
+            // creating a phantom horizontal scrollbar on the form.
+            className="glass-input block w-full min-w-0 h-11 px-3.5 text-sm appearance-none"
           />
         </FieldLabel>
 

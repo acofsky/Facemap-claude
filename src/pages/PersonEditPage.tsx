@@ -260,7 +260,7 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
       </div>
 
       {/* Scroll form */}
-      <div className="flex-1 overflow-y-auto pb-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-32">
         <div className="flex justify-center pt-4 pb-2">
           <div className="relative">
             <PersonAvatar name={name || 'New'} photo={photos[0]} size="lg" className="!w-24 !h-24 !text-2xl" />
@@ -343,7 +343,10 @@ export function PersonEditPage({ personId, onClose }: PersonEditPageProps) {
               type="date"
               value={dateMet}
               onChange={(e) => setDateMet(e.target.value)}
-              className={fieldInputClass}
+              // See the corresponding comment on the import review sheet
+              // — iOS WebKit's native date widget needs these to honor
+              // the container's width.
+              className={cn(fieldInputClass, 'block min-w-0 appearance-none')}
             />
           </Field>
 
