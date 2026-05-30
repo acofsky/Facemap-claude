@@ -87,6 +87,16 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkOptionsOpen, setBulkOptionsOpen] = useState(false);
+  // Multi-select on the review screen: lets the user hand-pick a subset,
+  // drop them into a circle/event, then pick another subset for a different
+  // one — instead of being forced to send the whole list to a single
+  // destination. selectMode toggles the UI; selectedIds is the working set.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // True when the bulk sheet was opened from a subset selection (vs "Add
+  // all"), so handleBulkAdd knows which set to act on and the sheet can
+  // adapt its copy.
+  const [bulkFromSelection, setBulkFromSelection] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [contactsResultModal, setContactsResultModal] = useState<
     { totalRead: number; alreadyKnown: number } | null
@@ -357,11 +367,18 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   // floor since the AI has no goal to measure against.
   const filterActive = !!filterText.trim();
   const visibleCandidates = useMemo(() => {
+    // No filter → nothing to score against, so just surface the first N in
+    // insertion order (topN is a real cap here).
     if (!filterActive) return aliveCandidates.slice(0, topN);
-    const qualified = aliveCandidates.filter(
+    // With a filter, topN is a soft TARGET, not a cap. Show every candidate
+    // that clears the quality bar — if 25 finance contacts qualify, show all
+    // 25, not just the selected 20. The selector still scopes intent (the
+    // user picks a ballpark) but we never bury a genuine match in the drawer
+    // just to honor an arbitrary ceiling. Fewer than N qualifying still shows
+    // fewer; the "go under" side of this was already the behavior.
+    return aliveCandidates.filter(
       (c) => (c.ai_relevance_score ?? 0) >= TOP_QUALITY_THRESHOLD,
     );
-    return qualified.slice(0, topN);
   }, [aliveCandidates, topN, filterActive]);
   const drawerCandidates = useMemo(() => {
     const visibleIds = new Set(visibleCandidates.map((c) => c.id));
@@ -424,17 +441,23 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     }
   };
 
-  // Add everyone shown on the review screen. Uses the AI's original
-  // bullets (any per-row edits live inside each row component and aren't
-  // hoisted here — the per-row + button is for users who want to tweak).
-  const handleAddEveryone = async (opts: { circleIds: string[]; eventIds: string[] }) => {
-    if (visibleCandidates.length === 0) return;
+  // Core bulk-add. Promotes (or merges, when matched) a specific set of
+  // candidates, optionally dropping them all into the given circles/events.
+  // Used by both "Add all" (whole visible list) and select-mode subset adds.
+  // Uses each candidate's AI bullets — per-field edits happen in the review
+  // sheet, not here.
+  const runBulkAdd = async (
+    targets: ImportCandidateRow[],
+    opts: { circleIds: string[]; eventIds: string[] },
+  ): Promise<number> => {
+    if (targets.length === 0) return 0;
     haptics.medium();
     setBulkAdding(true);
     let promoted = 0;
     let merged = 0;
     let failed = 0;
-    for (const c of visibleCandidates) {
+    const done: string[] = [];
+    for (const c of targets) {
       try {
         const matchedId = matchMap.get(c.id);
         if (matchedId) {
@@ -450,6 +473,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
           });
           promoted++;
         }
+        done.push(c.id);
         setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       } catch (e) {
         console.error('Bulk add failed for', c.id, e);
@@ -457,7 +481,6 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       }
     }
     setBulkAdding(false);
-    setBulkOptionsOpen(false);
     qc.invalidateQueries({ queryKey: ['persons'] });
     qc.invalidateQueries({ queryKey: ['person_circles'] });
     qc.invalidateQueries({ queryKey: ['person_events'] });
@@ -467,6 +490,48 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     if (merged) parts.push(`${merged} merged`);
     if (failed) parts.push(`${failed} failed`);
     toast.success(parts.join(' · ') || 'Done');
+    return done.length;
+  };
+
+  // "Add all N" path — confirms via the bulk sheet, acts on the whole
+  // visible list, then closes the sheet.
+  const handleAddEveryone = async (opts: { circleIds: string[]; eventIds: string[] }) => {
+    await runBulkAdd(visibleCandidates, opts);
+    setBulkOptionsOpen(false);
+    setBulkFromSelection(false);
+  };
+
+  // Select-mode subset path — acts on just the checked rows, then clears
+  // the selection but STAYS in select mode so the user can immediately pick
+  // the next batch for a different circle/event. Already-promoted rows drop
+  // out of the list on the next render, so the selection naturally resets.
+  const handleAddSelected = async (opts: { circleIds: string[]; eventIds: string[] }) => {
+    const targets = visibleCandidates.filter((c) => selectedIds.has(c.id));
+    await runBulkAdd(targets, opts);
+    setBulkOptionsOpen(false);
+    setBulkFromSelection(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const enterSelectMode = () => {
+    haptics.selection();
+    setSelectMode(true);
+    setSelectedIds(new Set());
+  };
+
+  const exitSelectMode = () => {
+    haptics.selection();
+    setSelectMode(false);
+    setSelectedIds(new Set());
   };
 
   // How many drafts each source contributed this session — used to label
@@ -491,6 +556,9 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     setRankFailed(false);
     setUnscoredCount(0);
     setShowLowScores(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setBulkFromSelection(false);
     setCandidates([]);
     setDrafts([]);
     setCompletedSources(new Set());
@@ -618,18 +686,25 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             rankFailed={rankFailed}
             unscoredCount={unscoredCount}
             ranking={ranking}
-            topN={topN}
             onRetryRank={handleRetryRank}
             onReview={(c) => setReviewingId(c.id)}
             onPromote={handlePromote}
             onMerge={handleMerge}
             onDismiss={handleDismiss}
             onOpenDrawer={() => setDrawerOpen(true)}
-            onAddEveryone={() => setBulkOptionsOpen(true)}
+            onAddEveryone={() => { setBulkFromSelection(false); setBulkOptionsOpen(true); }}
             onRestart={handleRestart}
             promotedCount={promotedCount}
             aliveCount={aliveCount}
             onDone={onClose}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onEnterSelectMode={enterSelectMode}
+            onExitSelectMode={exitSelectMode}
+            onToggleSelect={toggleSelect}
+            onSelectAll={() => setSelectedIds(new Set(visibleCandidates.map((c) => c.id)))}
+            onClearSelection={() => setSelectedIds(new Set())}
+            onAddSelected={() => { setBulkFromSelection(true); setBulkOptionsOpen(true); }}
           />
         )}
       </div>
@@ -659,10 +734,15 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
 
       <BulkAddOptionsSheet
         open={bulkOptionsOpen}
-        candidateCount={visibleCandidates.length}
+        candidateCount={bulkFromSelection ? selectedIds.size : visibleCandidates.length}
+        subset={bulkFromSelection}
         busy={bulkAdding}
-        onClose={() => !bulkAdding && setBulkOptionsOpen(false)}
-        onConfirm={handleAddEveryone}
+        onClose={() => {
+          if (bulkAdding) return;
+          setBulkOptionsOpen(false);
+          setBulkFromSelection(false);
+        }}
+        onConfirm={bulkFromSelection ? handleAddSelected : handleAddEveryone}
       />
 
       <LinkedInHowToModal open={linkedInHowTo} onClose={() => setLinkedInHowTo(false)} />
@@ -1167,7 +1247,6 @@ function ReviewStep({
   rankFailed,
   unscoredCount,
   ranking,
-  topN,
   onRetryRank,
   onReview,
   onPromote,
@@ -1179,6 +1258,14 @@ function ReviewStep({
   promotedCount,
   aliveCount,
   onDone,
+  selectMode,
+  selectedIds,
+  onEnterSelectMode,
+  onExitSelectMode,
+  onToggleSelect,
+  onSelectAll,
+  onClearSelection,
+  onAddSelected,
 }: {
   visibleCandidates: ImportCandidateRow[];
   drawerCount: number;
@@ -1188,7 +1275,6 @@ function ReviewStep({
   rankFailed: boolean;
   unscoredCount: number;
   ranking: boolean;
-  topN: TopN;
   onRetryRank: () => Promise<void> | void;
   onReview: (c: ImportCandidateRow) => void;
   onPromote: (c: ImportCandidateRow) => Promise<void> | void;
@@ -1200,7 +1286,16 @@ function ReviewStep({
   promotedCount: number;
   aliveCount: number;
   onDone: () => void;
+  selectMode: boolean;
+  selectedIds: Set<string>;
+  onEnterSelectMode: () => void;
+  onExitSelectMode: () => void;
+  onToggleSelect: (id: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  onAddSelected: () => void;
 }) {
+  const allSelected = visibleCandidates.length > 0 && selectedIds.size === visibleCandidates.length;
   return (
     <div className="px-5 pt-2">
       <p className="text-[13px] text-[hsl(var(--foreground)/0.6)] mb-3 leading-relaxed">
@@ -1208,9 +1303,7 @@ function ReviewStep({
           ? `${aliveCount} pulled`
           : visibleCandidates.length === 0
             ? `0 strong matches out of ${aliveCount} — see the drawer for the rest`
-            : visibleCandidates.length < topN
-              ? `${visibleCandidates.length} strong matches of ${aliveCount} — fewer than ${topN} cleared the bar`
-              : `AI's top ${visibleCandidates.length} of ${aliveCount}`}.
+            : `${visibleCandidates.length} strong ${visibleCandidates.length === 1 ? 'match' : 'matches'} of ${aliveCount}`}.
         {promotedCount > 0 && (
           <span className="text-foreground"> {promotedCount} added so far.</span>
         )}
@@ -1250,23 +1343,60 @@ function ReviewStep({
         </button>
       )}
 
-      {visibleCandidates.length > 0 && (
+      {visibleCandidates.length > 0 && !selectMode && (
+        <>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={onAddEveryone}
+              disabled={bulkAdding}
+              className="flex-1 glass-pill h-11 inline-flex items-center justify-center gap-1.5 text-[13px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {bulkAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 text-primary" strokeWidth={2} />}
+              {bulkAdding ? 'Adding…' : `Add all ${visibleCandidates.length}`}
+            </button>
+            <button
+              onClick={onRestart}
+              disabled={bulkAdding}
+              className="glass-pill h-11 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Restart
+            </button>
+          </div>
+          {/* Entry point for incremental adds: pick a subset → one circle/
+              event, then another subset → another. Sits under "Add all" so
+              the whole-list path stays the default one-tap action. */}
+          <button
+            onClick={onEnterSelectMode}
+            className="w-full mb-3 h-9 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.7)] active:scale-[0.99] transition-transform"
+          >
+            <Check className="w-3.5 h-3.5" strokeWidth={1.75} />
+            Select people to add by group
+          </button>
+        </>
+      )}
+
+      {/* Select-mode toolbar — replaces the Add-all bar while picking a
+          subset. Select-all / clear on the left, Done on the right. The
+          actual "Add N selected" CTA is the sticky bar near the bottom. */}
+      {visibleCandidates.length > 0 && selectMode && (
         <div className="flex items-center gap-2 mb-3">
           <button
-            onClick={onAddEveryone}
+            onClick={allSelected ? onClearSelection : onSelectAll}
             disabled={bulkAdding}
-            className="flex-1 glass-pill h-11 inline-flex items-center justify-center gap-1.5 text-[13px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+            className="glass-pill h-11 px-3.5 inline-flex items-center justify-center gap-1.5 text-[12px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
           >
-            {bulkAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 text-primary" strokeWidth={2} />}
-            {bulkAdding ? 'Adding…' : `Add all ${visibleCandidates.length}`}
+            {allSelected ? 'Clear all' : 'Select all'}
           </button>
+          <div className="flex-1 text-center text-[12px] text-[hsl(var(--foreground)/0.6)]">
+            {selectedIds.size} selected
+          </div>
           <button
-            onClick={onRestart}
+            onClick={onExitSelectMode}
             disabled={bulkAdding}
-            className="glass-pill h-11 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+            className="glass-pill h-11 px-3.5 inline-flex items-center justify-center text-[12px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
           >
-            <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Restart
+            Done
           </button>
         </div>
       )}
@@ -1289,7 +1419,7 @@ function ReviewStep({
           )}
         </div>
       ) : (
-        <div className="space-y-2.5 mt-2">
+        <div className={cn('space-y-2.5 mt-2', selectMode && selectedIds.size > 0 && 'pb-20')}>
           {visibleCandidates.map((c) => {
             const matchedId = matchMap.get(c.id);
             return (
@@ -1301,6 +1431,9 @@ function ReviewStep({
                   onReview={() => onReview(c)}
                   onPromote={() => (matchedId ? onMerge(c, matchedId) : onPromote(c))}
                   onDismiss={() => onDismiss(c)}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(c.id)}
+                  onToggleSelect={() => onToggleSelect(c.id)}
                 />
               </div>
             );
@@ -1308,7 +1441,22 @@ function ReviewStep({
         </div>
       )}
 
-      {drawerCount > 0 && (
+      {/* Sticky CTA while in select mode with at least one row checked.
+          Opens the same circle/event sheet, scoped to the selection. */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed left-0 right-0 bottom-0 z-30 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-black/90 via-black/70 to-transparent">
+          <button
+            onClick={onAddSelected}
+            disabled={bulkAdding}
+            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
+          >
+            {bulkAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
+            {bulkAdding ? 'Adding…' : `Add ${selectedIds.size} to a group`}
+          </button>
+        </div>
+      )}
+
+      {drawerCount > 0 && !selectMode && (
         <button
           onClick={onOpenDrawer}
           className="w-full mt-4 glass-pill h-12 inline-flex items-center justify-center gap-2 text-[14px] text-foreground"
@@ -1318,12 +1466,14 @@ function ReviewStep({
         </button>
       )}
 
-      <button
-        onClick={onDone}
-        className="w-full mt-6 h-[52px] rounded-2xl bg-[hsl(0_0%_100%/0.06)] text-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
-      >
-        Done
-      </button>
+      {!selectMode && (
+        <button
+          onClick={onDone}
+          className="w-full mt-6 h-[52px] rounded-2xl bg-[hsl(0_0%_100%/0.06)] text-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
+        >
+          Done
+        </button>
+      )}
     </div>
   );
 }

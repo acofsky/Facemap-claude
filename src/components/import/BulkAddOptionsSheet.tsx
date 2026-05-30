@@ -11,6 +11,10 @@ interface BulkAddOptionsSheetProps {
   open: boolean;
   candidateCount: number;
   busy?: boolean;
+  /** When true the sheet is acting on a hand-picked subset (select mode)
+   *  rather than the whole visible list. Only changes copy — "Add all N"
+   *  becomes "Add N selected" so the user knows the scope of the action. */
+  subset?: boolean;
   onClose: () => void;
   onConfirm: (opts: { circleIds: string[]; eventIds: string[] }) => void;
 }
@@ -25,6 +29,7 @@ export function BulkAddOptionsSheet({
   open,
   candidateCount,
   busy,
+  subset,
   onClose,
   onConfirm,
 }: BulkAddOptionsSheetProps) {
@@ -59,7 +64,7 @@ export function BulkAddOptionsSheet({
         <div className="flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-[hsl(var(--foreground)/0.55)] font-semibold">
-              Add all
+              {subset ? 'Add selected' : 'Add all'}
             </div>
             <h2 className="text-xl font-display text-foreground tracking-[-0.02em]">
               {candidateCount} {candidateCount === 1 ? 'person' : 'people'} to People
@@ -122,7 +127,7 @@ export function BulkAddOptionsSheet({
             className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] active:scale-[0.98] transition-transform disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2} />}
-            {busy ? 'Adding…' : `Add all ${candidateCount}`}
+            {busy ? 'Adding…' : subset ? `Add ${candidateCount} selected` : `Add all ${candidateCount}`}
           </button>
         </div>
       </motion.div>

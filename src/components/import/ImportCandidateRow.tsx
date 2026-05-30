@@ -1,4 +1,4 @@
-import { Loader2, Pencil, Plus, Users, X } from 'lucide-react';
+import { Check, Loader2, Pencil, Plus, Users, X } from 'lucide-react';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,13 @@ interface ImportCandidateRowProps {
    *  defaults, no per-field editing. */
   onPromote: () => void;
   onDismiss: () => void;
+  /** When true, the row is in multi-select mode: tapping the body toggles
+   *  selection instead of opening review, the avatar is replaced by a
+   *  checkbox, and the per-row action buttons are hidden (the batch action
+   *  bar handles adding the selected set). */
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /**
@@ -30,6 +37,9 @@ export function ImportCandidateRow({
   onReview,
   onPromote,
   onDismiss,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: ImportCandidateRowProps) {
   const meta: string[] = [];
   if (candidate.title) meta.push(candidate.title);
@@ -39,6 +49,15 @@ export function ImportCandidateRow({
   const handleReview = () => {
     haptics.selection();
     onReview();
+  };
+
+  const handleRowClick = () => {
+    if (selectMode) {
+      haptics.selection();
+      onToggleSelect?.();
+    } else {
+      handleReview();
+    }
   };
 
   const handlePromote = (e: React.MouseEvent) => {
@@ -61,15 +80,31 @@ export function ImportCandidateRow({
   return (
     <button
       type="button"
-      onClick={handleReview}
-      className="glass p-3 w-full text-left active:bg-[hsl(0_0%_100%/0.04)] transition-colors"
+      onClick={handleRowClick}
+      className={cn(
+        'glass p-3 w-full text-left active:bg-[hsl(0_0%_100%/0.04)] transition-colors',
+        selectMode && selected && 'ring-1 ring-primary/70 bg-[hsl(var(--primary)/0.08)]',
+      )}
     >
       <div className="flex items-center gap-3">
-        <PersonAvatar
-          name={candidate.name}
-          photo={candidate.photo_path || undefined}
-          size="sm"
-        />
+        {selectMode ? (
+          <span
+            className={cn(
+              'w-9 h-9 shrink-0 rounded-full flex items-center justify-center border transition-colors',
+              selected
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'border-[hsl(0_0%_100%/0.25)] text-transparent',
+            )}
+          >
+            <Check className="w-4 h-4" strokeWidth={2.5} />
+          </span>
+        ) : (
+          <PersonAvatar
+            name={candidate.name}
+            photo={candidate.photo_path || undefined}
+            size="sm"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-display text-[15px] text-foreground truncate leading-tight">
@@ -86,35 +121,39 @@ export function ImportCandidateRow({
             {meta.length > 0 ? meta.join(' · ') : `From ${sourceLabel(candidate.source)}`}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleEdit}
-          disabled={busy}
-          aria-label="Review and edit"
-          className={cn(
-            'w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.65)] active:scale-95 transition-transform disabled:opacity-50',
-          )}
-        >
-          <Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />
-        </button>
-        <button
-          type="button"
-          onClick={handlePromote}
-          disabled={busy}
-          aria-label={matchedPersonId ? 'Merge in' : 'Add to People'}
-          className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
-        </button>
-        <button
-          type="button"
-          onClick={handleDismiss}
-          disabled={busy}
-          aria-label="Dismiss"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.55)] active:scale-95 transition-transform disabled:opacity-50"
-        >
-          <X className="w-4 h-4" strokeWidth={1.75} />
-        </button>
+        {!selectMode && (
+          <>
+            <button
+              type="button"
+              onClick={handleEdit}
+              disabled={busy}
+              aria-label="Review and edit"
+              className={cn(
+                'w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.65)] active:scale-95 transition-transform disabled:opacity-50',
+              )}
+            >
+              <Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={handlePromote}
+              disabled={busy}
+              aria-label={matchedPersonId ? 'Merge in' : 'Add to People'}
+              className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              disabled={busy}
+              aria-label="Dismiss"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[hsl(var(--foreground)/0.55)] active:scale-95 transition-transform disabled:opacity-50"
+            >
+              <X className="w-4 h-4" strokeWidth={1.75} />
+            </button>
+          </>
+        )}
       </div>
     </button>
   );
