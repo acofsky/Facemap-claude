@@ -47,25 +47,32 @@ CRITICAL — keep candidates ISOLATED. Each candidate's bullets and rationale re
 
 SCORE ABSOLUTELY, not relative to others in this chunk. The same data produces the same score regardless of what other candidates appear alongside it.
 
-CRITICAL — A SINGLE strong signal is enough for the high band. If the candidate's company field directly contains a named firm matching the user's filter (e.g. "JPMorgan" / "Goldman Sachs" / "Cleveland Clinic" / "Cravath" for the respective domains), score 0.85+ — period. Do NOT downgrade because the title is missing, or the email is missing, or you have only name + company. Missing data is not a negative signal; only conflicting or unrelated data is. "JPMorgan" in the company field plus nothing else still earns 0.85+ on a finance filter.
+CRITICAL — A SINGLE strong signal is enough for the high band (0.85+). If the candidate's company, title, email domain, or context clearly belongs to the domain the user named, score 0.85+ — period. Do NOT downgrade because other fields are missing. Missing data is not a negative signal; only conflicting or unrelated data is. One matching field plus nothing else still earns 0.85+.
 
-CRITICAL — Don't invent firm names from email domains. If you recognize the domain (e.g. @jpmorgan.com → JP Morgan), use it. If you don't recognize the domain, say so — phrase the rationale as "email domain {domain} — firm unknown" and score by whatever other signal exists, not by your guess at what the domain might stand for. Hallucinating "PIC Partners" out of "pwpartners.com" is exactly the failure mode this rule prevents.
+CRITICAL — fame is NOT the bar; domain membership is. You are expected to use your full knowledge of each field, not just its household names. Mid-size firms, boutiques, regional players, specialist shops, advisory/recruiting firms, and lesser-known orgs that genuinely belong to the user's named domain score in the SAME high band as the marquee names. The breadth expected (illustrative across domains, NOT a finance-specific list):
+- finance filter → not only "Goldman Sachs" / "JPMorgan" but also boutique advisory, restructuring/turnaround shops (e.g. Alvarez & Marsal, FTI), regional banks, PE/credit funds, fintech, finance-focused recruiters.
+- medicine filter → not only "Cleveland Clinic" / "Mayo" but also regional hospital systems, group practices, biotech, med-device, nursing.
+- law filter → not only "Cravath" / "Skadden" but also regional firms, boutiques, in-house counsel, public defenders.
+- academia filter → not only "Harvard" but any university/college, department, lab, fraternity/sorority, dorm, course, .edu email.
+- arts / trades / sports / real estate / gaming / etc. → apply the same generosity using what your training knows about that field.
+If a firm is plausibly in the named domain but you're not certain, treat it as a match and say so in the rationale (e.g. "M3 — consulting firm, plausibly finance-adjacent"). Lean toward inclusion for real domain signal; reserve low scores for data that is clearly unrelated or absent.
 
-CRITICAL — score MUST align with rationale signal strength. Your rationale is your reasoning trail; the score must match it.
-- If your rationale describes a clear, direct match → score 0.85 to 1.0.
-- If your rationale uses words like "adjacent", "partial", "ambiguous", or "weak signal" → score 0.40 to 0.65.
-- If your rationale says "no signal evident", "no role indicated", "not relevant", "no relevant data", or similar → score MUST be 0.0 to 0.20.
-- NEVER score a candidate in the high band (0.85+) if your own rationale says they don't match. NEVER score in the middle band (0.40+) if your rationale describes them as unrelated.
+CRITICAL — Don't invent firm names from email domains. If you recognize the domain (e.g. @jpmorgan.com → JP Morgan), use it. If you don't recognize the domain, say so — phrase the rationale as "email domain {domain} — firm unknown" and score by whatever other signal exists, not by your guess at what the domain might stand for. Hallucinating "PIC Partners" out of "pwpartners.com" is exactly the failure mode this rule prevents. (This guards against fabrication — it does NOT mean "score low when unsure whether a KNOWN firm fits the domain." Those are different: don't invent names you can't read; do generously classify names you can read.)
 
-CRITICAL — presence of data is not a positive signal. A populated company field, a non-empty email, or any other field having content does NOT, by itself, justify a score above 0.20. The content must actually MATCH the user's filter. "Has a company" is not a signal. "Works at Goldman Sachs" for a finance filter IS a signal.
+CRITICAL — score MUST align with rationale signal strength, and presence of UNRELATED data is not a signal.
+- Rationale describes a clear domain match (marquee OR boutique) → score 0.85 to 1.0.
+- Rationale uses "adjacent", "partial", "ambiguous", "plausibly", or "weak signal" → score 0.55 to 0.80.
+- Rationale says "no signal evident", "not relevant", "company unrelated to filter", or similar → score 0.0 to 0.25.
+- A populated field whose CONTENT doesn't match the filter is NOT a positive signal ("has a company" ≠ a signal). But a populated field whose content DOES belong to the domain IS a strong signal, famous or not.
+- NEVER score 0.85+ if your rationale says they don't match. NEVER score 0.0-0.20 if your rationale names a real domain firm.
 
 CRITICAL — rationale cannot be empty or trivial. Every candidate gets a real 6-15 word rationale explaining WHY the score is what it is. For clear matches, name the matching signal. For non-matches, explain what's missing or wrong (e.g., "No relevant signal — generic stored contact", "Company field unrelated to filter domain"). Empty rationale is forbidden — if you can't articulate why a score is justified, the candidate doesn't belong in the high or middle band.
 
-When the user's filter mentions a specific career, industry, organization, or domain, recognize the relevant signals using your training — company names that fit, role titles that fit, email domains that fit, context that fits. Apply the same recognition principle to ANY domain the user names (medicine, law, art, academia, sports, real estate, gaming, you name it) — your training knows the equivalent firms / titles / signals for each. If the user's filter is open-ended ("interesting people," "anyone I should remember"), score by stub completeness instead.
+When the user's filter mentions a specific career, industry, organization, or domain, recognize the relevant signals using your training — company names that fit, role titles that fit, email domains that fit, context that fits. Apply the same recognition principle to ANY domain the user names (medicine, law, art, academia, sports, real estate, gaming, you name it) — your training knows the equivalent firms / titles / signals for each, down to the mid-size and boutique tier. If the user's filter is open-ended ("interesting people," "anyone I should remember"), score by stub completeness instead.
 
 Score bands — anchor your numbers here:
-- 0.85 to 1.0: Clear, unambiguous match. EITHER multiple matching signals OR one strong signal — including the candidate's company field directly naming a firm in the user's filter domain. Do not require multiple signals.
-- 0.55 to 0.80: Plausible match. Adjacent domain, single weaker signal, partial signal at a relevant org.
+- 0.85 to 1.0: Clear domain match. One or more fields name a firm/role/org/email that belongs to the user's domain — marquee OR boutique/regional/specialist. Do not require multiple signals, and do not require fame.
+- 0.55 to 0.80: Plausible match. Adjacent domain, single weaker signal, or a firm you suspect but can't confirm fits the domain.
 - 0.25 to 0.50: Ambiguous or sparse data. Generic role, no domain signal, name + phone only.
 - 0.0 to 0.20: Clear non-match. Context explicitly points away from filter, OR data exists but doesn't match the filter (e.g. company field has an unrelated company), OR rationale identifies no relevant signal.
 

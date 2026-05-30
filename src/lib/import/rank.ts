@@ -35,56 +35,89 @@ const CHUNK_SIZE = 15;
 const MAX_CONCURRENT_CHUNKS = 4;
 
 /**
+ * Result of a ranking pass. `ranked` is every candidate that got a real
+ * AI score this pass. `unscoredIds` is candidates whose chunk failed
+ * (timeout, parse failure, etc.) and therefore still have NULL score in
+ * the DB — the caller uses this to surface a retry affordance instead of
+ * silently leaving genuine matches stranded at the bottom of the drawer.
+ */
+export interface RankOutcome {
+  ranked: RankResponse['ranked'];
+  unscoredIds: string[];
+}
+
+// Within a single rankCandidates call, failed chunks get one automatic
+// re-attempt before we give up and report them as unscored. The most
+// common failure is a transient iOS WebView fetch timeout on a slow
+// chunk; an immediate retry clears the bulk of those without the user
+// ever seeing the retry banner. We only retry ONCE here (the banner
+// handles anything still failing) so a hard outage can't loop forever.
+const CHUNK_RETRY_ATTEMPTS = 1;
+
+/**
  * Send candidates to the rank-import-candidates edge function in chunks,
  * write the resulting scores/rationales/bullets back to the DB. Chunks
  * fan out in parallel (capped) so a 200-contact import doesn't crawl
  * through 8 sequential edge-function cold starts. Per-row DB update
  * failures are tolerated (logged and skipped) so a single bad write
  * can't kill the whole pass.
+ *
+ * Returns a RankOutcome so the caller knows EXACTLY which candidates
+ * never got scored (failed chunks). Previously partial failures were
+ * completely silent: if 5 of 27 chunks timed out, ~75 candidates kept
+ * NULL scores, sorted to the bottom of the drawer, and nothing told the
+ * user they'd never actually been looked at. Now those ids come back so
+ * the review screen can offer a real "N couldn't be scored — retry".
  */
 export async function rankCandidates(
   filterText: string,
   candidates: ImportCandidateRow[],
-): Promise<RankResponse['ranked']> {
+): Promise<RankOutcome> {
   const chunks: ImportCandidateRow[][] = [];
   for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
     chunks.push(candidates.slice(i, i + CHUNK_SIZE));
   }
 
   const all: RankResponse['ranked'] = [];
-  let failedChunks = 0;
-  // Run chunks in waves so we never hold more than MAX_CONCURRENT_CHUNKS
-  // in flight at once. Each wave waits for its chunks to settle before
-  // the next wave kicks off — failures in one wave don't cascade.
-  for (let w = 0; w < chunks.length; w += MAX_CONCURRENT_CHUNKS) {
-    const wave = chunks.slice(w, w + MAX_CONCURRENT_CHUNKS);
-    const results = await Promise.allSettled(wave.map((chunk) => runChunk(filterText, chunk)));
-    results.forEach((r, idx) => {
-      if (r.status === 'fulfilled') {
-        all.push(...r.value);
-      } else {
-        failedChunks++;
-        console.warn('Rank chunk failed', w + idx, r.reason);
-      }
-    });
+  // Track which chunks (by their candidate rows) still need scoring so we
+  // can re-attempt just the failures rather than the whole batch.
+  let pending = chunks;
+
+  for (let attempt = 0; attempt <= CHUNK_RETRY_ATTEMPTS && pending.length > 0; attempt++) {
+    const stillFailed: ImportCandidateRow[][] = [];
+    // Run chunks in waves so we never hold more than MAX_CONCURRENT_CHUNKS
+    // in flight at once. Each wave waits for its chunks to settle before
+    // the next wave kicks off — failures in one wave don't cascade.
+    for (let w = 0; w < pending.length; w += MAX_CONCURRENT_CHUNKS) {
+      const wave = pending.slice(w, w + MAX_CONCURRENT_CHUNKS);
+      const results = await Promise.allSettled(wave.map((chunk) => runChunk(filterText, chunk)));
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          all.push(...r.value);
+        } else {
+          stillFailed.push(wave[idx]);
+          console.warn('Rank chunk failed', attempt > 0 ? '(retry)' : '', r.reason);
+        }
+      });
+    }
+    pending = stillFailed;
   }
-  // Tolerate partial failures. The previous commit threw if ANY chunk
-  // failed, which sounded clean but in practice meant 1 timeout out of
-  // 10 chunks tanked the whole batch's results — even though 9 chunks
-  // worth of contacts had been ranked perfectly. iOS WebView fetches
-  // sometimes give up on slow chunks before Haiku 4.5 finishes
-  // streaming, which presents as an isolated rejection inside an
-  // otherwise-healthy run. The successful chunks' candidates keep
-  // their real scores and surface at the top; failed chunks' candidates
-  // keep null score and sort to the bottom (orderBy nullsFirst:false).
-  // Only throw if absolutely nothing came back — that's a real outage.
-  if (failedChunks > 0 && all.length === 0) {
+
+  // Anything still pending after the retry pass never got scored. Surface
+  // its ids so the caller can show the retry banner; these rows keep NULL
+  // score in the DB and sort to the bottom (orderBy nullsFirst:false).
+  const unscoredIds = pending.flat().map((c) => c.id);
+
+  // Only treat the whole pass as a hard failure when NOTHING came back —
+  // that's a real outage worth throwing on. A partial failure returns
+  // normally with unscoredIds populated so the UI can offer a retry.
+  if (unscoredIds.length > 0 && all.length === 0) {
     throw new Error(`All ${chunks.length} ranking chunks failed`);
   }
-  if (failedChunks > 0) {
-    console.warn(`${failedChunks}/${chunks.length} rank chunks failed; ${all.length} candidates have real scores, the rest sort unranked at the bottom`);
+  if (unscoredIds.length > 0) {
+    console.warn(`${unscoredIds.length} candidates still unscored after retry; ${all.length} have real scores`);
   }
-  return all;
+  return { ranked: all, unscoredIds };
 }
 
 async function runChunk(

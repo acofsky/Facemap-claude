@@ -97,6 +97,11 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   // review page tells the user why their scores look uniform and lets
   // them retry without leaving the screen.
   const [rankFailed, setRankFailed] = useState(false);
+  // How many candidates a partial-failure rank pass left UNSCORED (chunk
+  // timed out / parse-failed). These keep NULL score and sort to the bottom
+  // of the drawer — genuine matches can hide here. Drives a targeted retry
+  // banner separate from the total-failure (rankFailed) banner.
+  const [unscoredCount, setUnscoredCount] = useState(0);
   // Lets the user click "Browse all anyway" in the no-matches modal so the
   // review screen still renders the (low-scoring) candidates as-is.
   const [showLowScores, setShowLowScores] = useState(false);
@@ -278,8 +283,10 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
 
       const filterUsed = filterText.trim();
       let rankSucceeded = true;
+      let unscored = 0;
       try {
-        await rankCandidates(filterText, inserted);
+        const outcome = await rankCandidates(filterText, inserted);
+        unscored = outcome.unscoredIds.length;
       } catch (rankErr) {
         console.warn('Ranking failed, falling back to insertion order', rankErr);
         rankSucceeded = false;
@@ -290,6 +297,10 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         : inserted;
       setCandidates(refreshed);
       setRankFailed(!rankSucceeded);
+      // Partial-failure: some chunks never scored. Surface the count so
+      // the review banner can offer a targeted retry instead of leaving
+      // genuine matches stranded unscored at the bottom of the drawer.
+      setUnscoredCount(rankSucceeded ? unscored : 0);
       setStep('review');
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
 
@@ -478,6 +489,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     haptics.medium();
     setRankModal(null);
     setRankFailed(false);
+    setUnscoredCount(0);
     setShowLowScores(false);
     setCandidates([]);
     setDrafts([]);
@@ -497,11 +509,20 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     try {
       const sessionId = candidates[0]?.session_id;
       if (!sessionId) return;
+      // On a total failure (rankFailed) nothing was scored, so retry the
+      // whole alive set. On a partial failure, only re-rank the rows that
+      // never got a score — re-ranking already-scored rows just burns AI
+      // budget and risks re-shuffling matches the user is already happy with.
       const alive = candidates.filter((c) => !c.promoted && !c.dismissed);
-      await rankCandidates(filterText, alive);
+      const toRank = rankFailed
+        ? alive
+        : alive.filter((c) => c.ai_relevance_score == null);
+      const target = toRank.length > 0 ? toRank : alive;
+      const outcome = await rankCandidates(filterText, target);
       const refreshed = await fetchSessionCandidates(sessionId);
       setCandidates(refreshed);
       setRankFailed(false);
+      setUnscoredCount(outcome.unscoredIds.length);
       const filterUsed = filterText.trim();
       if (filterUsed) {
         const top = Math.max(0, ...refreshed.map((c) => c.ai_relevance_score ?? 0));
@@ -595,6 +616,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             reviewBusyId={reviewBusyId}
             bulkAdding={bulkAdding}
             rankFailed={rankFailed}
+            unscoredCount={unscoredCount}
             ranking={ranking}
             topN={topN}
             onRetryRank={handleRetryRank}
@@ -1143,6 +1165,7 @@ function ReviewStep({
   reviewBusyId,
   bulkAdding,
   rankFailed,
+  unscoredCount,
   ranking,
   topN,
   onRetryRank,
@@ -1163,6 +1186,7 @@ function ReviewStep({
   reviewBusyId: string | null;
   bulkAdding: boolean;
   rankFailed: boolean;
+  unscoredCount: number;
   ranking: boolean;
   topN: TopN;
   onRetryRank: () => Promise<void> | void;
@@ -1202,6 +1226,26 @@ function ReviewStep({
           <span className="text-left flex-1 leading-snug">
             <span className="font-semibold text-foreground">AI couldn't surface best matches.</span>{' '}
             Showing everyone in import order — tap to retry.
+          </span>
+        </button>
+      )}
+
+      {/* Partial-failure banner: ranking mostly worked, but some chunks
+          never scored (timeout / parse fail). Those candidates sit unscored
+          at the bottom of the drawer and could include genuine matches, so
+          offer a targeted retry that only re-ranks the unscored ones. */}
+      {!rankFailed && unscoredCount > 0 && (
+        <button
+          onClick={onRetryRank}
+          disabled={ranking}
+          className="w-full glass-warm p-3 mb-3 flex items-center gap-2.5 text-[12px] text-foreground active:scale-[0.99] transition-transform disabled:opacity-60"
+        >
+          <RotateCcw className={cn('w-3.5 h-3.5 text-primary shrink-0', ranking && 'animate-spin')} strokeWidth={1.75} />
+          <span className="text-left flex-1 leading-snug">
+            <span className="font-semibold text-foreground">
+              {unscoredCount} {unscoredCount === 1 ? 'contact' : 'contacts'} couldn't be scored.
+            </span>{' '}
+            They're unranked at the bottom of the drawer — tap to retry just those.
           </span>
         </button>
       )}
