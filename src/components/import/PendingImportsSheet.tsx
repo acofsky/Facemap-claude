@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Loader2, Plus, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { haptics } from '@/lib/haptics';
-import type { ImportCandidateRow as ImportCandidate } from '@/lib/import/types';
+import type { ImportCandidateRow as ImportCandidate, ImportSource } from '@/lib/import/types';
+import type { Person } from '@/lib/store';
 import { fetchPendingCandidates, dismissCandidate } from '@/lib/import/storage';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
@@ -14,9 +15,6 @@ import { ImportCandidateRow } from './ImportCandidateRow';
 import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
 import { BulkAddOptionsSheet } from './BulkAddOptionsSheet';
 
-import type { Person } from '@/lib/store';
-import type { ImportSource } from '@/lib/import/types';
-
 // Mirror of ImportPage's review threshold: candidates the AI scored at or
 // above this are "strong matches" shown up top; the rest sit behind a
 // "show more" toggle — the same top-X / drawer split as the in-wizard
@@ -24,8 +22,12 @@ import type { ImportSource } from '@/lib/import/types';
 const TOP_QUALITY_THRESHOLD = 0.55;
 
 interface PendingImportsSheetProps {
+  /** The sheet is always MOUNTED by PeoplePage; this gates visibility, the
+   *  scroll lock, and the candidate fetch. Removing it (and the
+   *  `if (!open) return null` guard) would leave the sheet stuck open and
+   *  the People page scroll permanently locked. */
+  open: boolean;
   onClose: () => void;
-  onSelectPerson?: (personId: string) => void;
 }
 
 /**
@@ -35,7 +37,7 @@ interface PendingImportsSheetProps {
  * the rest behind a "show more" toggle, plus a multi-select mode for adding
  * a hand-picked subset to a circle/event.
  */
-export function PendingImportsSheet({ onClose }: PendingImportsSheetProps) {
+export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps) {
   const qc = useQueryClient();
   const { data: existingPeople = [] } = usePersons();
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
@@ -51,14 +53,22 @@ export function PendingImportsSheet({ onClose }: PendingImportsSheetProps) {
   // True when the bulk sheet was opened from a subset selection (vs "Add
   // all"), so the confirm handler knows which set to act on.
   const [bulkFromSelection, setBulkFromSelection] = useState(false);
-  useScrollLock(true);
+  useScrollLock(open);
 
-  useMemo(() => {
+  // Fetch (and reset transient UI state) each time the sheet opens. Gating
+  // on `open` matters because PeoplePage keeps this component mounted — a
+  // bare mount-time fetch would fire once on app load and never refresh.
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    setShowMore(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
     fetchPendingCandidates().then((rows) => {
       setCandidates(rows);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [open]);
 
   const aliveCandidates = useMemo(
     () => candidates.filter((c) => !c.promoted && !c.dismissed),
@@ -254,6 +264,8 @@ export function PendingImportsSheet({ onClose }: PendingImportsSheetProps) {
     );
   };
 
+  if (!open) return null;
+
   return (
     <AnimatePresence>
       <motion.div
@@ -327,7 +339,9 @@ export function PendingImportsSheet({ onClose }: PendingImportsSheetProps) {
               {selectMode && (
                 <div className="flex items-center gap-2 pb-1">
                   <button
-                    onClick={allSelected ? () => setSelectedIds(new Set()) : () => setSelectedIds(new Set(aliveCandidates.map((c) => c.id)))}
+                    onClick={allSelected
+                      ? () => setSelectedIds(new Set())
+                      : () => setSelectedIds(new Set(aliveCandidates.map((c) => c.id)))}
                     disabled={bulkBusy}
                     className="glass-pill h-11 px-3.5 inline-flex items-center justify-center text-[12px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
                   >
