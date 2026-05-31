@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AppLayout, type Tab } from '@/components/AppLayout';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { HomePage } from './HomePage';
 import { NetworkPage } from './NetworkPage';
 import { RecallPage } from './RecallPage';
@@ -13,6 +14,7 @@ import { ImportPage } from './ImportPage';
 import { onNotificationTap } from '@/lib/notifications';
 
 const Index = () => {
+  const reduceMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
@@ -47,32 +49,6 @@ const Index = () => {
     return () => unsubscribe?.();
   }, []);
 
-  // Smart Import takes over the viewport when open — same wrapper as the
-  // detail pages so the safe-area gradient and edge-swipe-back behave
-  // identically. Routing this above selectedPersonId so the new-Person
-  // route fires after we close the wizard.
-  if (importOpen) {
-    return (
-      <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
-          style={{
-            height: 'calc(env(safe-area-inset-top) + 24px)',
-            background:
-              'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
-          }}
-        />
-        <ImportPage
-          onClose={() => setImportOpen(false)}
-          onSelectPerson={(id) => {
-            setImportOpen(false);
-            setSelectedPersonId(id);
-          }}
-        />
-      </div>
-    );
-  }
 
   // Detail pages are exclusive — fullscreen overlays that suspend the tab UI.
   if (selectedPersonId) {
@@ -165,6 +141,40 @@ const Index = () => {
       <AnimatePresence>
         {eodSheetOpen && (
           <QuickAddSheet variant="end-of-day" onClose={() => setEodSheetOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Smart Import slides in from the right (iOS push nav), same motion
+          as the Profile → Notifications subpage, and slides back out on
+          close. Rendered as an overlay (not an early return) so the tab
+          underneath stays mounted and AnimatePresence can play the exit. */}
+      <AnimatePresence>
+        {importOpen && (
+          <motion.div
+            key="smart-import"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'tween', duration: reduceMotion ? 0 : 0.28, ease: [0.32, 0.72, 0, 1] }}
+            className="fixed inset-0 z-[60] ambient-backdrop max-w-md mx-auto overflow-hidden"
+          >
+            <div
+              aria-hidden="true"
+              className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 pointer-events-none"
+              style={{
+                height: 'calc(env(safe-area-inset-top) + 24px)',
+                background:
+                  'linear-gradient(180deg, #000 0%, #000 calc(env(safe-area-inset-top) - 4px), rgba(0,0,0,0.55) calc(env(safe-area-inset-top) + 6px), rgba(0,0,0,0) 100%)',
+              }}
+            />
+            <ImportPage
+              onClose={() => setImportOpen(false)}
+              onSelectPerson={(id) => {
+                setImportOpen(false);
+                setSelectedPersonId(id);
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
     </>
