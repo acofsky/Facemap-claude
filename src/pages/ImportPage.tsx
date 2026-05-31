@@ -671,7 +671,13 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
 
   return (
     <div
-      className="flex flex-col min-h-screen safe-top"
+      // h-full + overflow-hidden fill the fixed slide-in wrapper from
+      // Index (which is `fixed inset-0 overflow-hidden`). Scrolling lives
+      // on the inner flex-1 region below — NOT the document body — so it
+      // survives the overlay wrapper and can't be left stuck by a leaked
+      // body-overflow lock (which is what wedged the review page after the
+      // app was backgrounded mid-rank).
+      className="flex flex-col h-full overflow-hidden safe-top"
       style={{
         transform: swipe.offsetX > 0 ? `translateX(${swipe.offsetX}px)` : undefined,
         transition: swipe.dragging ? 'none' : 'transform 0.2s ease-out',
@@ -679,13 +685,12 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       }}
       {...swipe.bind}
     >
-      {/* Nav bar — sits below the notch overlay (Index.tsx) with the same
-          fade-to-page gradient PersonEditPage uses, so the header bleeds
-          into content instead of presenting a hard edge. */}
+      {/* Nav bar — fixed top strip (shrink-0 so it never scrolls). Sits
+          below the notch overlay (Index.tsx) with the same fade-to-page
+          gradient PersonEditPage uses, so the header bleeds into content. */}
       <div
-        className="sticky z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
+        className="shrink-0 z-20 flex items-center justify-between px-3 pt-3 pb-2 border-b border-[hsl(0_0%_100%/0.06)] backdrop-blur-xl"
         style={{
-          top: 'env(safe-area-inset-top)',
           background:
             'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.3) 100%)',
         }}
@@ -701,7 +706,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         <span className="w-10" />
       </div>
 
-      <div className="flex-1 pb-8 safe-bottom">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-8 safe-bottom">
         {step === 'pick' && (
           <PickStep
             selectedSources={selectedSources}

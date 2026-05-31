@@ -1,79 +1,105 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, Plus, Trash2, X } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Check, Loader2, Plus, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { friendlyError } from '@/lib/errors';
-import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { haptics } from '@/lib/haptics';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ImportCandidateRow as ImportCandidateRowComponent } from './ImportCandidateRow';
-import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
-import {
-  fetchPendingCandidates,
-  dismissCandidate,
-  dismissAllPending,
-} from '@/lib/import/storage';
-import { InfoModal } from '@/components/InfoModal';
+import type { ImportCandidateRow as ImportCandidate } from '@/lib/import/types';
+import { fetchPendingCandidates, dismissCandidate } from '@/lib/import/storage';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import { usePersons } from '@/hooks/use-data';
+import { ImportCandidateRow } from './ImportCandidateRow';
+import { ImportCandidateReviewSheet } from './ImportCandidateReviewSheet';
+import { BulkAddOptionsSheet } from './BulkAddOptionsSheet';
+
 import type { Person } from '@/lib/store';
-import type { ImportCandidateRow, ImportSource } from '@/lib/import/types';
+import type { ImportSource } from '@/lib/import/types';
+
+// Mirror of ImportPage's review threshold: candidates the AI scored at or
+// above this are "strong matches" shown up top; the rest sit behind a
+// "show more" toggle — the same top-X / drawer split as the in-wizard
+// review screen, so reopening pending imports later behaves identically.
+const TOP_QUALITY_THRESHOLD = 0.55;
 
 interface PendingImportsSheetProps {
-  open: boolean;
   onClose: () => void;
+  onSelectPerson?: (personId: string) => void;
 }
 
 /**
- * Standalone drawer for un-promoted, un-dismissed candidates from ANY past
- * import session. Surfaces in PeoplePage so users can finish triaging an
- * import days after the original run.
+ * Drawer of every still-pending import candidate from past sessions. Lets
+ * the user finish triaging — promote, merge, dismiss — without re-running
+ * the wizard. Mirrors the in-wizard review screen: strong matches up top,
+ * the rest behind a "show more" toggle, plus a multi-select mode for adding
+ * a hand-picked subset to a circle/event.
  */
-export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps) {
+export function PendingImportsSheet({ onClose }: PendingImportsSheetProps) {
   const qc = useQueryClient();
-  const [loading, setLoading] = useState(true);
-  const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [bulkBusy, setBulkBusy] = useState<'add' | 'clear' | null>(null);
-  const [confirmKind, setConfirmKind] = useState<'add' | 'clear' | null>(null);
-  const [resultModal, setResultModal] = useState<{ kind: 'add' | 'clear'; counts: { added: number; merged: number; failed: number; cleared: number } } | null>(null);
   const { data: existingPeople = [] } = usePersons();
+  const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<ImportCandidate | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+  // Multi-select mode — same UX as the wizard review screen.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // True when the bulk sheet was opened from a subset selection (vs "Add
+  // all"), so the confirm handler knows which set to act on.
+  const [bulkFromSelection, setBulkFromSelection] = useState(false);
+  useScrollLock(true);
 
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    fetchPendingCandidates()
-      .then((rows) => setCandidates(rows))
-      .catch((e) => toast.error(friendlyError(e, 'Could not load pending imports.')))
-      .finally(() => setLoading(false));
-  }, [open]);
+  useMemo(() => {
+    fetchPendingCandidates().then((rows) => {
+      setCandidates(rows);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const aliveCandidates = useMemo(
+    () => candidates.filter((c) => !c.promoted && !c.dismissed),
+    [candidates],
+  );
 
   const matchMap = useMemo(() => {
-    const drafts = candidates.map((c) => ({
+    const draftsForMatch = aliveCandidates.map((c) => ({
       source: c.source as ImportSource,
       name: c.name,
       email: c.email || undefined,
       phone: c.phone || undefined,
     }));
-    const byIndex = findMatchesAgainstPeople(drafts, existingPeople);
+    const byIndex = findMatchesAgainstPeople(draftsForMatch, existingPeople);
     const byId = new Map<string, string>();
-    candidates.forEach((c, i) => {
+    aliveCandidates.forEach((c, i) => {
       const pid = byIndex.get(i);
       if (pid) byId.set(c.id, pid);
     });
     return byId;
-  }, [candidates, existingPeople]);
+  }, [aliveCandidates, existingPeople]);
 
-  const reviewingCandidate = useMemo(
-    () => candidates.find((c) => c.id === reviewingId) || null,
-    [candidates, reviewingId],
-  );
+  // Top-X / drawer split. Candidates arrive sorted by score desc. Strong =
+  // cleared the quality bar; the rest sit behind "show more". If nothing
+  // cleared the bar (e.g. all from no-filter sessions), don't bury
+  // everything — show the whole list as primary so the sheet isn't empty.
+  const { primary, secondary } = useMemo(() => {
+    const strong = aliveCandidates.filter(
+      (c) => (c.ai_relevance_score ?? 0) >= TOP_QUALITY_THRESHOLD,
+    );
+    if (strong.length === 0) return { primary: aliveCandidates, secondary: [] as ImportCandidate[] };
+    const rest = aliveCandidates.filter(
+      (c) => (c.ai_relevance_score ?? 0) < TOP_QUALITY_THRESHOLD,
+    );
+    return { primary: strong, secondary: rest };
+  }, [aliveCandidates]);
+
+  const allSelected = aliveCandidates.length > 0 && selectedIds.size === aliveCandidates.length;
 
   const handlePromote = async (
-    c: ImportCandidateRow,
+    c: ImportCandidate,
     payload?: { fields?: Partial<Person>; circleIds?: string[]; eventIds?: string[] },
   ) => {
     setBusyId(c.id);
@@ -83,106 +109,150 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
         circleIds: payload.circleIds,
         eventIds: payload.eventIds,
       } : undefined);
-      setCandidates((cur) => cur.filter((x) => x.id !== c.id));
+      setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       qc.invalidateQueries({ queryKey: ['persons'] });
       qc.invalidateQueries({ queryKey: ['person_circles'] });
       qc.invalidateQueries({ queryKey: ['person_events'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-      setReviewingId((cur) => (cur === c.id ? null : cur));
-    } catch (e) {
-      toast.error(friendlyError(e, 'Could not add that person.'));
+      setReviewing((cur) => (cur?.id === c.id ? null : cur));
+    } catch {
+      toast.error('Could not add that person.');
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleMerge = async (c: ImportCandidateRow, personId: string) => {
+  const handleMerge = async (c: ImportCandidate, personId: string) => {
     setBusyId(c.id);
     try {
       await mergeCandidateIntoPerson(c, personId);
-      setCandidates((cur) => cur.filter((x) => x.id !== c.id));
+      setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
       qc.invalidateQueries({ queryKey: ['persons'] });
+      qc.invalidateQueries({ queryKey: ['person_circles'] });
+      qc.invalidateQueries({ queryKey: ['person_events'] });
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-      qc.invalidateQueries({ queryKey: ['persons', personId] });
-      setReviewingId((cur) => (cur === c.id ? null : cur));
-      toast.success('Merged into existing person.');
-    } catch (e) {
-      toast.error(friendlyError(e, 'Could not merge.'));
+      setReviewing((cur) => (cur?.id === c.id ? null : cur));
+    } catch {
+      toast.error('Could not merge.');
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleDismiss = async (c: ImportCandidateRow) => {
+  const handleDismiss = async (c: ImportCandidate) => {
     setBusyId(c.id);
     try {
       await dismissCandidate(c.id);
-      setCandidates((cur) => cur.filter((x) => x.id !== c.id));
+      setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, dismissed: true } : x)));
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-      setReviewingId((cur) => (cur === c.id ? null : cur));
-    } catch (e) {
-      toast.error(friendlyError(e, 'Could not dismiss.'));
+      setReviewing((cur) => (cur?.id === c.id ? null : cur));
+    } catch {
+      toast.error('Could not dismiss.');
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleAddAll = async () => {
-    setConfirmKind(null);
-    setBulkBusy('add');
+  // Core bulk-add over a specific target set, optionally dropping everyone
+  // into the given circles/events. Shared by "Add all" and subset adds.
+  const runBulkAdd = async (
+    targets: ImportCandidate[],
+    opts: { circleIds: string[]; eventIds: string[] },
+  ) => {
+    if (targets.length === 0) return;
     haptics.medium();
-    // Parallelize in waves of 6 so a thousand-row bulk add doesn't take
-    // forever (used to be one sequential round trip per row). 6 keeps us
-    // well under Supabase's connection cap while cutting wall time ~6x.
-    const WAVE = 6;
-    let added = 0;
+    setBulkBusy(true);
+    let promoted = 0;
     let merged = 0;
     let failed = 0;
-    for (let i = 0; i < candidates.length; i += WAVE) {
-      const wave = candidates.slice(i, i + WAVE);
-      const results = await Promise.allSettled(wave.map(async (c) => {
+    for (const c of targets) {
+      try {
         const matchedId = matchMap.get(c.id);
         if (matchedId) {
-          await mergeCandidateIntoPerson(c, matchedId);
-          return 'merged';
-        }
-        await promoteCandidate(c);
-        return 'added';
-      }));
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          if (r.value === 'added') added++;
-          else merged++;
+          await mergeCandidateIntoPerson(c, matchedId, {
+            circleIds: opts.circleIds,
+            eventIds: opts.eventIds,
+          });
+          merged++;
         } else {
-          failed++;
+          await promoteCandidate(c, {
+            circleIds: opts.circleIds,
+            eventIds: opts.eventIds,
+          });
+          promoted++;
         }
+        setCandidates((cur) => cur.map((x) => (x.id === c.id ? { ...x, promoted: true } : x)));
+      } catch (e) {
+        console.error('Bulk add failed for', c.id, e);
+        failed++;
       }
     }
-    setCandidates([]);
+    setBulkBusy(false);
     qc.invalidateQueries({ queryKey: ['persons'] });
+    qc.invalidateQueries({ queryKey: ['person_circles'] });
+    qc.invalidateQueries({ queryKey: ['person_events'] });
     qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-    setBulkBusy(null);
-    setResultModal({ kind: 'add', counts: { added, merged, failed, cleared: 0 } });
+    const parts: string[] = [];
+    if (promoted) parts.push(`${promoted} added`);
+    if (merged) parts.push(`${merged} merged`);
+    if (failed) parts.push(`${failed} failed`);
+    toast.success(parts.join(' · ') || 'Done');
   };
 
-  const handleClearAll = async () => {
-    setConfirmKind(null);
-    setBulkBusy('clear');
-    haptics.medium();
-    try {
-      // Single SQL update via RLS, not a 1.5k-row client-side loop.
-      const cleared = await dismissAllPending();
-      setCandidates([]);
-      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
-      setResultModal({ kind: 'clear', counts: { added: 0, merged: 0, failed: 0, cleared } });
-    } catch (e) {
-      toast.error(friendlyError(e, "Couldn't clear pending imports."));
-    } finally {
-      setBulkBusy(null);
+  const handleBulkConfirm = async (opts: { circleIds: string[]; eventIds: string[] }) => {
+    if (bulkFromSelection) {
+      const targets = aliveCandidates.filter((c) => selectedIds.has(c.id));
+      await runBulkAdd(targets, opts);
+      setBulkOpen(false);
+      setBulkFromSelection(false);
+      // Clear the picked set but stay in select mode for the next batch.
+      setSelectedIds(new Set());
+    } else {
+      await runBulkAdd(aliveCandidates, opts);
+      setBulkOpen(false);
+      setBulkFromSelection(false);
     }
   };
 
-  if (!open) return null;
+  const toggleSelect = (id: string) => {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const enterSelectMode = () => {
+    haptics.selection();
+    setSelectMode(true);
+    setSelectedIds(new Set());
+  };
+
+  const exitSelectMode = () => {
+    haptics.selection();
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const renderRow = (c: ImportCandidate) => {
+    const matchedId = matchMap.get(c.id);
+    return (
+      <div key={c.id} className={busyId === c.id ? 'opacity-60' : ''}>
+        <ImportCandidateRow
+          candidate={c}
+          matchedPersonId={matchedId}
+          busy={busyId === c.id}
+          onReview={() => setReviewing(c)}
+          onPromote={() => (matchedId ? handleMerge(c, matchedId) : handlePromote(c))}
+          onDismiss={() => handleDismiss(c)}
+          selectMode={selectMode}
+          selected={selectedIds.has(c.id)}
+          onToggleSelect={() => toggleSelect(c.id)}
+        />
+      </div>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -198,138 +268,140 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 32, stiffness: 360 }}
-        className="glass-sheet fixed left-0 right-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl z-[71] flex flex-col"
+        className="glass-sheet fixed inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl z-[71] flex flex-col"
         style={{ maxHeight: '85vh', background: 'rgba(20, 14, 14, 0.92)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[hsl(0_0%_100%/0.08)]">
-          <h2 className="text-xl font-display text-foreground tracking-[-0.02em]">
-            Pending imports
-          </h2>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-[hsl(var(--foreground)/0.55)] font-semibold">
+              Pending
+            </div>
+            <h2 className="text-xl font-display text-foreground tracking-[-0.02em]">
+              {loading ? 'Loading…' : `${aliveCandidates.length} waiting`}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-8 h-8 rounded-md flex items-center justify-center text-[hsl(var(--foreground)/0.55)]"
+            className="w-9 h-9 rounded-md flex items-center justify-center text-[hsl(var(--foreground)/0.55)]"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
 
-        {!loading && candidates.length > 0 && (
-          <div className="px-5 pt-3 flex items-center gap-2">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-[hsl(var(--foreground)/0.4)]" />
+            </div>
+          ) : aliveCandidates.length === 0 ? (
+            <div className="glass p-8 text-center">
+              <p className="text-sm font-display-italic text-[hsl(var(--foreground)/0.6)]">
+                Nothing pending. Imported people live in your People list.
+              </p>
+            </div>
+          ) : (
+            <>
+              {!selectMode && (
+                <div className="flex items-center gap-2 pb-1">
+                  <button
+                    onClick={() => { setBulkFromSelection(false); setBulkOpen(true); }}
+                    disabled={bulkBusy}
+                    className="flex-1 glass-pill h-11 inline-flex items-center justify-center gap-1.5 text-[13px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    <Users className="w-4 h-4 text-primary" strokeWidth={1.75} />
+                    Add all {aliveCandidates.length}
+                  </button>
+                  <button
+                    onClick={enterSelectMode}
+                    disabled={bulkBusy}
+                    className="glass-pill h-11 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" strokeWidth={1.75} />
+                    Select
+                  </button>
+                </div>
+              )}
+
+              {selectMode && (
+                <div className="flex items-center gap-2 pb-1">
+                  <button
+                    onClick={allSelected ? () => setSelectedIds(new Set()) : () => setSelectedIds(new Set(aliveCandidates.map((c) => c.id)))}
+                    disabled={bulkBusy}
+                    className="glass-pill h-11 px-3.5 inline-flex items-center justify-center text-[12px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    {allSelected ? 'Clear all' : 'Select all'}
+                  </button>
+                  <div className="flex-1 text-center text-[12px] text-[hsl(var(--foreground)/0.6)]">
+                    {selectedIds.size} selected
+                  </div>
+                  <button
+                    onClick={exitSelectMode}
+                    disabled={bulkBusy}
+                    className="glass-pill h-11 px-3.5 inline-flex items-center justify-center text-[12px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+
+              {primary.map(renderRow)}
+
+              {secondary.length > 0 && !showMore && (
+                <button
+                  onClick={() => setShowMore(true)}
+                  className="w-full glass-pill h-11 inline-flex items-center justify-center gap-2 text-[13px] text-foreground active:scale-[0.98] transition-transform"
+                >
+                  <Users className="w-4 h-4" strokeWidth={1.75} />
+                  Show {secondary.length} more
+                </button>
+              )}
+
+              {showMore && secondary.map(renderRow)}
+            </>
+          )}
+        </div>
+
+        {/* Sticky footer CTA while picking a subset. */}
+        {selectMode && selectedIds.size > 0 && (
+          <div className="shrink-0 px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom">
             <button
-              onClick={() => setConfirmKind('add')}
-              disabled={!!bulkBusy}
-              className="flex-1 glass-pill h-10 inline-flex items-center justify-center gap-1.5 text-[12px] text-foreground active:scale-[0.98] transition-transform disabled:opacity-50"
+              onClick={() => { setBulkFromSelection(true); setBulkOpen(true); }}
+              disabled={bulkBusy}
+              className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {bulkBusy === 'add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-primary" strokeWidth={2} />}
-              {bulkBusy === 'add' ? 'Adding…' : `Add all ${candidates.length}`}
-            </button>
-            <button
-              onClick={() => setConfirmKind('clear')}
-              disabled={!!bulkBusy}
-              className="glass-pill h-10 px-3.5 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
-            >
-              {bulkBusy === 'clear' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
-              Clear all
+              {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
+              {bulkBusy ? 'Adding…' : `Add ${selectedIds.size} to a group`}
             </button>
           </div>
         )}
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-2.5 safe-bottom">
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            </div>
-          ) : candidates.length === 0 ? (
-            <p className="text-center text-[13px] font-display-italic text-[hsl(var(--foreground)/0.6)] py-8">
-              All caught up.
-            </p>
-          ) : (
-            candidates.map((c) => {
-              const matchedId = matchMap.get(c.id);
-              return (
-                <div key={c.id} className={cn(busyId === c.id && 'opacity-60')}>
-                  <ImportCandidateRowComponent
-                    candidate={c}
-                    matchedPersonId={matchedId}
-                    busy={busyId === c.id}
-                    onReview={() => setReviewingId(c.id)}
-                    onPromote={() => (matchedId ? handleMerge(c, matchedId) : handlePromote(c))}
-                    onDismiss={() => handleDismiss(c)}
-                  />
-                </div>
-              );
-            })
-          )}
-        </div>
       </motion.div>
 
-      <ImportCandidateReviewSheet
-        candidate={reviewingCandidate}
-        matchedPersonId={reviewingCandidate ? matchMap.get(reviewingCandidate.id) : undefined}
-        busy={!!reviewingCandidate && busyId === reviewingCandidate.id}
-        onClose={() => setReviewingId(null)}
-        onPromote={(payload) => reviewingCandidate && handlePromote(reviewingCandidate, payload)}
-        onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
-        onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
-      />
+      {reviewing && (
+        <ImportCandidateReviewSheet
+          candidate={reviewing}
+          matchedPersonId={reviewing ? matchMap.get(reviewing.id) : undefined}
+          busy={busyId === reviewing.id}
+          onClose={() => setReviewing(null)}
+          onPromote={(payload) => handlePromote(reviewing, payload)}
+          onMerge={(pid) => handleMerge(reviewing, pid)}
+          onDismiss={() => handleDismiss(reviewing)}
+        />
+      )}
 
-      <ConfirmDialog
-        open={confirmKind === 'add'}
-        title={`Add all ${candidates.length}?`}
-        description="Everyone pending will land in your People list. Matches against existing people are merged into their existing entry without overwriting fields."
-        confirmLabel="Add all"
-        cancelLabel="Not yet"
-        onConfirm={handleAddAll}
-        onCancel={() => setConfirmKind(null)}
+      <BulkAddOptionsSheet
+        open={bulkOpen}
+        candidateCount={bulkFromSelection ? selectedIds.size : aliveCandidates.length}
+        subset={bulkFromSelection}
+        busy={bulkBusy}
+        onClose={() => {
+          if (bulkBusy) return;
+          setBulkOpen(false);
+          setBulkFromSelection(false);
+        }}
+        onConfirm={handleBulkConfirm}
       />
-      <ConfirmDialog
-        open={confirmKind === 'clear'}
-        title={`Clear all ${candidates.length}?`}
-        description="These pending imports will be dismissed. You can re-import them later, but their AI bullets will be regenerated."
-        confirmLabel="Clear all"
-        cancelLabel="Keep"
-        destructive
-        loading={bulkBusy === 'clear'}
-        loadingLabel="Clearing"
-        onConfirm={handleClearAll}
-        onCancel={() => setConfirmKind(null)}
-      />
-
-      <InfoModal
-        open={!!resultModal}
-        title={resultModal?.kind === 'clear' ? 'Pending imports cleared' : 'Bulk add complete'}
-        onClose={() => setResultModal(null)}
-      >
-        {resultModal?.kind === 'clear' ? (
-          <p>
-            <span className="text-foreground">{resultModal.counts.cleared}</span>{' '}
-            pending import{resultModal.counts.cleared === 1 ? '' : 's'} dismissed.
-            You can re-pull from any source any time.
-          </p>
-        ) : resultModal ? (
-          <>
-            {resultModal.counts.added > 0 && (
-              <p>
-                <span className="text-foreground">{resultModal.counts.added}</span> new{' '}
-                {resultModal.counts.added === 1 ? 'person' : 'people'} added.
-              </p>
-            )}
-            {resultModal.counts.merged > 0 && (
-              <p>
-                <span className="text-foreground">{resultModal.counts.merged}</span>{' '}
-                merged into existing People (filled empty fields, didn't overwrite).
-              </p>
-            )}
-            {resultModal.counts.failed > 0 && (
-              <p className="text-[hsl(var(--foreground)/0.55)]">
-                {resultModal.counts.failed} couldn't be added — likely a network issue. Retry from the pending list if needed.
-              </p>
-            )}
-          </>
-        ) : null}
-      </InfoModal>
     </AnimatePresence>
   );
 }
