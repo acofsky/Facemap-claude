@@ -46,13 +46,15 @@ export interface RankOutcome {
   unscoredIds: string[];
 }
 
-// Within a single rankCandidates call, failed chunks get one automatic
-// re-attempt before we give up and report them as unscored. The most
-// common failure is a transient iOS WebView fetch timeout on a slow
-// chunk; an immediate retry clears the bulk of those without the user
-// ever seeing the retry banner. We only retry ONCE here (the banner
-// handles anything still failing) so a hard outage can't loop forever.
-const CHUNK_RETRY_ATTEMPTS = 1;
+// Within a single rankCandidates call, failed chunks get a few automatic
+// re-attempts before we hand the leftovers back to the caller. The most
+// common failure is a transient iOS WebView fetch timeout on a slow chunk;
+// immediate retries clear the bulk of those. The caller (ImportPage) also
+// runs its own background re-rank loop on whatever's still unscored, so
+// between the two layers the user effectively never has to retry by hand —
+// but the cap here keeps a single call from spinning forever on a true
+// outage (the caller's loop has its own cap too).
+const CHUNK_RETRY_ATTEMPTS = 2;
 
 /**
  * Send candidates to the rank-import-candidates edge function in chunks,
@@ -84,6 +86,10 @@ export async function rankCandidates(
   let pending = chunks;
 
   for (let attempt = 0; attempt <= CHUNK_RETRY_ATTEMPTS && pending.length > 0; attempt++) {
+    // Brief backoff before each retry pass so a transient blip (token
+    // refresh, network hiccup) has a moment to clear instead of getting
+    // hammered by an immediate re-fire.
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt));
     const stillFailed: ImportCandidateRow[][] = [];
     // Run chunks in waves so we never hold more than MAX_CONCURRENT_CHUNKS
     // in flight at once. Each wave waits for its chunks to settle before

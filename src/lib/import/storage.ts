@@ -215,3 +215,26 @@ export async function dismissAllPending(): Promise<number> {
   if (error) throw error;
   return count ?? 0;
 }
+
+/**
+ * Persist a free-text feedback message from the Smart Import review screen.
+ * Stored in the user's own Supabase project (no email provider wired); the
+ * founder reads submissions via the dashboard. RLS scopes rows to the
+ * author. `surface` lets the same table collect feedback from other
+ * features later.
+ */
+export async function submitFeedback(input: {
+  message: string;
+  appVersion?: string;
+  surface?: string;
+}): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { error } = await supabase.from('feedback').insert({
+    user_id: user.id,
+    message: input.message.trim(),
+    app_version: input.appVersion ?? null,
+    surface: input.surface ?? 'smart_import',
+  });
+  if (error) throw error;
+}

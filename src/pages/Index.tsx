@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppLayout, type Tab } from '@/components/AppLayout';
-import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { HomePage } from './HomePage';
 import { NetworkPage } from './NetworkPage';
 import { RecallPage } from './RecallPage';
@@ -14,7 +14,7 @@ import { ImportPage } from './ImportPage';
 import { onNotificationTap } from '@/lib/notifications';
 
 const Index = () => {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReduceMotion();
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);

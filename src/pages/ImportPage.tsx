@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft, Calendar, Check, FileText, Files,
@@ -19,6 +19,7 @@ import { InfoModal } from '@/components/InfoModal';
 import { LinkedInHowToModal } from '@/components/import/LinkedInHowToModal';
 import { SpreadsheetHowToModal } from '@/components/import/SpreadsheetHowToModal';
 import { RankResultModal } from '@/components/import/RankResultModal';
+import { FeedbackSheet } from '@/components/import/FeedbackSheet';
 import { gatherContactsCandidates } from '@/lib/import/sources/contacts-source';
 import { parseLinkedInCsv } from '@/lib/import/sources/linkedin-source';
 import { gatherFileCandidates, UnsupportedFileError } from '@/lib/import/sources/file-source';
@@ -39,6 +40,9 @@ import type { CandidateDraft, ImportCandidateRow, ImportSource } from '@/lib/imp
 const TOP_N_OPTIONS = [5, 10, 20, 50] as const;
 type TopN = (typeof TOP_N_OPTIONS)[number];
 const DEFAULT_TOP_N: TopN = 20;
+// Tag feedback submissions with the app version for triage. Mirrors the
+// constant in ProfilePage; keep them in sync on release bumps.
+const APP_VERSION = '1.0.4';
 /** Candidates scoring below this with a filter set count as "no close matches". */
 const NO_MATCH_THRESHOLD = 0.35;
 /**
@@ -115,6 +119,8 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   // Lets the user click "Browse all anyway" in the no-matches modal so the
   // review screen still renders the (low-scoring) candidates as-is.
   const [showLowScores, setShowLowScores] = useState(false);
+  // "How'd we do?" feedback popup, opened from a link on the review screen.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const linkedInRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -569,8 +575,8 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
 
   // Retry the rank pass against the candidates that are already in the
   // DB. Cheaper than re-gathering — same candidate ids, just a fresh AI
-  // call. Surfaces as a small banner on the review screen when the
-  // initial pass failed.
+  // call. Used for the TOTAL-failure banner (nothing scored at all); the
+  // partial-failure case is handled silently by the background loop below.
   const handleRetryRank = async () => {
     if (candidates.length === 0) return;
     setRanking(true);
@@ -604,6 +610,61 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       setRanking(false);
     }
   };
+
+  // Background auto-retry for partially-scored imports. When the initial
+  // pass leaves some contacts unscored (a few chunks timed out), we don't
+  // make the user tap "retry" — we quietly re-rank just the NULL-score rows
+  // on a loop until everyone has a score (or we hit the attempt cap on a
+  // genuine outage). The review screen meanwhile shows a calm "still
+  // scoring N more — you can start reviewing" note instead of an error.
+  const autoRetryGuard = useRef(false);
+  const autoRetryAttempts = useRef(0);
+  // Cap the background loop so a real outage can't spin forever. Each pass
+  // itself retries chunks a few times, so this is passes-of-passes.
+  const MAX_AUTO_RETRY_PASSES = 6;
+  useEffect(() => {
+    // Only run on the review screen, when there's a real partial gap (not a
+    // total failure — that has its own manual banner), and not already busy.
+    if (step !== 'review') return;
+    if (rankFailed || unscoredCount <= 0) {
+      autoRetryAttempts.current = 0;
+      return;
+    }
+    if (autoRetryGuard.current) return;
+    if (autoRetryAttempts.current >= MAX_AUTO_RETRY_PASSES) return;
+
+    autoRetryGuard.current = true;
+    autoRetryAttempts.current += 1;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const sessionId = candidates[0]?.session_id;
+        if (!sessionId) return;
+        const stillUnscored = candidates.filter(
+          (c) => !c.promoted && !c.dismissed && c.ai_relevance_score == null,
+        );
+        if (stillUnscored.length === 0) {
+          if (!cancelled) setUnscoredCount(0);
+          return;
+        }
+        const outcome = await rankCandidates(filterText, stillUnscored);
+        if (cancelled) return;
+        const refreshed = await fetchSessionCandidates(sessionId);
+        if (cancelled) return;
+        setCandidates(refreshed);
+        setUnscoredCount(outcome.unscoredIds.length);
+      } catch (e) {
+        console.warn('Background rank retry pass failed', e);
+        // Leave unscoredCount as-is; the effect re-fires and the attempt
+        // cap eventually stops the loop if the outage persists.
+      } finally {
+        autoRetryGuard.current = false;
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [step, rankFailed, unscoredCount, candidates, filterText]);
 
   const aliveCount = aliveCandidates.length;
   const promotedCount = candidates.filter((c) => c.promoted).length;
@@ -705,6 +766,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             onSelectAll={() => setSelectedIds(new Set(visibleCandidates.map((c) => c.id)))}
             onClearSelection={() => setSelectedIds(new Set())}
             onAddSelected={() => { setBulkFromSelection(true); setBulkOptionsOpen(true); }}
+            onShareFeedback={() => setFeedbackOpen(true)}
           />
         )}
       </div>
@@ -730,6 +792,12 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         onPromote={(payload) => reviewingCandidate && handlePromote(reviewingCandidate, payload)}
         onMerge={(pid) => reviewingCandidate && handleMerge(reviewingCandidate, pid)}
         onDismiss={() => reviewingCandidate && handleDismiss(reviewingCandidate)}
+      />
+
+      <FeedbackSheet
+        open={feedbackOpen}
+        appVersion={APP_VERSION}
+        onClose={() => setFeedbackOpen(false)}
       />
 
       <BulkAddOptionsSheet
@@ -966,7 +1034,6 @@ function FilterStep({
         rows={5}
         placeholder={EXAMPLE_FILTER}
         className="glass-input w-full p-3 text-[14px] leading-relaxed resize-none"
-        autoFocus
       />
 
       <div className="mt-3 flex items-start gap-2 text-[11px] text-[hsl(var(--foreground)/0.55)] leading-snug">
@@ -1266,6 +1333,7 @@ function ReviewStep({
   onSelectAll,
   onClearSelection,
   onAddSelected,
+  onShareFeedback,
 }: {
   visibleCandidates: ImportCandidateRow[];
   drawerCount: number;
@@ -1294,6 +1362,7 @@ function ReviewStep({
   onSelectAll: () => void;
   onClearSelection: () => void;
   onAddSelected: () => void;
+  onShareFeedback: () => void;
 }) {
   const allSelected = visibleCandidates.length > 0 && selectedIds.size === visibleCandidates.length;
   return (
@@ -1323,24 +1392,22 @@ function ReviewStep({
         </button>
       )}
 
-      {/* Partial-failure banner: ranking mostly worked, but some chunks
-          never scored (timeout / parse fail). Those candidates sit unscored
-          at the bottom of the drawer and could include genuine matches, so
-          offer a targeted retry that only re-ranks the unscored ones. */}
+      {/* Partial-progress note: ranking mostly finished but a few chunks are
+          still being scored in the background (the auto-retry loop in
+          ImportPage re-ranks them until done). This is intentional, not a
+          failure — so it's a calm status line with a spinner, not a retry
+          button. The best matches so far are already shown above; the user
+          can start reviewing immediately. */}
       {!rankFailed && unscoredCount > 0 && (
-        <button
-          onClick={onRetryRank}
-          disabled={ranking}
-          className="w-full glass-warm p-3 mb-3 flex items-center gap-2.5 text-[12px] text-foreground active:scale-[0.99] transition-transform disabled:opacity-60"
-        >
-          <RotateCcw className={cn('w-3.5 h-3.5 text-primary shrink-0', ranking && 'animate-spin')} strokeWidth={1.75} />
+        <div className="w-full glass-warm p-3 mb-3 flex items-center gap-2.5 text-[12px] text-foreground">
+          <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" strokeWidth={1.75} />
           <span className="text-left flex-1 leading-snug">
             <span className="font-semibold text-foreground">
-              {unscoredCount} {unscoredCount === 1 ? 'contact' : 'contacts'} couldn't be scored.
+              Still scoring {unscoredCount} more…
             </span>{' '}
-            They're unranked at the bottom of the drawer — tap to retry just those.
+            Your strongest matches are ready — go ahead and start reviewing while we finish.
           </span>
-        </button>
+        </div>
       )}
 
       {visibleCandidates.length > 0 && !selectMode && (
@@ -1472,6 +1539,17 @@ function ReviewStep({
           className="w-full mt-6 h-[52px] rounded-2xl bg-[hsl(0_0%_100%/0.06)] text-foreground font-semibold text-[15px] active:scale-[0.98] transition-transform"
         >
           Done
+        </button>
+      )}
+
+      {/* Smart Import is new — a quiet invitation to tell us how it went.
+          Manual (not auto-popped) so it never gets in the way. */}
+      {!selectMode && (
+        <button
+          onClick={onShareFeedback}
+          className="w-full mt-3 mb-2 text-[12px] text-[hsl(var(--foreground)/0.55)] active:text-foreground transition-colors"
+        >
+          New feature — <span className="font-display-italic text-[hsl(var(--foreground)/0.75)]">how&apos;d we do?</span>
         </button>
       )}
     </div>
