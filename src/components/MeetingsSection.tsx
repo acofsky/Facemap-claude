@@ -48,7 +48,12 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
     <div>
       {adding && (
         <div className="glass p-4 mb-3 space-y-2 animate-fade-in">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className={cn(inputClass, 'min-w-0 appearance-none')}
+          />
           <input
             value={place}
             onChange={(e) => setPlace(e.target.value)}

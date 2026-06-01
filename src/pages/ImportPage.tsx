@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft, Calendar, Check, FileText, Files,
-  Info, Loader2, Plus, RotateCcw, Sparkles, Users, X,
+  Info, Loader2, Plus, RotateCcw, Sparkles, Trash2, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ import {
   insertCandidates,
   fetchSessionCandidates,
   dismissCandidate,
+  dismissSelectedCandidates,
 } from '@/lib/import/storage';
 import { rankCandidates } from '@/lib/import/rank';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
@@ -447,6 +448,54 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
     }
   };
 
+  // Dismiss the checked rows in one round trip, then clear the selection
+  // but STAY in select mode (parallels handleAddSelected) so the user can
+  // keep triaging. Dismissed rows drop out of the list on next render.
+  const handleDismissSelected = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    haptics.medium();
+    setBulkAdding(true);
+    try {
+      await dismissSelectedCandidates(ids);
+      const idSet = new Set(ids);
+      setCandidates((cur) => cur.map((x) => (idSet.has(x.id) ? { ...x, dismissed: true } : x)));
+      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} dismissed`);
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not dismiss.'));
+    } finally {
+      setBulkAdding(false);
+    }
+  };
+
+  // "Clear all" — dismiss every candidate currently in view (visible + the
+  // drawer). Scoped to this session's alive candidates rather than the
+  // global pending pool so it can't nuke imports from another session.
+  const handleClearAll = async () => {
+    const ids = aliveCandidates.map((c) => c.id);
+    if (ids.length === 0) return;
+    if (!confirm(`Clear all ${ids.length} imports? They won't be added to People. You can re-run the import later to get them back.`)) {
+      return;
+    }
+    haptics.medium();
+    setBulkAdding(true);
+    try {
+      await dismissSelectedCandidates(ids);
+      const idSet = new Set(ids);
+      setCandidates((cur) => cur.map((x) => (idSet.has(x.id) ? { ...x, dismissed: true } : x)));
+      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      toast.success(`${ids.length} cleared`);
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not clear imports.'));
+    } finally {
+      setBulkAdding(false);
+    }
+  };
+
   // Core bulk-add. Promotes (or merges, when matched) a specific set of
   // candidates, optionally dropping them all into the given circles/events.
   // Used by both "Add all" (whole visible list) and select-mode subset adds.
@@ -771,6 +820,8 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             onSelectAll={() => setSelectedIds(new Set(visibleCandidates.map((c) => c.id)))}
             onClearSelection={() => setSelectedIds(new Set())}
             onAddSelected={() => { setBulkFromSelection(true); setBulkOptionsOpen(true); }}
+            onDismissSelected={handleDismissSelected}
+            onClearAll={handleClearAll}
             onShareFeedback={() => setFeedbackOpen(true)}
           />
         )}
@@ -1338,6 +1389,8 @@ function ReviewStep({
   onSelectAll,
   onClearSelection,
   onAddSelected,
+  onDismissSelected,
+  onClearAll,
   onShareFeedback,
 }: {
   visibleCandidates: ImportCandidateRow[];
@@ -1367,6 +1420,8 @@ function ReviewStep({
   onSelectAll: () => void;
   onClearSelection: () => void;
   onAddSelected: () => void;
+  onDismissSelected: () => void;
+  onClearAll: () => void;
   onShareFeedback: () => void;
 }) {
   const allSelected = visibleCandidates.length > 0 && selectedIds.size === visibleCandidates.length;
@@ -1438,13 +1493,24 @@ function ReviewStep({
           {/* Entry point for incremental adds: pick a subset → one circle/
               event, then another subset → another. Sits under "Add all" so
               the whole-list path stays the default one-tap action. */}
-          <button
-            onClick={onEnterSelectMode}
-            className="w-full mb-3 h-9 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.7)] active:scale-[0.99] transition-transform"
-          >
-            <Check className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Select people to add by group
-          </button>
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <button
+              onClick={onEnterSelectMode}
+              className="h-9 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.7)] active:scale-[0.99] transition-transform"
+            >
+              <Check className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Select people to add by group
+            </button>
+            <span className="text-[hsl(var(--foreground)/0.25)]">·</span>
+            <button
+              onClick={onClearAll}
+              disabled={bulkAdding}
+              className="h-9 inline-flex items-center justify-center gap-1.5 text-[12px] text-[hsl(var(--foreground)/0.6)] active:scale-[0.99] transition-transform disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Clear all
+            </button>
+          </div>
         </>
       )}
 
@@ -1516,11 +1582,20 @@ function ReviewStep({
       {/* Sticky CTA while in select mode with at least one row checked.
           Opens the same circle/event sheet, scoped to the selection. */}
       {selectMode && selectedIds.size > 0 && (
-        <div className="fixed left-0 right-0 bottom-0 z-30 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-black/90 via-black/70 to-transparent">
+        <div className="fixed left-0 right-0 bottom-0 z-30 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 bg-gradient-to-t from-black/90 via-black/70 to-transparent flex items-center gap-2">
+          <button
+            onClick={onDismissSelected}
+            disabled={bulkAdding}
+            aria-label={`Dismiss ${selectedIds.size} selected`}
+            className="h-12 px-4 rounded-2xl glass-pill inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" strokeWidth={1.75} />
+            Dismiss
+          </button>
           <button
             onClick={onAddSelected}
             disabled={bulkAdding}
-            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
+            className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
           >
             {bulkAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
             {bulkAdding ? 'Adding…' : `Add ${selectedIds.size} to a group`}

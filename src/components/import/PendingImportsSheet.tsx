@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Loader2, Plus, Users, X } from 'lucide-react';
+import { Check, Loader2, Plus, Trash2, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { haptics } from '@/lib/haptics';
 import type { ImportCandidateRow as ImportCandidate, ImportSource } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
-import { fetchPendingCandidates, dismissCandidate } from '@/lib/import/storage';
+import { fetchPendingCandidates, dismissCandidate, dismissSelectedCandidates } from '@/lib/import/storage';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import { usePersons } from '@/hooks/use-data';
@@ -224,6 +224,51 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
     }
   };
 
+  // Dismiss just the checked rows, then clear the selection but stay in
+  // select mode so the user can keep triaging the next batch.
+  const handleDismissSelected = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    haptics.medium();
+    setBulkBusy(true);
+    try {
+      await dismissSelectedCandidates(ids);
+      const idSet = new Set(ids);
+      setCandidates((cur) => cur.map((x) => (idSet.has(x.id) ? { ...x, dismissed: true } : x)));
+      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} dismissed`);
+    } catch {
+      toast.error('Could not dismiss.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // "Clear all" — dismiss every still-pending candidate in the drawer.
+  const handleClearAll = async () => {
+    const ids = aliveCandidates.map((c) => c.id);
+    if (ids.length === 0) return;
+    if (!confirm(`Clear all ${ids.length} pending imports? They won't be added to People. You can re-run the import later to get them back.`)) {
+      return;
+    }
+    haptics.medium();
+    setBulkBusy(true);
+    try {
+      await dismissSelectedCandidates(ids);
+      const idSet = new Set(ids);
+      setCandidates((cur) => cur.map((x) => (idSet.has(x.id) ? { ...x, dismissed: true } : x)));
+      qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      toast.success(`${ids.length} cleared`);
+    } catch {
+      toast.error('Could not clear imports.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds((cur) => {
       const next = new Set(cur);
@@ -333,6 +378,14 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
                     <Check className="w-3.5 h-3.5" strokeWidth={1.75} />
                     Select
                   </button>
+                  <button
+                    onClick={handleClearAll}
+                    disabled={bulkBusy}
+                    aria-label="Clear all pending imports"
+                    className="glass-pill h-11 px-3.5 inline-flex items-center justify-center text-[hsl(var(--foreground)/0.6)] active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" strokeWidth={1.75} />
+                  </button>
                 </div>
               )}
 
@@ -379,11 +432,20 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
 
         {/* Sticky footer CTA while picking a subset. */}
         {selectMode && selectedIds.size > 0 && (
-          <div className="shrink-0 px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom">
+          <div className="shrink-0 px-5 py-3 border-t border-[hsl(0_0%_100%/0.08)] safe-bottom flex items-center gap-2">
+            <button
+              onClick={handleDismissSelected}
+              disabled={bulkBusy}
+              aria-label={`Dismiss ${selectedIds.size} selected`}
+              className="h-12 px-4 rounded-2xl glass-pill inline-flex items-center justify-center gap-1.5 text-[13px] text-[hsl(var(--foreground)/0.75)] active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" strokeWidth={1.75} />
+              Dismiss
+            </button>
             <button
               onClick={() => { setBulkFromSelection(true); setBulkOpen(true); }}
               disabled={bulkBusy}
-              className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
+              className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground font-semibold text-[14px] inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50"
             >
               {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" strokeWidth={2.25} />}
               {bulkBusy ? 'Adding…' : `Add ${selectedIds.size} to a group`}

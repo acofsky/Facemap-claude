@@ -196,6 +196,21 @@ export async function dismissCandidate(candidateId: string): Promise<void> {
 }
 
 /**
+ * Dismiss a hand-picked subset of candidates in one round trip (select
+ * mode → "Dismiss selected"). Like dismissCandidate but for many ids, so
+ * we don't fire one PATCH per row. RLS still confines this to the caller's
+ * own rows. No-ops on an empty list.
+ */
+export async function dismissSelectedCandidates(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from('import_candidates')
+    .update({ dismissed: true })
+    .in('id', ids);
+  if (error) throw error;
+}
+
+/**
  * Dismiss every still-pending candidate for the current user in one SQL
  * UPDATE. RLS confines the scope to the caller's own rows so we don't
  * need to spell out user_id here. Returns the count of rows touched.
