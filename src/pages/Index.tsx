@@ -11,6 +11,7 @@ import { CircleDetailPage } from './CircleDetailPage';
 import { EventDetailPage } from './EventDetailPage';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { ImportPage } from './ImportPage';
+import { WhatsNewPopup, WHATS_NEW_VERSION, WHATS_NEW_SEEN_KEY } from '@/components/WhatsNewPopup';
 import { onNotificationTap } from '@/lib/notifications';
 
 const Index = () => {
@@ -21,6 +22,28 @@ const Index = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eodSheetOpen, setEodSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+
+  // "What's New" on the first load after updating — but only for EXISTING
+  // users. A brand-new user gets onboarding instead; we pre-mark this version
+  // seen for them so it never pops after they finish. Mount-only on purpose
+  // (reads the onboarded flag as it was at load, so finishing onboarding in
+  // this same session never triggers it).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onboarded = window.localStorage.getItem('membr_onboarded') === 'true';
+    const seen = window.localStorage.getItem(WHATS_NEW_SEEN_KEY);
+    if (!onboarded) {
+      window.localStorage.setItem(WHATS_NEW_SEEN_KEY, WHATS_NEW_VERSION);
+    } else if (seen !== WHATS_NEW_VERSION) {
+      setWhatsNewOpen(true);
+    }
+  }, []);
+
+  const dismissWhatsNew = () => {
+    window.localStorage.setItem(WHATS_NEW_SEEN_KEY, WHATS_NEW_VERSION);
+    setWhatsNewOpen(false);
+  };
 
   // Onboarding can pre-arm a Smart Import by stashing this flag. We pop the
   // flag on mount so we never re-open the wizard after the user has dismissed
@@ -177,6 +200,15 @@ const Index = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <WhatsNewPopup
+        open={whatsNewOpen}
+        onTryImport={() => {
+          dismissWhatsNew();
+          setImportOpen(true);
+        }}
+        onClose={dismissWhatsNew}
+      />
     </>
   );
 };

@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
-import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles, Upload, Info } from 'lucide-react';
+import { LogOut, X, Loader2, Bell, ShieldCheck, ChevronRight, AtSign, KeyRound, Pencil, Sparkles, Upload, Info, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { friendlyError } from '@/lib/errors';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { EnrichInfoModal } from '@/components/EnrichInfoModal';
 import { NotificationPreferencesPage } from '@/pages/NotificationPreferencesPage';
 import { AppPermissionsPage } from '@/pages/AppPermissionsPage';
 import { cn } from '@/lib/utils';
+import { openFeedback } from '@/lib/feedback';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
 const APP_VERSION = '1.0.4';
@@ -242,6 +243,11 @@ export function ProfilePage({ onOpenImport }: ProfilePageProps = {}) {
       <SectionLabel>About</SectionLabel>
       <SectionCard>
         <AIDisclosure />
+        <SettingRow
+          icon={MessageSquare}
+          label="Leave feedback"
+          onClick={openFeedback}
+        />
         <SettingRow
           label="Version"
           rightLabel={APP_VERSION}
