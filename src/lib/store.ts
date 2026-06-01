@@ -6,6 +6,12 @@ export type Circle = Tables<'circles'>;
 export type PersonCircle = Tables<'person_circles'>;
 export type Connection = Tables<'connections'>;
 export type Meeting = Tables<'meetings'>;
+export type MeetingParticipant = Tables<'meeting_participants'>;
+
+/** A meeting plus its tagged additional people (Membr persons + name-only tags). */
+export interface MeetingWithParticipants extends Meeting {
+  participants: Pick<MeetingParticipant, 'id' | 'person_id' | 'external_name'>[];
+}
 export type Event = Tables<'events'>;
 export type PersonEvent = Tables<'person_events'>;
 
@@ -239,14 +245,97 @@ export async function deleteConnection(id: string): Promise<void> {
 
 // ---- Meetings ----
 
-export async function fetchMeetingsForPerson(personId: string): Promise<Meeting[]> {
-  const { data, error } = await supabase
-    .from('meetings')
-    .select('*')
-    .eq('person_id', personId)
-    .order('meeting_date', { ascending: false });
-  if (error) throw error;
-  return data;
+export async function fetchMeetingsForPerson(personId: string): Promise<MeetingWithParticipants[]> {
+  // A person sees an encounter if they're the owner (meetings.person_id) OR a
+  // tagged participant. First find the meetings they're tagged into, then pull
+  // owner + tagged meetings in one query, with each meeting's participants
+  // embedded so the UI can render "with X, Y" chips without an N+1.
+  //
+  // The whole participant path is wrapped so that if the meeting_participants
+  // table isn't deployed yet (the migration ships via a separate GitHub
+  // Action), the Encounters section still works in owner-only mode instead of
+  // erroring out. Once the migration lands, tagging lights up automatically.
+  try {
+    const { data: tagged, error: tagErr } = await supabase
+      .from('meeting_participants')
+      .select('meeting_id')
+      .eq('person_id', personId);
+    if (tagErr) throw tagErr;
+    const taggedMeetingIds = (tagged ?? []).map((r) => r.meeting_id);
+
+    let query = supabase
+      .from('meetings')
+      .select('*, participants:meeting_participants(id, person_id, external_name)')
+      .order('meeting_date', { ascending: false });
+    query = taggedMeetingIds.length
+      ? query.or(`person_id.eq.${personId},id.in.(${taggedMeetingIds.join(',')})`)
+      : query.eq('person_id', personId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []) as MeetingWithParticipants[];
+  } catch {
+    // Fallback: owner-only, no participants (table not deployed yet).
+    const { data, error } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('person_id', personId)
+      .order('meeting_date', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((m) => ({ ...m, participants: [] }));
+  }
+}
+
+/**
+ * Replace the set of additional participants on an encounter (mirrors
+ * setPersonEvents). Each entry is either a Membr person (personId) or a
+ * name-only tag (externalName). Diffs against the current rows so we don't
+ * thrash unchanged ones. The owner (meetings.person_id) is NOT stored here.
+ */
+export async function setMeetingParticipants(
+  meetingId: string,
+  participants: { personId?: string; externalName?: string }[],
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: existing } = await supabase
+    .from('meeting_participants')
+    .select('id, person_id, external_name')
+    .eq('meeting_id', meetingId);
+
+  // Key each participant so person rows and name rows diff independently.
+  const keyOf = (p: { person_id?: string | null; external_name?: string | null }) =>
+    p.person_id ? `p:${p.person_id}` : `n:${(p.external_name ?? '').trim().toLowerCase()}`;
+
+  const currentByKey = new Map((existing ?? []).map((r) => [keyOf(r), r]));
+  const nextKeys = new Set(
+    participants.map((p) => keyOf({ person_id: p.personId ?? null, external_name: p.externalName ?? null })),
+  );
+
+  const toInsert = participants.filter(
+    (p) => !currentByKey.has(keyOf({ person_id: p.personId ?? null, external_name: p.externalName ?? null })),
+  );
+  const toRemove = (existing ?? []).filter((r) => !nextKeys.has(keyOf(r)));
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from('meeting_participants').insert(
+      toInsert.map((p) => ({
+        user_id: user.id,
+        meeting_id: meetingId,
+        person_id: p.personId ?? null,
+        external_name: p.personId ? null : (p.externalName ?? '').trim() || null,
+      })),
+    );
+    if (error) throw error;
+  }
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from('meeting_participants')
+      .delete()
+      .in('id', toRemove.map((r) => r.id));
+    if (error) throw error;
+  }
 }
 
 export async function fetchRecentMeetings(sinceISODate: string): Promise<Meeting[]> {

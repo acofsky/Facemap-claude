@@ -322,6 +322,48 @@ export type Database = {
           },
         ]
       }
+      meeting_participants: {
+        Row: {
+          created_at: string
+          external_name: string | null
+          id: string
+          meeting_id: string
+          person_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          external_name?: string | null
+          id?: string
+          meeting_id: string
+          person_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          external_name?: string | null
+          id?: string
+          meeting_id?: string
+          person_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_participants_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_participants_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       person_circles: {
         Row: {
           circle_id: string

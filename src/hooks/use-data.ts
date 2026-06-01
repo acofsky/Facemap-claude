@@ -7,6 +7,7 @@ import {
   uploadPhoto,
   fetchConnections, createConnection, deleteConnection,
   fetchMeetingsForPerson, fetchRecentMeetings, createMeeting, updateMeeting, deleteMeeting,
+  setMeetingParticipants,
   fetchEvents, createEvent, updateEvent, archiveEvent, deleteEvent,
   fetchPersonEvents, setPersonEvents,
 } from '@/lib/store';
@@ -228,7 +229,20 @@ export function useCreateMeeting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createMeeting,
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['meetings', vars.person_id] }),
+    // Broad invalidate: an encounter can now surface on tagged people's
+    // profiles too, so we can't scope to just the owner's list.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['meetings'] }),
+  });
+}
+
+export function useSetMeetingParticipants() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ meetingId, participants }: {
+      meetingId: string;
+      participants: { personId?: string; externalName?: string }[];
+    }) => setMeetingParticipants(meetingId, participants),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['meetings'] }),
   });
 }
 

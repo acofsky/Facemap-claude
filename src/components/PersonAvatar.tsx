@@ -4,11 +4,12 @@ import { getPhotoUrl } from '@/lib/store';
 interface PersonAvatarProps {
   name: string;
   photo?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
 }
 
 const sizes = {
+  xs: 'w-6 h-6 text-[10px]',
   sm: 'w-10 h-10 text-sm',
   md: 'w-14 h-14 text-base',
   lg: 'w-20 h-20 text-xl',
