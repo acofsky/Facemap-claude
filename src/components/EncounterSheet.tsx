@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ArrowLeft, CalendarDays, Check, Loader2, MapPin, NotebookPen, Search, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -81,6 +81,7 @@ export function EncounterSheet({
   // and re-attaches instead of creating a second, duplicate meeting.
   const createdMeetingId = useRef<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const whoSectionRef = useRef<HTMLDivElement>(null);
 
   const taggedPersonIds = useMemo(
     () => new Set(tags.filter((t) => t.personId).map((t) => t.personId!)),
@@ -118,16 +119,29 @@ export function EncounterSheet({
     !tags.some((t) => t.externalName?.toLowerCase() === trimmedQuery.toLowerCase()) &&
     !matches.some((p) => p.name.toLowerCase() === trimmedQuery.toLowerCase());
 
-  // While searching to tag, keep the body scrolled to the bottom so the
-  // "Who else was there" field + its results sit at the top of the visible
-  // area (or as far down as the content allows). Re-runs as results grow so
-  // freshly-rendered matches never end up trapped under the sticky footer.
-  useEffect(() => {
-    if (trimmedQuery.length === 0) return;
-    const el = bodyRef.current;
-    const id = setTimeout(() => el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }), 60);
-    return () => clearTimeout(id);
-  }, [trimmedQuery, matches.length, showAddAsName]);
+  // Focused state drives a one-time scroll + a spacer that reserves room
+  // below the tag field for results. We never auto-scroll on result changes —
+  // that yanked the cursor around as the list grew/shrank while typing.
+  const [tagFocused, setTagFocused] = useState(false);
+
+  const handleTagFocus = () => {
+    setTagFocused(true);
+    // Once, after the keyboard + sheet resize settles: bring the "Who else
+    // was there" section near the top of the visible body (~12% down),
+    // leaving the rest below for results. The spacer guarantees there's
+    // enough scrollable room to actually move it up that far.
+    setTimeout(() => {
+      const body = bodyRef.current;
+      const sec = whoSectionRef.current;
+      if (!body || !sec) return;
+      const top =
+        body.scrollTop +
+        sec.getBoundingClientRect().top -
+        body.getBoundingClientRect().top -
+        body.clientHeight * 0.12;
+      body.scrollTo({ top, behavior: 'smooth' });
+    }, 300);
+  };
 
   const nameOf = (t: TagPart) =>
     t.personId ? people.find((p) => p.id === t.personId)?.name ?? 'Someone' : t.externalName ?? '';
@@ -283,7 +297,7 @@ export function EncounterSheet({
           </label>
 
           {/* Who else was there */}
-          <div>
+          <div ref={whoSectionRef}>
             <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-1.5">
               <UserPlus className="w-3 h-3" strokeWidth={1.75} /> Who else was there
               <span className="font-normal normal-case tracking-normal text-muted-text/70">(optional)</span>
@@ -330,13 +344,8 @@ export function EncounterSheet({
               <input
                 value={tagQuery}
                 onChange={(e) => setTagQuery(e.target.value)}
-                onFocus={() => {
-                  // Scroll the sheet body to the bottom so the tagging section
-                  // sits at the top of the visible area. Wait out the keyboard
-                  // + sheet-resize transition first.
-                  const el = bodyRef.current;
-                  setTimeout(() => el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }), 300);
-                }}
+                onFocus={handleTagFocus}
+                onBlur={() => setTagFocused(false)}
                 placeholder="Tag someone…"
                 className={cn(inputClass, 'pl-10')}
               />
@@ -374,6 +383,12 @@ export function EncounterSheet({
               </div>
             )}
           </div>
+
+          {/* Reserves scroll room below the tag field so the one-time focus
+              scroll can lift the section up and leave space for results.
+              Sits below the results, so removing it on blur never shifts the
+              tappable result rows. */}
+          {tagFocused && <div aria-hidden className="shrink-0 h-72" />}
         </div>
 
         {/* Footer — inside the sheet so kb-aware-sheet keeps it above the keyboard. */}
