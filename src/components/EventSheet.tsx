@@ -29,7 +29,12 @@ interface EventSheetProps {
     endDate: string | null;
     personIds: string[];
   };
-  onClose: () => void;
+  /**
+   * Called when the sheet closes. On a fresh create it receives the new
+   * event's id so callers (e.g. the import bulk-add sheet) can auto-select
+   * it; on delete it receives `{ deleted: true }`. Mirrors CircleSheet.
+   */
+  onClose: (result?: { id: string } | { deleted: true }) => void;
   /**
    * Called after the Event was deleted (in addition to onClose). Lets the
    * parent unmount the surrounding detail page so we don't flash an
@@ -66,6 +71,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
   const handleSave = async () => {
     if (!canSave) return;
     try {
+      let createdId: string | null = null;
       if (isEdit && event) {
         await updateEvt.mutateAsync({
           id: event.id,
@@ -83,6 +89,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
           start_date: startDate || null,
           end_date: endDate || null,
         });
+        createdId = created.id;
         // Auto-add any suggested members the user kept in the chip list.
         if (suggestedMemberIds.length > 0) {
           // Apply per-person so we don't overwrite a person's existing events.
@@ -100,7 +107,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
           );
         }
       }
-      onClose();
+      onClose(createdId ? { id: createdId } : undefined);
     } catch (e: any) {
       toast.error(e.message || 'Could not save event');
     }
@@ -134,7 +141,7 @@ export function EventSheet({ event, suggestion, onClose, onDeleted }: EventSheet
       onDeleted?.();
       await deleteEvt.mutateAsync(event.id);
       setDeleteConfirmOpen(false);
-      onClose();
+      onClose({ deleted: true });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not delete this event';
       toast.error(msg);

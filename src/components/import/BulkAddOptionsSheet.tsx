@@ -160,7 +160,16 @@ export function BulkAddOptionsSheet({
       )}
       {createEventOpen && createPortal(
         <div className="relative z-[80]">
-          <EventSheet onClose={() => setCreateEventOpen(false)} />
+          <EventSheet
+            onClose={(result) => {
+              setCreateEventOpen(false);
+              // Auto-select the newly created event in the bulk picker so the
+              // people being added actually land in it — matches New Circle.
+              if (result && 'id' in result) {
+                setEventIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
+              }
+            }}
+          />
         </div>,
         document.body,
       )}

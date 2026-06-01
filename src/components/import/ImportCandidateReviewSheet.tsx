@@ -346,7 +346,16 @@ function SheetBody({
       )}
       {createEventOpen && createPortal(
         <div className="relative z-[80]">
-          <EventSheet onClose={() => setCreateEventOpen(false)} />
+          <EventSheet
+            onClose={(result) => {
+              setCreateEventOpen(false);
+              // Auto-select the freshly created event so this person actually
+              // lands in it on promote — matches the New Circle pill.
+              if (result && 'id' in result) {
+                setEventIds((cur) => (cur.includes(result.id) ? cur : [...cur, result.id]));
+              }
+            }}
+          />
         </div>,
         document.body,
       )}
