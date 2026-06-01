@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { CalendarDays, Check, Loader2, MapPin, NotebookPen, Search, UserPlus, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Loader2, MapPin, NotebookPen, Search, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
@@ -34,11 +34,29 @@ interface EncounterSheetProps {
   viewerPersonId: string;
   /** Present = edit an existing encounter; omit = create a new one. */
   meeting?: MeetingWithParticipants | null;
+  /** Optional owner name/photo to show in the header (e.g. when opened from
+   *  the global Log-encounter picker, where there's no profile context). */
+  ownerName?: string;
+  ownerPhoto?: string;
+  /** When set, a back chevron appears in the header (returns to a picker). */
+  onBack?: () => void;
+  /** Set false when a parent already holds the scroll lock, to avoid two
+   *  competing locks (useScrollLock isn't ref-counted). Defaults true. */
+  lockScroll?: boolean;
   onClose: () => void;
 }
 
-export function EncounterSheet({ ownerPersonId, viewerPersonId, meeting, onClose }: EncounterSheetProps) {
-  useScrollLock(true);
+export function EncounterSheet({
+  ownerPersonId,
+  viewerPersonId,
+  meeting,
+  ownerName,
+  ownerPhoto,
+  onBack,
+  lockScroll = true,
+  onClose,
+}: EncounterSheetProps) {
+  useScrollLock(lockScroll);
   const { data: people = [] } = usePersons();
   const createPerson = useCreatePerson();
   const createMeeting = useCreateMeeting();
@@ -152,6 +170,7 @@ export function EncounterSheet({ ownerPersonId, viewerPersonId, meeting, onClose
           await setParticipants.mutateAsync({ meetingId: created.id, participants });
         }
       }
+      toast.success(isEdit ? 'Encounter updated' : 'Encounter logged');
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save encounter');
@@ -168,10 +187,24 @@ export function EncounterSheet({ ownerPersonId, viewerPersonId, meeting, onClose
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0">
-          <h3 className="font-display text-xl text-foreground tracking-[-0.02em]">
-            {isEdit ? 'Edit encounter' : 'New encounter'}
-          </h3>
+        <div className="flex items-center gap-2 px-5 pt-4 pb-3 shrink-0">
+          {onBack && (
+            <button
+              onClick={onBack}
+              disabled={busy}
+              aria-label="Back"
+              className="w-9 h-9 -ml-1 rounded-md flex items-center justify-center hover:bg-[hsl(0_0%_100%/0.06)] text-muted-text disabled:opacity-50"
+            >
+              <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
+            </button>
+          )}
+          {ownerName && <PersonAvatar name={ownerName} photo={ownerPhoto} size="sm" />}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-display text-xl text-foreground tracking-[-0.02em] truncate">
+              {isEdit ? 'Edit encounter' : 'New encounter'}
+            </h3>
+            {ownerName && <p className="text-[12px] text-muted-text truncate">with {ownerName}</p>}
+          </div>
           <button
             onClick={onClose}
             disabled={busy}
