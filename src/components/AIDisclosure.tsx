@@ -24,6 +24,11 @@ const FEATURES = [
       "When you tap the wand on a photo, the image is sent to the model, which returns a short bulleted description you can edit or delete.",
   },
   {
+    title: "Voice notes",
+    detail:
+      "When you speak a note, the transcript — plus the names and notes of people you've already added, so it can tell who you mean — is sent to the model. It sorts the note into a new person or an encounter and fills in the fields, which you review before saving.",
+  },
+  {
     title: "Smart Import ranking",
     detail:
       "When you import people, their details (names, companies, titles, and any context from your files) and the goal you type are sent to the model. It scores how well each person matches and drafts a few factual notes you can edit before saving.",
