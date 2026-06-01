@@ -45,6 +45,7 @@ export function BulkAddOptionsSheet({
   if (!open) return null;
 
   return (
+    <>
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -132,11 +133,15 @@ export function BulkAddOptionsSheet({
           </button>
         </div>
       </motion.div>
+    </AnimatePresence>
 
       {/* Portal the create sheets to <body> at z-80 so they stack ABOVE
           this bulk sheet (z-71) — otherwise the bulk sheet sits on top and
           the keyboard covers the create sheet's name input. Portaling also
-          frees their position:fixed from this transformed motion.div. */}
+          frees their position:fixed from this transformed motion.div.
+          These MUST live OUTSIDE <AnimatePresence>: a bare createPortal as a
+          direct AnimatePresence child isn't reconciled as present, so the
+          create sheet never mounts (tapping the pill did nothing). */}
       {createCircleOpen && createPortal(
         <div className="relative z-[80]">
           <CircleSheet
@@ -159,6 +164,6 @@ export function BulkAddOptionsSheet({
         </div>,
         document.body,
       )}
-    </AnimatePresence>
+    </>
   );
 }
