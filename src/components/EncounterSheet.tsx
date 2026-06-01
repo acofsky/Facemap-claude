@@ -80,6 +80,7 @@ export function EncounterSheet({
   // attaching participants, remember the id so a retry re-applies the fields
   // and re-attaches instead of creating a second, duplicate meeting.
   const createdMeetingId = useRef<string | null>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   const taggedPersonIds = useMemo(
     () => new Set(tags.filter((t) => t.personId).map((t) => t.personId!)),
@@ -100,6 +101,14 @@ export function EncounterSheet({
   // Chips shown to the user — hide the viewer's own row (it stays in `tags`
   // so saving preserves their tag on a mirrored encounter).
   const visibleTags = tags.filter((t) => t.personId !== viewerPersonId);
+
+  // When editing a mirrored encounter from a profile that ISN'T the owner,
+  // the owner (stored on meetings.person_id, not in participants) is still
+  // "someone else who was there" from this viewer's point of view. Show them
+  // as a read-only chip so the sheet matches the card's "with X". It's not
+  // part of the editable tag set, so saving never rewrites ownership.
+  const ownerPerson =
+    ownerPersonId !== viewerPersonId ? people.find((p) => p.id === ownerPersonId) : undefined;
 
   // Offer "add as a name" when the typed text isn't an exact match we already
   // show or have tagged — so people not in Membr can still be attached.
@@ -269,8 +278,17 @@ export function EncounterSheet({
               <span className="font-normal normal-case tracking-normal text-muted-text/70">(optional)</span>
             </span>
 
-            {visibleTags.length > 0 && (
+            {(ownerPerson || visibleTags.length > 0) && (
               <div className="flex flex-wrap gap-1.5 mb-2">
+                {ownerPerson && (
+                  <span
+                    className="glass-pill inline-flex items-center gap-1.5 !h-8 !px-2.5 text-[12px] text-foreground"
+                    title="Logged this encounter"
+                  >
+                    <PersonAvatar name={ownerPerson.name} photo={ownerPerson.photos?.[0]} size="xs" />
+                    <span className="max-w-[120px] truncate">{ownerPerson.name}</span>
+                  </span>
+                )}
                 {visibleTags.map((t) => (
                   <span
                     key={t.key}
@@ -299,15 +317,26 @@ export function EncounterSheet({
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-text" strokeWidth={1.75} />
               <input
+                ref={tagInputRef}
                 value={tagQuery}
                 onChange={(e) => setTagQuery(e.target.value)}
+                onFocus={() => {
+                  // Lift the search field toward the top of the scrollable
+                  // body so the results list isn't trapped under the sticky
+                  // footer / keyboard. Wait out the keyboard + sheet-resize
+                  // transition before scrolling.
+                  setTimeout(
+                    () => tagInputRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
+                    300,
+                  );
+                }}
                 placeholder="Tag someone…"
                 className={cn(inputClass, 'pl-10')}
               />
             </div>
 
             {trimmedQuery.length > 0 && (
-              <div className="mt-1.5 glass rounded-xl overflow-hidden divide-y divide-[hsl(0_0%_100%/0.06)]">
+              <div className="mt-1.5 glass rounded-xl max-h-56 overflow-y-auto divide-y divide-[hsl(0_0%_100%/0.06)]">
                 {matches.map((p) => (
                   <button
                     key={p.id}
