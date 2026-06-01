@@ -23,6 +23,16 @@ const FEATURES = [
     detail:
       "When you tap the wand on a photo, the image is sent to the model, which returns a short bulleted description you can edit or delete.",
   },
+  {
+    title: "Smart Import ranking",
+    detail:
+      "When you import people, their details (names, companies, titles, and any context from your files) and the goal you type are sent to the model. It scores how well each person matches and drafts a few factual notes you can edit before saving.",
+  },
+  {
+    title: "Smart Import from photos",
+    detail:
+      "When you import from a photo — a name badge, business card, or group shot — the image is sent to the model, which reads the names written in it. It only reads visible text; it does not identify anyone by their face.",
+  },
 ];
 
 interface AIDisclosureProps {
@@ -104,7 +114,7 @@ export function AIDisclosure({ className }: AIDisclosureProps) {
 
                 <div className="overflow-y-auto px-5 pb-6 space-y-4">
                   <p className="text-sm text-foreground/90 leading-relaxed">
-                    Three features in Membr use a generative AI model from {AI_PROVIDER_LABEL}, called{" "}
+                    A few features in Membr use a generative AI model from {AI_PROVIDER_LABEL}, called{" "}
                     <span className="font-semibold">{AI_MODEL_LABEL}</span>. Everywhere else, the app
                     is just storing what you type.
                   </p>
