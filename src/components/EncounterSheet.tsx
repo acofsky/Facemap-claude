@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ArrowLeft, CalendarDays, Check, Loader2, MapPin, NotebookPen, Search, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -76,6 +76,10 @@ export function EncounterSheet({
   );
   const [tagQuery, setTagQuery] = useState('');
   const [promotingKey, setPromotingKey] = useState<string | null>(null);
+  // If a new-encounter save creates the meeting but then fails while
+  // attaching participants, remember the id so a retry re-applies the fields
+  // and re-attaches instead of creating a second, duplicate meeting.
+  const createdMeetingId = useRef<string | null>(null);
 
   const taggedPersonIds = useMemo(
     () => new Set(tags.filter((t) => t.personId).map((t) => t.personId!)),
@@ -152,13 +156,18 @@ export function EncounterSheet({
     const participants = tags.map((t) =>
       t.personId ? { personId: t.personId } : { externalName: t.externalName },
     );
+    const updates = { meeting_date: date, place: place.trim() || null, notes: notes.trim() || null };
     try {
+      // Resolve the meeting id, creating it only once. Editing an existing
+      // meeting, or retrying a save whose create already succeeded, both go
+      // through updateMeeting; only a genuinely new encounter inserts.
+      let meetingId: string;
       if (isEdit && meeting) {
-        await updateMeeting.mutateAsync({
-          id: meeting.id,
-          updates: { meeting_date: date, place: place.trim() || null, notes: notes.trim() || null },
-        });
-        await setParticipants.mutateAsync({ meetingId: meeting.id, participants });
+        meetingId = meeting.id;
+        await updateMeeting.mutateAsync({ id: meetingId, updates });
+      } else if (createdMeetingId.current) {
+        meetingId = createdMeetingId.current;
+        await updateMeeting.mutateAsync({ id: meetingId, updates });
       } else {
         const created = await createMeeting.mutateAsync({
           person_id: ownerPersonId,
@@ -166,10 +175,10 @@ export function EncounterSheet({
           place: place.trim() || undefined,
           notes: notes.trim() || undefined,
         });
-        if (participants.length > 0) {
-          await setParticipants.mutateAsync({ meetingId: created.id, participants });
-        }
+        meetingId = created.id;
+        createdMeetingId.current = created.id;
       }
+      await setParticipants.mutateAsync({ meetingId, participants });
       toast.success(isEdit ? 'Encounter updated' : 'Encounter logged');
       onClose();
     } catch (e) {

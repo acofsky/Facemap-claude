@@ -4,6 +4,7 @@ import { MapPin, Plus, Trash2, Users } from 'lucide-react';
 import { useMeetings, useDeleteMeeting, usePersons } from '@/hooks/use-data';
 import { BulletDisplay } from '@/components/BulletTextarea';
 import { EncounterSheet } from '@/components/EncounterSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { MeetingWithParticipants } from '@/lib/store';
 
 interface MeetingsSectionProps {
@@ -17,6 +18,8 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
 
   // null = closed; otherwise add (no meeting) or edit (a meeting).
   const [sheet, setSheet] = useState<{ meeting: MeetingWithParticipants | null } | null>(null);
+  // Id of the encounter pending delete confirmation (null = dialog closed).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
 
@@ -38,9 +41,13 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
     return names;
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (confirm('Delete this encounter?')) deleteMeeting.mutate(id);
+  const handleDelete = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      await deleteMeeting.mutateAsync(confirmDeleteId);
+    } finally {
+      setConfirmDeleteId(null);
+    }
   };
 
   return (
@@ -55,10 +62,11 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
         {meetings.map((m) => {
           const others = othersFor(m);
           return (
-            <button
+            <div
               key={m.id}
+              role="button"
               onClick={() => setSheet({ meeting: m })}
-              className="w-full text-left glass p-3.5 active:scale-[0.99] transition-transform"
+              className="glass p-3.5 active:scale-[0.99] transition-transform cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -84,17 +92,19 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
                   )}
                   {m.notes && <BulletDisplay value={m.notes} className="mt-1" />}
                 </div>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => handleDelete(e, m.id)}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteId(m.id);
+                  }}
                   aria-label="Delete encounter"
                   className="p-1 rounded-md text-muted-text hover:text-destructive transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
-                </span>
+                </button>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -117,6 +127,17 @@ export function MeetingsSection({ personId }: MeetingsSectionProps) {
           onClose={() => setSheet(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this encounter?"
+        description="This removes it for everyone tagged on it. This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMeeting.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }
