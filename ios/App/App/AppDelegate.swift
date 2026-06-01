@@ -106,3 +106,14 @@ public class ContactViewerPlugin: CAPPlugin, CAPBridgedPlugin, CNContactViewCont
         viewController.dismiss(animated: true)
     }
 }
+
+// MARK: - Bridge view controller
+//
+// App-defined plugins (vs. ones shipped as packages) aren't auto-discovered,
+// so we register ContactViewerPlugin here in capacitorDidLoad(). Main.storyboard
+// points its bridge view controller at this subclass.
+class MainViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(ContactViewerPlugin())
+    }
+}
