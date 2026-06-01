@@ -1,5 +1,7 @@
 import UIKit
 import Capacitor
+import Contacts
+import ContactsUI
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -46,4 +48,61 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+}
+
+// MARK: - ContactViewer plugin
+//
+// Presents the native contact card (CNContactViewController) for a linked
+// iPhone contact. iOS has no public URL scheme to open Contacts.app to a
+// specific person, so we show Apple's own contact UI inside Membr instead —
+// same view/edit experience as the Contacts app. Defined here (an already-
+// compiled file) and auto-registered via CAPBridgedPlugin, so no new Xcode
+// project files or registration boilerplate are needed.
+@objc(ContactViewerPlugin)
+public class ContactViewerPlugin: CAPPlugin, CAPBridgedPlugin, CNContactViewControllerDelegate {
+    public let identifier = "ContactViewerPlugin"
+    public let jsName = "ContactViewer"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "openContact", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func openContact(_ call: CAPPluginCall) {
+        guard let contactId = call.getString("contactId"), !contactId.isEmpty else {
+            call.reject("Missing contactId")
+            return
+        }
+        let store = CNContactStore()
+        let keys = [CNContactViewController.descriptorForRequiredKeys()]
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let contact = try store.unifiedContact(withIdentifier: contactId, keysToFetch: keys)
+                DispatchQueue.main.async {
+                    let vc = CNContactViewController(for: contact)
+                    vc.delegate = self
+                    vc.allowsEditing = true
+                    vc.allowsActions = true
+                    let nav = UINavigationController(rootViewController: vc)
+                    vc.navigationItem.leftBarButtonItem = UIBarButtonItem(
+                        barButtonSystemItem: .done,
+                        target: self,
+                        action: #selector(self.dismissContact)
+                    )
+                    self.bridge?.viewController?.present(nav, animated: true)
+                    call.resolve()
+                }
+            } catch {
+                DispatchQueue.main.async { call.reject("Contact not found") }
+            }
+        }
+    }
+
+    @objc func dismissContact() {
+        DispatchQueue.main.async {
+            self.bridge?.viewController?.presentedViewController?.dismiss(animated: true)
+        }
+    }
+
+    public func contactViewController(_ viewController: CNContactViewController, didCompleteWith contact: CNContact?) {
+        viewController.dismiss(animated: true)
+    }
 }

@@ -1,6 +1,13 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Contacts, type ContactPayload } from '@capacitor-community/contacts';
 import { getPhotoUrl } from '@/lib/store';
+
+// Tiny native plugin (defined in ios/App/App/AppDelegate.swift) that presents
+// the native contact card for a linked iPhone contact.
+interface ContactViewerPlugin {
+  openContact(options: { contactId: string }): Promise<void>;
+}
+const ContactViewer = registerPlugin<ContactViewerPlugin>('ContactViewer');
 
 /** True only inside the native iOS Capacitor build. */
 export function isNativeIOS(): boolean {
@@ -193,8 +200,13 @@ export async function createIOSContactFromPerson(p: PersonForExport): Promise<st
   return created?.contactId || null;
 }
 
-/** Open the iOS Contacts app to a specific contact id. No-op outside iOS. */
+/**
+ * Present the native iOS contact card for a linked contact id. iOS has no
+ * public URL scheme to open Contacts.app to a specific person, so this shows
+ * Apple's CNContactViewController inside Membr (same view/edit UI). No-op
+ * outside the native iOS build.
+ */
 export async function openIOSContact(contactId: string): Promise<void> {
   if (!isNativeIOS()) return;
-  window.location.href = `contacts://${contactId}`;
+  await ContactViewer.openContact({ contactId });
 }

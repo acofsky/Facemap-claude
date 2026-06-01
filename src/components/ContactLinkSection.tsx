@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Contact2, Link2Off, UserPlus, Loader2, Check, Sparkles } from 'lucide-react';
+import { Contact2, Link2Off, UserPlus, Loader2, Check, Sparkles, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   isNativeIOS,
   pickIOSContact,
   createIOSContactFromPerson,
+  openIOSContact,
   type PersonForExport,
 } from '@/lib/ios-contacts';
 import { useUpdatePerson } from '@/hooks/use-data';
@@ -95,6 +96,14 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
     toast.success('Unlinked');
   };
 
+  const handleOpen = async () => {
+    try {
+      await openIOSContact(iosContactId!);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not open contact');
+    }
+  };
+
   if (iosContactId) {
     return (
       <div className="glass p-4">
@@ -102,24 +111,35 @@ export function ContactLinkSection({ personId, person, iosContactId }: Props) {
           <Contact2 className="w-3.5 h-3.5" strokeWidth={1.75} />
           iPhone Contact
         </div>
-        {/* "Open in Contacts" used to live here, but iOS doesn't expose
-            a public URL scheme that opens Contacts.app to a specific
-            person — the link did nothing. Surface the linked state
-            instead and let the user open Contacts manually. */}
         <div className="flex items-center gap-2">
           <Check className="w-4 h-4 text-success shrink-0" strokeWidth={1.75} />
           <span className="text-[14px] text-foreground flex-1 min-w-0 truncate">
             Linked to your iPhone Contacts
           </span>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={handleOpen}
+            disabled={!native}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-[13px] font-medium text-foreground disabled:opacity-50 hover:border-[hsl(0_0%_100%/0.18)] transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.75} />
+            Open contact
+          </button>
           <button
             onClick={handleUnlink}
             aria-label="Unlink contact"
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-[12px] font-medium text-muted-text hover:border-[hsl(0_0%_100%/0.18)] hover:text-foreground transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md bg-surface-2 border border-[hsl(0_0%_100%/0.12)] text-[13px] font-medium text-muted-text hover:border-[hsl(0_0%_100%/0.18)] hover:text-foreground transition-colors"
           >
             <Link2Off className="w-3.5 h-3.5" strokeWidth={1.75} />
             Unlink
           </button>
         </div>
+        {!native && (
+          <p className="text-[11px] font-display-italic text-[hsl(var(--foreground)/0.65)] mt-2">
+            Opening the contact card works in the iPhone app.
+          </p>
+        )}
       </div>
     );
   }
