@@ -10,7 +10,13 @@ import type { Person } from '@/lib/store';
  * eagerly, especially when one of the two was older and the user was
  * just topping up a single new add):
  *   A. keyword:  ≥3 people in the last 48h share at least one signal term
- *   B. timing :  ≥4 people added in the last 24h regardless of overlap
+ *   B. timing :  ≥4 people added in the last 24h that ALSO share at least
+ *                one signal term across ≥2 of them. The shared term is both
+ *                what we name the Event after and the evidence it's a real
+ *                scene — without it, a contextless burst of adds (most often
+ *                a Smart Import of unrelated contacts, whose facts live in
+ *                Background/About, not how-we-met) would surface a
+ *                meaningless "New Event" the engine can't even name.
  *
  * Suggestions are de-duplicated against existing Events AND Circles
  * via fuzzy name matching at the hook layer (see use-smart-clusters),
@@ -104,15 +110,16 @@ export function detectClusters(people: Person[], opts: DetectOptions = {}): Smar
     clusters.push(buildCluster(cand.ids, cand.tokens, 'keyword', people));
   }
 
-  // --- Rule B: ≥MIN_TIMING_MEMBERS in 24h regardless of keyword overlap ---
+  // --- Rule B: ≥MIN_TIMING_MEMBERS in 24h, but only when ≥2 of them share a
+  // signal term — that term names the Event and proves it's a real scene
+  // rather than a contextless burst (e.g. a Smart Import). ---
   if (recent24.length >= MIN_TIMING_MEMBERS) {
-    const ids = recent24.map((p) => p.id);
-    // Only add if not already covered by a keyword cluster with the same set.
-    const already = clusters.some((c) => sameSet(c.personIds, ids));
-    if (!already) {
-      // Borrow tokens for naming if any exist across the group, else fall back.
-      const sharedTokens = mostCommonTokens(recent24);
-      clusters.push(buildCluster(ids, sharedTokens, 'timing', people));
+    const sharedTokens = tokensSharedByAtLeast(recent24, 2);
+    if (sharedTokens.length > 0) {
+      const ids = recent24.map((p) => p.id);
+      // Only add if not already covered by a keyword cluster with the same set.
+      const already = clusters.some((c) => sameSet(c.personIds, ids));
+      if (!already) clusters.push(buildCluster(ids, sharedTokens, 'timing', people));
     }
   }
 
@@ -176,10 +183,15 @@ function titleCase(s: string): string {
     .join(' ');
 }
 
-function mostCommonTokens(people: Person[]): string[] {
+/** Signal terms appearing in at least `minPeople` of the group, most-common
+ *  first. Used to both gate and name a timing cluster. */
+function tokensSharedByAtLeast(people: Person[], minPeople: number): string[] {
   const counts = new Map<string, number>();
   for (const p of people) for (const t of new Set(personSignals(p))) counts.set(t, (counts.get(t) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  return [...counts.entries()]
+    .filter(([, c]) => c >= minPeople)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t]) => t);
 }
 
 function sameSet(a: string[], b: string[]) {
