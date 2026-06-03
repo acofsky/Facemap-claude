@@ -42,6 +42,11 @@ export async function promoteCandidate(
   const person = await createPerson({
     name: overrides?.fieldOverrides?.name ?? (c.name || 'Unnamed'),
     photos: c.photo_path ? [c.photo_path] : [],
+    // Auto-link people imported from iOS Contacts to their source contact,
+    // so the Person detail page shows "Linked" + "Open contact" with no
+    // manual step. The id captured at import (raw.contact_id) is the same
+    // CNContact identifier the link/open native calls use.
+    ios_contact_id: iosContactIdFrom(c) ?? undefined,
     misc_notes: about,
     important_info: background,
     how_we_met: overrides?.fieldOverrides?.how_we_met ?? mapped.how_we_met ?? undefined,
@@ -89,7 +94,7 @@ export async function mergeCandidateIntoPerson(
   const mapped = (c.raw as { mapped_fields?: MappedPersonFields } | null)?.mapped_fields || {};
   const { data: existing, error: fetchErr } = await supabase
     .from('persons')
-    .select('misc_notes, important_info, photos, how_we_met, where_when, physical_description, known_people_notes')
+    .select('misc_notes, important_info, photos, how_we_met, where_when, physical_description, known_people_notes, ios_contact_id')
     .eq('id', personId)
     .single();
   if (fetchErr) throw fetchErr;
@@ -107,6 +112,10 @@ export async function mergeCandidateIntoPerson(
   fillIfEmpty('where_when', mapped.where_when);
   fillIfEmpty('physical_description', mapped.physical_description);
   fillIfEmpty('known_people_notes', mapped.known_people_notes);
+  // Auto-link to the source iPhone contact when merging an iOS Contacts
+  // candidate into someone not already linked. Never overwrite an existing
+  // link the user may have set deliberately.
+  fillIfEmpty('ios_contact_id', iosContactIdFrom(c));
   if (c.photo_path && (!existing?.photos || existing.photos.length === 0)) {
     updates.photos = [c.photo_path];
   }
@@ -153,6 +162,18 @@ export async function mergeCandidateIntoPerson(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * The source iPhone contact id for an import candidate, if it came from the
+ * iOS Contacts source and carries one. Only contacts-source rows have a
+ * usable CNContact identifier; other sources (LinkedIn, spreadsheet, photo)
+ * return undefined so nothing gets falsely linked.
+ */
+function iosContactIdFrom(c: ImportCandidateRow): string | undefined {
+  if (c.source !== 'contacts') return undefined;
+  const id = (c.raw as { contact_id?: unknown } | null)?.contact_id;
+  return typeof id === 'string' && id.trim() ? id : undefined;
+}
 
 /**
  * Strip the candidate's OWN name off the front of an AI bullet. The model
