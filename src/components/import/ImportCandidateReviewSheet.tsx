@@ -70,6 +70,12 @@ export function ImportCandidateReviewSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <SheetBody
+          // Key by candidate id so the body fully remounts when switching
+          // people. SheetBody seeds all its fields (including circle/event
+          // selections) from `candidate` via useState, which would otherwise
+          // persist a prior person's edits — and crucially their picked
+          // circles/events — into the next one reviewed.
+          key={candidate.id}
           candidate={candidate}
           matchedPersonId={matchedPersonId}
           busy={busy}

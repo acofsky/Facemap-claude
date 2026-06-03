@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, X } from 'lucide-react';
@@ -41,6 +41,20 @@ export function BulkAddOptionsSheet({
   const [eventIds, setEventIds] = useState<string[]>([]);
   const [createCircleOpen, setCreateCircleOpen] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
+
+  // The sheet stays mounted across opens (parent renders it unconditionally
+  // and just toggles `open`), so its selection state survives between
+  // batches. Reset every fresh open so each group of people starts with a
+  // clean slate — otherwise circles/events picked (or created) for an
+  // earlier batch stay selected and silently get applied to the next one.
+  useEffect(() => {
+    if (open) {
+      setCircleIds([]);
+      setEventIds([]);
+      setCreateCircleOpen(false);
+      setCreateEventOpen(false);
+    }
+  }, [open]);
 
   if (!open) return null;
 
