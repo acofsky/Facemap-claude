@@ -7,7 +7,7 @@ import { useScrollLock } from '@/hooks/use-scroll-lock';
 import { haptics } from '@/lib/haptics';
 import type { ImportCandidateRow as ImportCandidate, ImportSource } from '@/lib/import/types';
 import type { Person } from '@/lib/store';
-import { fetchPendingCandidates, dismissCandidate, dismissSelectedCandidates } from '@/lib/import/storage';
+import { fetchPendingCandidates, dismissCandidate, dismissSelectedCandidates, dismissAllPending } from '@/lib/import/storage';
 import { promoteCandidate, mergeCandidateIntoPerson } from '@/lib/import/promote';
 import { findMatchesAgainstPeople } from '@/lib/import/dedupe';
 import { usePersons } from '@/hooks/use-data';
@@ -247,21 +247,25 @@ export function PendingImportsSheet({ open, onClose }: PendingImportsSheetProps)
 
   // "Clear all" — dismiss every still-pending candidate in the drawer.
   const handleClearAll = async () => {
-    const ids = aliveCandidates.map((c) => c.id);
-    if (ids.length === 0) return;
-    if (!confirm(`Clear all ${ids.length} pending imports? They won't be added to People. You can re-run the import later to get them back.`)) {
+    const shownCount = aliveCandidates.length;
+    if (shownCount === 0) return;
+    if (!confirm(`Clear all ${shownCount} pending imports? They won't be added to People. You can re-run the import later to get them back.`)) {
       return;
     }
     haptics.medium();
     setBulkBusy(true);
     try {
-      await dismissSelectedCandidates(ids);
-      const idSet = new Set(ids);
-      setCandidates((cur) => cur.map((x) => (idSet.has(x.id) ? { ...x, dismissed: true } : x)));
+      // Single bulk UPDATE scoped by RLS — clears EVERY pending row, not
+      // just the ones loaded in the sheet, and needs no id list (so it can't
+      // hit the giant-URL failure that the old dismissSelectedCandidates path
+      // did at 1k+ rows). This is what actually makes Clear All work for a
+      // large import.
+      const cleared = await dismissAllPending();
+      setCandidates((cur) => cur.map((x) => ({ ...x, dismissed: true })));
       qc.invalidateQueries({ queryKey: ['import_candidates_pending'] });
       setSelectedIds(new Set());
       setSelectMode(false);
-      toast.success(`${ids.length} cleared`);
+      toast.success(`${cleared} cleared`);
     } catch {
       toast.error('Could not clear imports.');
     } finally {

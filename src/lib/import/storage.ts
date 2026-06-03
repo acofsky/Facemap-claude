@@ -82,21 +82,48 @@ export async function updateCandidateRanking(
   if (error) throw error;
 }
 
+// PostgREST (Supabase) caps every GET at a server-side `max-rows` ceiling —
+// 1000 by default. That ceiling is a hard upper bound: a client-side
+// `.limit(5000)` is silently clamped back to 1000, so a single select can
+// never return more than a page no matter what you ask for. The only way
+// past it is to walk the result in `.range()` pages. A user with a large
+// Contacts book (1k+) blows past one page easily; without paging the
+// pending sheet, the wizard review, and the re-import dedup all silently
+// truncate at 1000 — which is exactly what stranded ~470 of a 1.4k import.
+const PAGE_SIZE = 1000;
+
+/**
+ * Walk a PostgREST query in PAGE_SIZE-row pages until a short page signals
+ * the end, returning every row. `build` must apply `.range(from, to)` to a
+ * fresh query each call. Always include a deterministic tiebreaker in the
+ * query's ordering (e.g. a final `.order('id')`) so rows can't shuffle
+ * between page requests and get skipped or double-counted at a boundary.
+ */
+async function fetchAllPaged<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = data || [];
+    out.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
-  // Supabase's default fetch cap is 1000 rows. With users testing imports
-  // multiple times against large Contacts books, 1k is easy to exceed,
-  // and the truncated list would silently hide entries from the pending
-  // sheet (and from any bulk action that iterated client-side). Explicit
-  // higher limit; the API still pages further if needed.
-  const { data, error } = await supabase
-    .from('import_candidates')
-    .select('*')
-    .eq('promoted', false)
-    .eq('dismissed', false)
-    .order('ai_relevance_score', { ascending: false, nullsFirst: false })
-    .limit(5000);
-  if (error) throw error;
-  return data || [];
+  return fetchAllPaged<ImportCandidateRow>((from, to) =>
+    supabase
+      .from('import_candidates')
+      .select('*')
+      .eq('promoted', false)
+      .eq('dismissed', false)
+      .order('ai_relevance_score', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
 }
 
 /**
@@ -112,20 +139,32 @@ export async function fetchPendingCandidates(): Promise<ImportCandidateRow[]> {
  * doesn't lock anyone out forever.
  */
 export async function fetchKnownContactIds(): Promise<Set<string>> {
-  const [candResult, personResult] = await Promise.all([
-    supabase
-      .from('import_candidates')
-      .select('raw, promoted, promoted_person_id')
-      .eq('source', 'contacts')
-      .eq('dismissed', false),
-    supabase.from('persons').select('id'),
+  // Both sides paginate: a returning user can easily have 1k+ contact
+  // candidates AND 1k+ People, so a single un-paged select on either would
+  // hit the max-rows ceiling and wrongly treat the overflow as "unknown" —
+  // re-importing already-imported contacts as duplicates.
+  const [candRows, personRows] = await Promise.all([
+    fetchAllPaged<{ raw: unknown; promoted: boolean; promoted_person_id: string | null }>((from, to) =>
+      supabase
+        .from('import_candidates')
+        .select('raw, promoted, promoted_person_id')
+        .eq('source', 'contacts')
+        .eq('dismissed', false)
+        .order('id', { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPaged<{ id: string }>((from, to) =>
+      supabase
+        .from('persons')
+        .select('id')
+        .order('id', { ascending: true })
+        .range(from, to),
+    ),
   ]);
-  if (candResult.error) throw candResult.error;
-  if (personResult.error) throw personResult.error;
 
-  const livePersonIds = new Set((personResult.data || []).map((p) => p.id));
+  const livePersonIds = new Set(personRows.map((p) => p.id));
   const ids = new Set<string>();
-  for (const row of candResult.data || []) {
+  for (const row of candRows) {
     const cid = (row.raw as { contact_id?: unknown } | null)?.contact_id;
     if (typeof cid !== 'string' || !cid) continue;
 
@@ -146,13 +185,18 @@ export async function fetchKnownContactIds(): Promise<Set<string>> {
 }
 
 export async function fetchSessionCandidates(sessionId: string): Promise<ImportCandidateRow[]> {
-  const { data, error } = await supabase
-    .from('import_candidates')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('ai_relevance_score', { ascending: false, nullsFirst: false });
-  if (error) throw error;
-  return data || [];
+  // Paged — a single import of a large Contacts book is itself one session
+  // with 1k+ candidates, so the un-paged select used to truncate the wizard
+  // review at 1000 and make a 1.4k import *look* complete with no "xx left".
+  return fetchAllPaged<ImportCandidateRow>((from, to) =>
+    supabase
+      .from('import_candidates')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('ai_relevance_score', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
 }
 
 export async function markCandidatePromoted(
@@ -203,11 +247,19 @@ export async function dismissCandidate(candidateId: string): Promise<void> {
  */
 export async function dismissSelectedCandidates(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  const { error } = await supabase
-    .from('import_candidates')
-    .update({ dismissed: true })
-    .in('id', ids);
-  if (error) throw error;
+  // Chunk the id list. `.in('id', [...])` serializes every id into the
+  // request URL; at ~1k UUIDs that's a ~37KB query string that overflows
+  // the URL-length limit and fails the whole request. Splitting keeps each
+  // PATCH's URL well within bounds. (Clear-all uses dismissAllPending, which
+  // needs no id list at all — prefer that when dismissing everything.)
+  const CHUNK = 200;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { error } = await supabase
+      .from('import_candidates')
+      .update({ dismissed: true })
+      .in('id', ids.slice(i, i + CHUNK));
+    if (error) throw error;
+  }
 }
 
 /**

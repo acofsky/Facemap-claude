@@ -74,13 +74,24 @@ const CHUNK_RETRY_ATTEMPTS = 2;
 export async function rankCandidates(
   filterText: string,
   candidates: ImportCandidateRow[],
+  opts?: {
+    /** Fires as each chunk finishes scoring, with the running count of
+     *  candidates processed and the total. Lets the UI show a live
+     *  "Ranked X of N" counter instead of an indefinite spinner — a big
+     *  deal for 1k+ imports where ranking takes a couple of minutes. */
+    onProgress?: (done: number, total: number) => void;
+  },
 ): Promise<RankOutcome> {
+  const total = candidates.length;
   const chunks: ImportCandidateRow[][] = [];
   for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
     chunks.push(candidates.slice(i, i + CHUNK_SIZE));
   }
 
   const all: RankResponse['ranked'] = [];
+  // Candidates whose chunk has finished (counted once, on first success, so
+  // a retried chunk doesn't double-count toward the progress total).
+  let done = 0;
   // Track which chunks (by their candidate rows) still need scoring so we
   // can re-attempt just the failures rather than the whole batch.
   let pending = chunks;
@@ -100,6 +111,8 @@ export async function rankCandidates(
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled') {
           all.push(...r.value);
+          done += wave[idx].length;
+          opts?.onProgress?.(Math.min(done, total), total);
         } else {
           stillFailed.push(wave[idx]);
           console.warn('Rank chunk failed', attempt > 0 ? '(retry)' : '', r.reason);

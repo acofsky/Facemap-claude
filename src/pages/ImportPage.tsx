@@ -87,6 +87,9 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const [linkedInHowTo, setLinkedInHowTo] = useState(false);
   const [spreadsheetHowTo, setSpreadsheetHowTo] = useState(false);
   const [ranking, setRanking] = useState(false);
+  // Live ranking progress for the "Ranked X of N" counter. null while not
+  // ranking (or before the first chunk lands).
+  const [rankProgress, setRankProgress] = useState<{ done: number; total: number } | null>(null);
   const [candidates, setCandidates] = useState<ImportCandidateRow[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
@@ -267,6 +270,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       return;
     }
     setRanking(true);
+    setRankProgress(null);
     setShowLowScores(false);
     try {
       // Pre-flight token refresh. iOS WebView can let the access token
@@ -302,7 +306,10 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       let rankSucceeded = true;
       let unscored = 0;
       try {
-        const outcome = await rankCandidates(filterText, inserted);
+        setRankProgress({ done: 0, total: inserted.length });
+        const outcome = await rankCandidates(filterText, inserted, {
+          onProgress: (d, t) => setRankProgress({ done: d, total: t }),
+        });
         unscored = outcome.unscoredIds.length;
       } catch (rankErr) {
         console.warn('Ranking failed, falling back to insertion order', rankErr);
@@ -336,6 +343,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       toast.error(friendlyError(e, 'Could not start the import. Try again.'));
     } finally {
       setRanking(false);
+      setRankProgress(null);
     }
   };
 
@@ -629,6 +637,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
   const handleRetryRank = async () => {
     if (candidates.length === 0) return;
     setRanking(true);
+    setRankProgress(null);
     try {
       const sessionId = candidates[0]?.session_id;
       if (!sessionId) return;
@@ -641,7 +650,10 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
         ? alive
         : alive.filter((c) => c.ai_relevance_score == null);
       const target = toRank.length > 0 ? toRank : alive;
-      const outcome = await rankCandidates(filterText, target);
+      setRankProgress({ done: 0, total: target.length });
+      const outcome = await rankCandidates(filterText, target, {
+        onProgress: (d, t) => setRankProgress({ done: d, total: t }),
+      });
       const refreshed = await fetchSessionCandidates(sessionId);
       setCandidates(refreshed);
       setRankFailed(false);
@@ -657,6 +669,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
       console.warn('Retry rank failed', e);
     } finally {
       setRanking(false);
+      setRankProgress(null);
     }
   };
 
@@ -789,6 +802,7 @@ export function ImportPage({ onClose, onSelectPerson: _onSelectPerson }: ImportP
             onShowFileHowTo={() => setSpreadsheetHowTo(true)}
             onContinue={handleRankAndReview}
             ranking={ranking}
+            rankProgress={rankProgress}
           />
         )}
         {step === 'review' && (
@@ -1157,6 +1171,7 @@ function GatherStep({
   onShowFileHowTo,
   onContinue,
   ranking,
+  rankProgress,
 }: {
   selectedSources: Set<ImportSource>;
   completedSources: Set<ImportSource>;
@@ -1172,6 +1187,7 @@ function GatherStep({
   onShowFileHowTo: () => void;
   onContinue: () => void;
   ranking: boolean;
+  rankProgress: { done: number; total: number } | null;
 }) {
   // For each completed source, was it productive or did it yield zero new?
   // Used to swap the green "Done" pill for a muted "0 new" so the user
@@ -1278,7 +1294,9 @@ function GatherStep({
           {ranking ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Finding your best matches…
+              {rankProgress && rankProgress.total > 0
+                ? `Ranked ${rankProgress.done} of ${rankProgress.total}…`
+                : 'Finding your best matches…'}
             </>
           ) : draftsCount === 0 ? (
             'Pull from at least one source'
