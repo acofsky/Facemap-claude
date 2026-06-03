@@ -134,7 +134,7 @@ The user just spoke into their phone. The transcript is a casual, spoken account
 Your job:
 1. Decide whether this transcript is a NEW PERSON (no existing person referenced, or the person sounds new) or an ENCOUNTER with an existing person from the list below.
 2. Extract structured fields from the transcript.
-3. For encounters, if the transcript mentions something that meaningfully UPDATES the existing profile (new job, moved cities, changed status, contradicts an existing fact), surface it as a profile update suggestion. Only surface updates that are clearly stated in the transcript — never invent or extrapolate.
+3. For encounters, ONLY when the transcript states a durable, structural change to who this person is (see the strict test under profile_updates), surface it as a profile update suggestion. Episodic, one-off, or talking-point details do NOT belong in the profile — they stay in the encounter note. Never invent or extrapolate.
 
 Rules for matching to an existing person:
 - Match on name (case-insensitive, partial OK), nickname, or distinctive context ("Sarah from the Stanford mixer" matches a Sarah whose where_when mentions Stanford).
@@ -146,15 +146,30 @@ Rules for fields:
 - Use today's date (${today}) as the default for meeting_date and date_met when the user says "today", "just now", etc. Use ISO format YYYY-MM-DD.
 - where_when is short location/context ("Tribeca Rooftop", "Stanford alumni mixer"). place is the meeting location specifically.
 - how_we_met is a one-line phrase about the introduction ("sat next to each other at dinner").
-- important_info is durable profile info (their job, where they live, family, key background).
-- misc_notes is everything else worth remembering — interests, hobbies, mentioned topics.
-- notes (on encounter_fields) is what was discussed at this specific encounter.
+- important_info is DURABLE, structural profile info: their job/employer/title, where they live, family/relationship, education, long-term situation.
+- misc_notes is durable things worth remembering about WHO THEY ARE — stable interests, ongoing hobbies, values, lasting preferences. NOT one-off events or things they just happened to mention doing.
 - Only fill fields the transcript actually contains. Omit empty fields entirely.
 
-Rules for profile_updates (encounter mode only):
-- Only include if the transcript directly states new info that contradicts or extends an existing field.
+Rules for encounter_fields.notes (this is the log of THIS specific encounter — the most important output to get right):
+- Do NOT dump the transcript verbatim. Clean it up.
+- Distill it into concise, organized bullet points. Each bullet on its own line, starting with "• ".
+- Strip filler, false starts, self-corrections, and "um/like/you know". Keep the substance.
+- Group related points; one idea per bullet. Order from most to least useful for remembering this person later.
+- This is where ALL the episodic, conversational, talking-point detail goes: what they talked about, what they're up to lately, a trip they took, a project they mentioned, how they seemed. These make for great future-brief talking points and should live here, not in the profile.
+- Write in terse note style ("• Just back from a post-grad trip through SE Asia"), not full sentences echoing the user.
+
+Rules for profile_updates (encounter mode only) — BE CONSERVATIVE, default to proposing NOTHING:
+- A profile update is ONLY justified when the transcript states a durable, STRUCTURAL fact that changes who this person fundamentally is in the user's network and would still be true weeks or months from now.
+- Structural (DO propose): changed jobs / employer / title, got promoted, moved cities, got married/engaged/divorced, had a kid, started or finished a degree, a lasting role or status change, or a stable new interest that defines them.
+- Episodic / talking points (DO NOT propose — leave them in the encounter note instead): a recent trip or vacation, what they did last weekend, a one-off event, a passing opinion, a current mood, short-term plans, a movie/book they mentioned, anything that's "news from this conversation" rather than "a fact about them".
+- Litmus test: "Is this still a defining fact about them in 3 months, or was it just what was going on when we talked?" Only the former is a profile update.
+- Worked examples:
+  • "She just started as a PM at Google" → profile_update to important_info (structural job change).
+  • "He went on a post-grad trip to Europe" → NO profile update; goes in the encounter note as "• Did a post-grad trip through Europe".
+  • "They moved to Austin" → profile_update to important_info.
+  • "He's really into rock climbing these days" → NO profile update unless it's clearly a defining, lasting part of who they are; otherwise an encounter-note bullet.
 - current_value is what's currently in the existing profile (verbatim from the list below).
-- proposed_value is what the field should become after merging in the new info.
+- proposed_value is what the field should become after merging in the new info (keep the existing content, add the new fact).
 - reason is a short human-readable explanation ("she mentioned switching jobs to Anthropic").
 - Allowed fields: how_we_met, where_when, important_info, misc_notes.
 
@@ -221,12 +236,15 @@ ${transcript}`;
                   properties: {
                     meeting_date: { type: "string", description: "ISO YYYY-MM-DD." },
                     place: { type: "string" },
-                    notes: { type: "string" },
+                    notes: {
+                      type: "string",
+                      description: "The log of this encounter as CLEANED, ORGANIZED bullet points — never the verbatim transcript. Each bullet on its own line starting with '• '. Strip filler/false-starts, group related points, terse note style. All episodic/talking-point detail (trips, what they're up to, what was discussed) goes here, not in the profile.",
+                    },
                   },
                 },
                 profile_updates: {
                   type: "array",
-                  description: "Only for encounter mode. Profile fields that should change based on new info in the transcript.",
+                  description: "Only for encounter mode, and only for DURABLE STRUCTURAL changes (job/title/employer change, moved, family/relationship/education change, lasting status). Default to an EMPTY array. Episodic or one-off details (a recent trip, a passing mention, current plans) must NOT appear here — they belong in encounter_fields.notes.",
                   items: {
                     type: "object",
                     properties: {

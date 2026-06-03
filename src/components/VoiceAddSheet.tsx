@@ -455,12 +455,11 @@ export function VoiceAddSheet({ onClose }: VoiceAddSheetProps) {
                     />
                   </Field>
                   <Field label="Notes">
-                    <textarea
+                    <BulletTextarea
                       value={encounterNotes}
-                      onChange={(e) => setEncounterNotes(e.target.value)}
+                      onChange={setEncounterNotes}
                       placeholder="What did you talk about?"
                       rows={3}
-                      className={textareaClass}
                     />
                   </Field>
 
