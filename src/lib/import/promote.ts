@@ -47,6 +47,10 @@ export async function promoteCandidate(
     // manual step. The id captured at import (raw.contact_id) is the same
     // CNContact identifier the link/open native calls use.
     ios_contact_id: iosContactIdFrom(c) ?? undefined,
+    // Parallel auto-link for LinkedIn imports: the connections export carries
+    // each person's profile URL, so a promoted LinkedIn candidate lands
+    // already linked to their LinkedIn profile.
+    linkedin_url: linkedInUrlFrom(c) ?? undefined,
     misc_notes: about,
     important_info: background,
     how_we_met: overrides?.fieldOverrides?.how_we_met ?? mapped.how_we_met ?? undefined,
@@ -94,7 +98,7 @@ export async function mergeCandidateIntoPerson(
   const mapped = (c.raw as { mapped_fields?: MappedPersonFields } | null)?.mapped_fields || {};
   const { data: existing, error: fetchErr } = await supabase
     .from('persons')
-    .select('misc_notes, important_info, photos, how_we_met, where_when, physical_description, known_people_notes, ios_contact_id')
+    .select('misc_notes, important_info, photos, how_we_met, where_when, physical_description, known_people_notes, ios_contact_id, linkedin_url')
     .eq('id', personId)
     .single();
   if (fetchErr) throw fetchErr;
@@ -116,6 +120,8 @@ export async function mergeCandidateIntoPerson(
   // candidate into someone not already linked. Never overwrite an existing
   // link the user may have set deliberately.
   fillIfEmpty('ios_contact_id', iosContactIdFrom(c));
+  // Same for LinkedIn imports merged into an existing, unlinked person.
+  fillIfEmpty('linkedin_url', linkedInUrlFrom(c));
   if (c.photo_path && (!existing?.photos || existing.photos.length === 0)) {
     updates.photos = [c.photo_path];
   }
@@ -173,6 +179,17 @@ function iosContactIdFrom(c: ImportCandidateRow): string | undefined {
   if (c.source !== 'contacts') return undefined;
   const id = (c.raw as { contact_id?: unknown } | null)?.contact_id;
   return typeof id === 'string' && id.trim() ? id : undefined;
+}
+
+/**
+ * The LinkedIn profile URL for a candidate, if it came from the LinkedIn
+ * source and the export carried a URL. Other sources return undefined so
+ * nothing gets falsely linked.
+ */
+function linkedInUrlFrom(c: ImportCandidateRow): string | undefined {
+  if (c.source !== 'linkedin') return undefined;
+  const url = (c.raw as { linkedin_url?: unknown } | null)?.linkedin_url;
+  return typeof url === 'string' && url.trim() ? url.trim() : undefined;
 }
 
 /**

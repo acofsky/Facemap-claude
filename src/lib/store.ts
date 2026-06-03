@@ -75,6 +75,7 @@ export async function createPerson(input: Partial<{
   reminder_date: string;
   reminder_note: string;
   ios_contact_id: string;
+  linkedin_url: string;
 }>): Promise<Person> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -94,6 +95,7 @@ export async function createPerson(input: Partial<{
       reminder_date: input.reminder_date || null,
       reminder_note: input.reminder_note || null,
       ios_contact_id: input.ios_contact_id || null,
+      linkedin_url: input.linkedin_url || null,
     })
     .select()
     .single();

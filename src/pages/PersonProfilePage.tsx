@@ -11,6 +11,7 @@ import { MeetingBriefModal } from '@/components/MeetingBriefModal';
 import { AIBadge } from '@/components/AIBadge';
 import { BulletDisplay } from '@/components/BulletTextarea';
 import { ContactLinkSection } from '@/components/ContactLinkSection';
+import { LinkedInLinkSection } from '@/components/LinkedInLinkSection';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InfoModal } from '@/components/InfoModal';
 import { PersonMembershipsSheet } from '@/components/PersonMembershipsSheet';
@@ -204,25 +205,30 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
         </div>
       </div>
 
-      {/* iPhone Contact — sits directly below the action buttons so it's
-          visible without scrolling. The (i) opens a quick explainer. */}
+      {/* Links — iPhone Contact + LinkedIn. Sits directly below the action
+          buttons so it's visible without scrolling. The (i) opens a quick
+          explainer covering both. */}
       <div className="px-5 mb-3 flex items-center gap-1.5">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text">
-          iPhone Contact
+          Links
         </h2>
         <button
           onClick={() => setContactInfoOpen(true)}
-          aria-label="How iPhone Contact linking works"
+          aria-label="How linking works"
           className="text-muted-text active:scale-90 transition-transform"
         >
           <Info className="w-3.5 h-3.5" strokeWidth={1.75} />
         </button>
       </div>
-      <div className="px-5 mb-6">
+      <div className="px-5 mb-6 space-y-2">
         <ContactLinkSection
           personId={personId}
           person={person}
           iosContactId={iosContactId}
+        />
+        <LinkedInLinkSection
+          personId={personId}
+          linkedinUrl={person.linkedin_url ?? null}
         />
       </div>
 
@@ -409,20 +415,22 @@ export function PersonProfilePage({ personId, onBack, onSelectPerson }: PersonPr
 
       <InfoModal
         open={contactInfoOpen}
-        title="iPhone Contact"
+        title="Links"
         onClose={() => setContactInfoOpen(false)}
       >
         <p>
-          Linking ties this person to a card in your iPhone's Contacts app. You can
-          link an existing contact or create a new one.
+          Links tie this person to their card in other apps. People imported from
+          iPhone Contacts or a LinkedIn export get linked automatically.
         </p>
         <p>
-          When you create one, Membr fills in their name and photo, and scans your
-          notes for a phone number, email, or birthday to add too.
+          <strong>iPhone Contact</strong> — link an existing contact or create a new
+          one. Creating one fills in their name and photo, and scans your notes for a
+          phone number, email, or birthday. It's a one-time export; editing this
+          profile later won't change the contact, and unlinking never deletes anything.
         </p>
         <p>
-          It's a one-time export — editing this profile later won't change the
-          contact, and unlinking never deletes anything from Contacts.
+          <strong>LinkedIn</strong> — paste their profile URL to link it. Tapping Open
+          later routes to the LinkedIn app if you have it, otherwise Safari.
         </p>
       </InfoModal>
 

@@ -406,6 +406,7 @@ export type Database = {
           important_info: string | null
           ios_contact_id: string | null
           known_people_notes: string | null
+          linkedin_url: string | null
           misc_notes: string | null
           name: string
           photos: string[]
@@ -425,6 +426,7 @@ export type Database = {
           important_info?: string | null
           ios_contact_id?: string | null
           known_people_notes?: string | null
+          linkedin_url?: string | null
           misc_notes?: string | null
           name?: string
           photos?: string[]
@@ -444,6 +446,7 @@ export type Database = {
           important_info?: string | null
           ios_contact_id?: string | null
           known_people_notes?: string | null
+          linkedin_url?: string | null
           misc_notes?: string | null
           name?: string
           photos?: string[]
