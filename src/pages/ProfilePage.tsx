@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { openFeedback } from '@/lib/feedback';
 import { useOnboarded } from '@/hooks/use-onboarded';
 
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 const PRIVACY_POLICY_URL: string | null =
   'https://www.termsfeed.com/live/00f81b1d-cab0-4059-93ed-1103b7603d30';
 

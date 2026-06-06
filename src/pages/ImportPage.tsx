@@ -43,7 +43,7 @@ type TopN = (typeof TOP_N_OPTIONS)[number];
 const DEFAULT_TOP_N: TopN = 20;
 // Tag feedback submissions with the app version for triage. Mirrors the
 // constant in ProfilePage; keep them in sync on release bumps.
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 /** Candidates scoring below this with a filter set count as "no close matches". */
 const NO_MATCH_THRESHOLD = 0.35;
 /**
