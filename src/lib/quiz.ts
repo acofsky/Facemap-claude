@@ -113,8 +113,46 @@ function distractorNames(subject: Person, pool: Person[]): string[] {
   return shuffle(pool.filter((p) => p.id !== subject.id).map((p) => p.name)).slice(0, 3);
 }
 
+/**
+ * Pull quiz-worthy fact lines out of a person's About/Background. Most of what
+ * the user records lives here as bullets, so without this the fallback has
+ * almost nothing to ask about. We drop provenance/contact lines and anything
+ * that names the person (which would give the answer away).
+ */
+function factsFor(p: Person): string[] {
+  const blob = [p.misc_notes, p.important_info].filter(Boolean).join('\n');
+  const firstName = (p.name || '').trim().split(/\s+/)[0]?.toLowerCase() || '';
+  return blob
+    .split('\n')
+    .map((l) => l.replace(/^\s*[•\-*]\s*/, '').trim())
+    .filter(Boolean)
+    .filter((l) => !/^(imported from|email:|phone:|url:|birthday:|linked(in)?\b)/i.test(l))
+    .filter((l) => l.length >= 6 && l.length <= 120)
+    .filter((l) => !(firstName && l.toLowerCase().includes(firstName)));
+}
+
 function localQuiz(members: Person[]): QuizQuestion[] {
   const out: QuizQuestion[] = [];
+
+  // "Who does this describe?" from About/Background bullets — the richest
+  // source for most people. Up to 2 facts each so one chatty profile doesn't
+  // dominate the quiz.
+  for (const m of members) {
+    const facts = shuffle(factsFor(m)).slice(0, 2);
+    for (const fact of facts) {
+      const names = distractorNames(m, members);
+      if (names.length < 3) continue;
+      out.push({
+        id: nextId(),
+        type: 'fact_to_person',
+        personId: m.id,
+        prompt: `Who does this describe? “${fact}”`,
+        options: shuffle([m.name, ...names]),
+        answer: m.name,
+        explanation: m.name,
+      });
+    }
+  }
 
   // Photo → name for everyone with a photo.
   for (const m of members) {
