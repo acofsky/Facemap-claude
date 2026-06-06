@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Sparkles, Brain } from 'lucide-react';
+import { MIN_QUIZ_MEMBERS } from '@/lib/quiz';
 import {
   useEvents, usePersons, usePersonEvents, useSetPersonEvents,
 } from '@/hooks/use-data';
@@ -19,6 +20,7 @@ interface EventDetailPageProps {
   eventId: string;
   onBack: () => void;
   onSelectPerson: (id: string) => void;
+  onStartQuiz: () => void;
 }
 
 const SURFACE3_DISMISSED_PREFIX = 'membr_evt_s3_dismissed:';
@@ -32,7 +34,7 @@ function dismissSurface3(eventId: string) {
   window.localStorage.setItem(SURFACE3_DISMISSED_PREFIX + eventId, '1');
 }
 
-export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetailPageProps) {
+export function EventDetailPage({ eventId, onBack, onSelectPerson, onStartQuiz }: EventDetailPageProps) {
   const { data: events = [], isLoading: eventsLoading } = useEvents({ includeArchived: true });
   const { data: people = [] } = usePersons();
   const { data: personEvents = [] } = usePersonEvents();
@@ -167,6 +169,20 @@ export function EventDetailPage({ eventId, onBack, onSelectPerson }: EventDetail
           </p>
         )}
       </div>
+
+      {/* Quiz — learn/retain everyone at this event. Hidden until there are
+          enough people to build 4-option multiple choice. */}
+      {members.length >= MIN_QUIZ_MEMBERS && (
+        <div className="px-5 -mt-3 mb-6">
+          <button
+            onClick={onStartQuiz}
+            className="w-full glass-pill h-12 inline-flex items-center justify-center gap-2 text-[14px] font-medium text-foreground active:scale-[0.98] transition-transform"
+          >
+            <Brain className="w-4 h-4 text-primary" strokeWidth={1.75} />
+            Quiz me on these {members.length}
+          </button>
+        </div>
+      )}
 
       {/* Smart Circle Surface 3 — suggestions card at the top of the member list */}
       {surface3People.length > 0 && (

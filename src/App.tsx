@@ -98,7 +98,7 @@ function useAuthDeepLink(onRecovery: () => void) {
 // long enough that the isolates may have shut down. Each ping is
 // fire-and-forget and short-circuits inside the function (no Anthropic
 // call), so this is cheap.
-const AI_FUNCTIONS = ['describe-from-photo', 'meeting-brief', 'recall-search', 'parse-voice-input', 'rank-import-candidates'];
+const AI_FUNCTIONS = ['describe-from-photo', 'meeting-brief', 'recall-search', 'parse-voice-input', 'rank-import-candidates', 'generate-quiz'];
 const PREWARM_COOLDOWN_MS = 5 * 60 * 1000;
 let lastPrewarmAt = 0;
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, UserMinus, ChevronRight, Trash2, Loader2, Brain } from 'lucide-react';
+import { MIN_QUIZ_MEMBERS } from '@/lib/quiz';
 import {
   useCircles, usePersons, usePersonCircles, useAddPersonToCircle, useRemovePersonFromCircle,
   useDeleteCircle,
@@ -21,6 +22,7 @@ interface CircleDetailPageProps {
   circleId: string;
   onBack: () => void;
   onSelectPerson: (id: string) => void;
+  onStartQuiz: () => void;
 }
 
 function fallbackTone(id: string): Tone {
@@ -29,7 +31,7 @@ function fallbackTone(id: string): Tone {
   return TONES[hash % TONES.length];
 }
 
-export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDetailPageProps) {
+export function CircleDetailPage({ circleId, onBack, onSelectPerson, onStartQuiz }: CircleDetailPageProps) {
   const { data: circles = [], isLoading: circlesLoading } = useCircles();
   const { data: people = [] } = usePersons();
   const { data: personCircles = [] } = usePersonCircles();
@@ -122,6 +124,20 @@ export function CircleDetailPage({ circleId, onBack, onSelectPerson }: CircleDet
           </div>
         </div>
       </div>
+
+      {/* Quiz — learn/retain everyone in this circle. Hidden until there are
+          enough people to build 4-option multiple choice. */}
+      {members.length >= MIN_QUIZ_MEMBERS && (
+        <div className="px-5 -mt-3 mb-6">
+          <button
+            onClick={onStartQuiz}
+            className="w-full glass-pill h-12 inline-flex items-center justify-center gap-2 text-[14px] font-medium text-foreground active:scale-[0.98] transition-transform"
+          >
+            <Brain className="w-4 h-4 text-primary" strokeWidth={1.75} />
+            Quiz me on these {members.length}
+          </button>
+        </div>
+      )}
 
       {/* Members list */}
       <div className="flex items-center justify-between px-5 mb-3">

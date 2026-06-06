@@ -9,6 +9,7 @@ import { ProfilePage } from './ProfilePage';
 import { PersonProfilePage } from './PersonProfilePage';
 import { CircleDetailPage } from './CircleDetailPage';
 import { EventDetailPage } from './EventDetailPage';
+import { QuizPage } from './QuizPage';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { ImportPage } from './ImportPage';
 import { WhatsNewPopup, WHATS_NEW_VERSION, WHATS_NEW_SEEN_KEY } from '@/components/WhatsNewPopup';
@@ -20,6 +21,9 @@ const Index = () => {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  // When set, a full-screen group quiz overlays the (still-selected) circle
+  // or event, so backing out of the quiz returns to that detail page.
+  const [quizGroup, setQuizGroup] = useState<{ kind: 'circle' | 'event'; id: string } | null>(null);
   const [eodSheetOpen, setEodSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
@@ -65,6 +69,7 @@ const Index = () => {
         setSelectedPersonId(null);
         setSelectedCircleId(null);
         setSelectedEventId(null);
+        setQuizGroup(null);
         setActiveTab('home');
         setEodSheetOpen(true);
       }
@@ -74,6 +79,22 @@ const Index = () => {
 
 
   // Detail pages are exclusive — fullscreen overlays that suspend the tab UI.
+  if (quizGroup) {
+    return (
+      <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
+        <QuizPage
+          group={quizGroup}
+          onBack={() => setQuizGroup(null)}
+          onSelectPerson={(id) => {
+            setQuizGroup(null);
+            setSelectedCircleId(null);
+            setSelectedEventId(null);
+            setSelectedPersonId(id);
+          }}
+        />
+      </div>
+    );
+  }
   if (selectedPersonId) {
     return (
       <div className="ambient-backdrop max-w-md mx-auto min-h-[100dvh] relative overflow-hidden">
@@ -113,6 +134,7 @@ const Index = () => {
             setSelectedCircleId(null);
             setSelectedPersonId(id);
           }}
+          onStartQuiz={() => setQuizGroup({ kind: 'circle', id: selectedCircleId })}
         />
       </div>
     );
@@ -136,6 +158,7 @@ const Index = () => {
             setSelectedEventId(null);
             setSelectedPersonId(id);
           }}
+          onStartQuiz={() => setQuizGroup({ kind: 'event', id: selectedEventId })}
         />
       </div>
     );
