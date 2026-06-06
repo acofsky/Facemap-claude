@@ -303,6 +303,15 @@ function ResultsScreen({
         <p className="text-[14px] font-display-italic text-[hsl(var(--foreground)/0.7)] mt-2">{headline}</p>
       </div>
 
+      {/* Be honest when the notes only supported a short quiz instead of
+          padding it out with vague, multi-answer questions. */}
+      {total < 6 && (
+        <p className="text-[12px] text-muted-text text-center -mt-3 mb-6 px-3 leading-relaxed">
+          Short quiz — that's all these notes could fairly cover. Add a few details
+          (where you met, what they do) to unlock more questions.
+        </p>
+      )}
+
       {missed.length > 0 && (
         <>
           <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-text mb-3 px-1">

@@ -81,7 +81,7 @@ export async function generateQuiz(group: QuizGroup, members: Person[]): Promise
     console.warn('AI quiz generation failed, using local fallback', e);
   }
 
-  return localQuiz(usable);
+  return localQuiz(usable, group.name);
 }
 
 function toQuestion(q: RawQuestion, members: Person[]): QuizQuestion | null {
@@ -103,14 +103,41 @@ function toQuestion(q: RawQuestion, members: Person[]): QuizQuestion | null {
 }
 
 // ---------------------------------------------------------------------------
-// On-device fallback. Deliberately simple: only the question types that can be
-// built reliably from single-line fields without language understanding —
-// photo→name, where-you-met, and how-you-met. The AI path covers the richer
-// "who went to Columbia"-style questions.
+// On-device fallback (used until generate-quiz is deployed, or when offline).
+// Builds "who does this describe?" from distinctive About/Background bullets,
+// plus photo→name, where-you-met, and how-you-met. Crucially it only asks
+// about facts that single one person out — it would rather make a SHORT quiz
+// than a question several people could answer. The AI path produces richer,
+// better-phrased questions.
 // ---------------------------------------------------------------------------
 
 function distractorNames(subject: Person, pool: Person[]): string[] {
   return shuffle(pool.filter((p) => p.id !== subject.id).map((p) => p.name)).slice(0, 3);
+}
+
+// Words too common to carry meaning when comparing whether two facts describe
+// the same thing. The group name's own words are added at runtime — in an
+// "A&M" circle, "A&M" and "intern" describe half the members, so a fact built
+// only from those isn't distinctive enough to ask "who is this?" about.
+const STOPWORDS = new Set([
+  'with', 'me', 'the', 'a', 'an', 'at', 'in', 'of', 'and', 'to', 'my', 'i',
+  'we', 'for', 'on', 'is', 'was', 'our', 'us', 'they', 'them', 'he', 'she',
+  'his', 'her', 'as', 'by', 'from', 'that', 'this', 'it', '&', 'who', 'are',
+]);
+
+function sigTokens(s: string, extraStop: Set<string>): Set<string> {
+  return new Set(
+    s.toLowerCase().split(/\s+/)
+      .map((t) => t.replace(/^[^a-z0-9&]+|[^a-z0-9&]+$/g, ''))
+      .filter((t) => t.length >= 2 && !STOPWORDS.has(t) && !extraStop.has(t)),
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter++;
+  return inter / (a.size + b.size - inter);
 }
 
 /**
@@ -131,22 +158,51 @@ function factsFor(p: Person): string[] {
     .filter((l) => !(firstName && l.toLowerCase().includes(firstName)));
 }
 
-function localQuiz(members: Person[]): QuizQuestion[] {
+function localQuiz(members: Person[], groupName = ''): QuizQuestion[] {
   const out: QuizQuestion[] = [];
 
-  // "Who does this describe?" from About/Background bullets — the richest
-  // source for most people. Up to 2 facts each so one chatty profile doesn't
-  // dominate the quiz.
-  for (const m of members) {
-    const facts = shuffle(factsFor(m)).slice(0, 2);
-    for (const fact of facts) {
+  // The group name's words are group-wide noise (every "A&M" member is an
+  // "A&M intern"), so strip them before judging whether a fact is distinctive.
+  const groupStop = new Set(
+    groupName.toLowerCase().split(/\s+/)
+      .map((t) => t.replace(/^[^a-z0-9&]+|[^a-z0-9&]+$/g, ''))
+      .filter(Boolean),
+  );
+
+  // Pre-tokenize every member's facts so we can tell distinctive facts ("went
+  // to Columbia" — one person) from shared ones ("A&M intern with me" — half
+  // the circle). Only distinctive facts make fair "who is this?" questions.
+  const memberFacts = members.map((m) => ({
+    m,
+    facts: factsFor(m).map((text) => ({ text, tokens: sigTokens(text, groupStop) })),
+  }));
+
+  const isDistinctive = (subjectId: string, tokens: Set<string>): boolean => {
+    if (tokens.size === 0) return false; // nothing left after stripping noise
+    for (const other of memberFacts) {
+      if (other.m.id === subjectId) continue;
+      for (const f of other.facts) {
+        // High token overlap with another member's fact → ambiguous, skip.
+        if (jaccard(tokens, f.tokens) >= 0.5) return false;
+      }
+    }
+    return true;
+  };
+
+  // "Who does this describe?" from distinctive About/Background bullets only.
+  // Up to 2 facts each so one chatty profile doesn't dominate. If a person has
+  // no fact unique to them, we simply ask nothing about them rather than
+  // forcing a question multiple people could answer.
+  for (const { m, facts } of memberFacts) {
+    const distinctive = shuffle(facts.filter((f) => isDistinctive(m.id, f.tokens))).slice(0, 2);
+    for (const f of distinctive) {
       const names = distractorNames(m, members);
       if (names.length < 3) continue;
       out.push({
         id: nextId(),
         type: 'fact_to_person',
         personId: m.id,
-        prompt: `Who does this describe? “${fact}”`,
+        prompt: `Who does this describe? “${f.text}”`,
         options: shuffle([m.name, ...names]),
         answer: m.name,
         explanation: m.name,
